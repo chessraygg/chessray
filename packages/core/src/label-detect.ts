@@ -5,7 +5,8 @@
  * Call detectLabels(pixels) — it handles everything internally.
  */
 
-import type { PixelBuffer, OrientationResult } from './image-utils.js';
+import type { PixelBuffer } from './pixel-utils.js';
+import type { OrientationResult } from './orientation.js';
 import Tesseract from 'tesseract.js';
 
 let worker: Tesseract.Worker | null = null;

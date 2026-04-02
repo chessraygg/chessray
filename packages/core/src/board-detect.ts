@@ -1,5 +1,6 @@
 import type { BoardBBox } from './types.js';
-import { refineBbox, type PixelBuffer } from './image-utils.js';
+import { refineBbox } from './bbox-refine.js';
+import type { PixelBuffer } from './pixel-utils.js';
 
 export interface BoardDetectionResult {
   found: boolean;

@@ -1,5 +1,5 @@
 import type { PipelineResult, EvalResult, ArrowDescriptor, BoardBBox } from './types.js';
-import type { PixelBuffer } from './image-utils.js';
+import type { PixelBuffer } from './pixel-utils.js';
 import type { BoardDetectionResult } from './board-detect.js';
 import type { RecognitionResult } from './types.js';
 import { computeArrows } from './arrows.js';

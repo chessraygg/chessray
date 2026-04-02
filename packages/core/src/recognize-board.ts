@@ -1,6 +1,7 @@
 import type { RecognitionResult } from './types.js';
-import type { PixelBuffer, OrientationSource } from './image-utils.js';
-import { detectHighlightedSquares, disambiguateHighlights, turnFromHighlight, detectBoardFlipped } from './image-utils.js';
+import type { PixelBuffer } from './pixel-utils.js';
+import { detectHighlightedSquares, disambiguateHighlights, turnFromHighlight } from './highlight.js';
+import { detectBoardFlipped, type OrientationSource } from './orientation.js';
 import { flipFen, buildFullFen } from './fen.js';
 import { detectLabels } from './label-detect.js';
 
