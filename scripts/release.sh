@@ -1,18 +1,26 @@
 #!/usr/bin/env bash
 #
-# Usage:
-#   ./scripts/release.sh patch    # 0.1.0 → 0.1.1
-#   ./scripts/release.sh minor    # 0.1.0 → 0.2.0
-#   ./scripts/release.sh major    # 0.1.0 → 1.0.0
-#   ./scripts/release.sh 2.1.0   # explicit version
+# LOCAL OVERRIDE — for manual releases outside the normal PR flow.
 #
-# Bumps version in all package.json files, commits, tags, and pushes.
-# The CI workflow picks up the tag and creates a GitHub Release with binaries.
+# Normal flow: merge a PR into main with a "major", "minor", or "patch" label.
+#              CI auto-bumps version, tags, builds, and creates a GitHub Release.
+#
+# This script is for exceptional cases only (e.g., hotfix from local).
+#
+# Usage:
+#   ./scripts/release.sh patch    # 0.2.0 → 0.2.1
+#   ./scripts/release.sh minor    # 0.2.0 → 0.3.0
+#   ./scripts/release.sh major    # 0.2.0 → 1.0.0
+#   ./scripts/release.sh 2.1.0   # explicit version
 
 set -euo pipefail
 
 if [ $# -ne 1 ]; then
   echo "Usage: $0 <patch|minor|major|x.y.z>"
+  echo ""
+  echo "NOTE: The normal release flow is automatic — merge a PR with a"
+  echo "      'major', 'minor', or 'patch' label. Use this script only"
+  echo "      for exceptional manual releases."
   exit 1
 fi
 
