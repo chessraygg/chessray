@@ -12,3 +12,4 @@ test/e2e/output/
 test-results/
 .test-profile/
 .test-profile-live/
+*.traineddata
