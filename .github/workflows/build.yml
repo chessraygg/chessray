@@ -10,6 +10,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
@@ -50,11 +51,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Collect only the actual distributable files (DMG, EXE, DEB, ZIP)
+      # into a flat directory for clean artifact upload.
+      - name: Collect release assets
+        shell: bash
+        run: |
+          mkdir -p dist
+          find packages/electron/out/make -type f \
+            \( -name '*.dmg' -o -name '*.exe' -o -name '*.nupkg' \
+               -o -name '*.deb' -o -name '*.zip' -o -name '*.msi' \) \
+            -exec cp {} dist/ \;
+          echo "Release assets:"
+          ls -lh dist/
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: chessray-${{ matrix.platform }}-${{ matrix.arch }}
-          path: packages/electron/out/make/**/*
+          path: dist/*
           if-no-files-found: error
 
   release:
@@ -64,12 +78,35 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
+
+      - name: List release assets
+        run: find artifacts -type f | sort
+
+      - name: Determine pre-release
+        id: prerelease
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # 0.x.x versions are pre-release
+          if [[ "$VERSION" == 0.* ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: ChessRay v${{ steps.version.outputs.version }}
           files: artifacts/**/*
           generate_release_notes: true
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease == 'true' }}

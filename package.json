@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "test:e2e": "npx playwright test",
     "setup": "node scripts/download-vendor.js",
-    "gen-expected": "tsx scripts/gen-expected-images.ts"
+    "gen-expected": "tsx scripts/gen-expected-images.ts",
+    "release": "bash scripts/release.sh"
   },
   "dependencies": {
     "onnxruntime-node": "^1.24.3"
