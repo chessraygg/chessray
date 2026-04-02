@@ -1,6 +1,6 @@
 {
   "name": "chessray",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "license": "GPL-3.0-or-later",
   "repository": {
@@ -8,7 +8,9 @@
     "url": "https://github.com/chessraygg/chessray.git"
   },
   "description": "Electron app for real-time chess position recognition and evaluation from video",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "vitest run",
