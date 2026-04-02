@@ -1,0 +1,27 @@
+{
+  "name": "@chessray/electron",
+  "version": "0.1.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "description": "Desktop app for real-time chess position recognition and evaluation from any screen/window",
+  "main": ".vite/build/main.js",
+  "scripts": {
+    "start": "electron-forge start",
+    "build": "electron-forge make",
+    "package": "electron-forge package",
+    "install-app": "node scripts/kill-app.js && electron-forge package && node scripts/install-app.js"
+  },
+  "dependencies": {
+    "@chessray/core": "*"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.8.0",
+    "@electron-forge/maker-deb": "^7.11.1",
+    "@electron-forge/maker-dmg": "^7.11.1",
+    "@electron-forge/maker-squirrel": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.8.0",
+    "@electron-forge/plugin-vite": "^7.8.0",
+    "electron": "^35.0.0",
+    "vite": "^6.0.0"
+  }
+}

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ChessRay Analysis</title>
+  <style>
+    body { margin: 0; background: #1a1a2e; color: #e0e0e0; font-family: system-ui, sans-serif; }
+    canvas { display: none; }
+
+    /* Source picker UI (shown when hash is #picker) */
+    .picker { display: none; padding: 20px; }
+    .picker.active { display: block; }
+    .picker h1 { font-size: 18px; margin: 0 0 16px; color: #22c55e; }
+    .picker .sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    .picker .source {
+      background: #2a2a3e;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      padding: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .picker .source:hover { border-color: #22c55e; }
+    .picker .source img { width: 100%; border-radius: 4px; }
+    .picker .source .name { margin-top: 6px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .picker .loading { color: #9ca3af; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <canvas id="capture-canvas"></canvas>
+
+  <div class="picker" id="picker">
+    <h1>Select a screen or window to analyze</h1>
+    <div class="loading" id="picker-loading">Loading sources...</div>
+    <div class="sources" id="picker-sources"></div>
+  </div>
+
+  <script>
+    // Signal to main process that the renderer window is loaded.
+    // The analysis module may still be loading via Vite, but the preload
+    // API is available immediately. Main will retry start-capture until
+    // the module's IPC listener is registered.
+    if (window.chessRay) window.chessRay.sendRendererReady();
+  </script>
+  <script type="module" src="./analysis.ts"></script>
+</body>
+</html>

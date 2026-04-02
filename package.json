@@ -1,0 +1,31 @@
+{
+  "name": "chessray",
+  "version": "0.1.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chessraygg/chessray.git"
+  },
+  "description": "Electron app for real-time chess position recognition and evaluation from video",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "npx playwright test",
+    "setup": "node scripts/download-vendor.js",
+    "gen-expected": "tsx scripts/gen-expected-images.ts"
+  },
+  "dependencies": {
+    "onnxruntime-node": "^1.24.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^22.0.0",
+    "pngjs": "^7.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.js.map
+.env
+.DS_Store
+.claude/
+.vite/
+vendor/stockfish/
+vendor/onnxruntime-web/
+test/output/
+test/e2e/output/
+test-results/
+.test-profile/
+.test-profile-live/

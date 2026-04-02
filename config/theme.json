@@ -1,0 +1,56 @@
+{
+  "colors": {
+    "bg": "#0f0f0f",
+    "surface": "#171717",
+    "surfaceHover": "#1f1f1f",
+    "border": "#272727",
+    "borderSubtle": "#1f1f1f",
+    "textPrimary": "#e5e5e5",
+    "textSecondary": "#9ca3af",
+    "textMuted": "#6b7280",
+    "activeBar": "#9ca3af",
+    "activeBg": "#1f1f1f",
+    "error": "#ef4444",
+    "success": "#22c55e",
+    "accent": "#6366f1"
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24
+  },
+  "radius": {
+    "xs": 3,
+    "sm": 4,
+    "md": 8,
+    "lg": 12
+  },
+  "font": {
+    "xs": 10,
+    "sm": 11,
+    "md": 12,
+    "base": 13,
+    "lg": 15
+  },
+  "fontFamily": {
+    "sans": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif",
+    "mono": "ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace"
+  },
+  "fontWeight": {
+    "normal": 400,
+    "medium": 500,
+    "semibold": 600
+  },
+  "transition": {
+    "fast": "0.1s ease",
+    "normal": "0.15s ease",
+    "slow": "0.2s ease"
+  },
+  "brand": {
+    "letter": "d",
+    "bgColor": "#171717",
+    "textColor": "#e5e5e5"
+  }
+}
