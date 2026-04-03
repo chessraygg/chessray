@@ -18,7 +18,13 @@ if (process.platform === 'darwin') {
     process.exit(1);
   }
 
+  // Remove from both ~/Applications and /Applications to avoid duplicates
+  const systemDest = '/Applications/ChessRay.app';
   execSync(`rm -rf "${dest}"`);
+  if (fs.existsSync(systemDest)) {
+    execSync(`rm -rf "${systemDest}"`);
+    console.log(`Removed stale ${systemDest}`);
+  }
   execSync(`cp -R "${src}" "${dest}"`);
   console.log(`Installed to ${dest}`);
 
