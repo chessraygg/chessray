@@ -208,18 +208,8 @@ canvas#video-overlay {
   color: var(--text);
 }
 
-/* ── Status ── */
 
-.status {
-  color: var(--text-muted);
-  text-align: center;
-  padding: 4px 0;
-}
-
-.status.tracking { color: var(--text-dim); }
-
-.tracking-content { display: none; }
-.tracking-content.active { display: flex; flex-direction: column; gap: 6px; }
+.tracking-content { display: flex; flex-direction: column; gap: 6px; }
 
 /* ── Board frame ── */
 
@@ -397,4 +387,37 @@ canvas#video-overlay {
 .meta {
   font: 9px/1 var(--mono);
   color: var(--text-faint);
+}
+
+/* ── Zoom controls ── */
+
+.zoom-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.zoom-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font: 11px/1 var(--mono);
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.zoom-btn:hover { color: var(--text); border-color: #3a3a3a; }
+
+.zoom-label {
+  font: 9px/1 var(--mono);
+  color: var(--text-faint);
+  min-width: 28px;
+  text-align: center;
 }

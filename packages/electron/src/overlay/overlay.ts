@@ -6,7 +6,7 @@
 import type { PipelineResult } from '@chessray/core';
 import { loadPrefs, savePrefs } from './preferences.js';
 import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay } from './canvas-renderer.js';
-import { setupDrag, setTrackingState, updateDebugPanel } from './debug-panel.js';
+import { setupDrag, updateDebugPanel } from './debug-panel.js';
 
 declare global {
   interface Window {
@@ -29,7 +29,6 @@ let userPanel: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
 let debugFen: HTMLDivElement | null = null;
 let debugInfo: HTMLDivElement | null = null;
-let isTracking = false;
 let useSan: boolean;
 
 const state: OverlayState = {
@@ -145,6 +144,33 @@ function initOverlay(): void {
         savePrefs({ panelScale });
       }
     });
+  }
+
+  // ── Zoom buttons ──
+  const zoomLabel = document.getElementById('cv-zoom-label');
+  function updateZoomLabel(): void {
+    if (zoomLabel) zoomLabel.textContent = `${Math.round(panelScale * 100)}%`;
+  }
+  updateZoomLabel();
+
+  document.getElementById('cv-zoom-in')?.addEventListener('click', () => {
+    panelScale = Math.min(2, panelScale + 0.1);
+    applyScale(); updateZoomLabel(); savePrefs({ panelScale });
+  });
+  document.getElementById('cv-zoom-out')?.addEventListener('click', () => {
+    panelScale = Math.max(0.5, panelScale - 0.1);
+    applyScale(); updateZoomLabel(); savePrefs({ panelScale });
+  });
+  document.getElementById('cv-zoom-reset')?.addEventListener('click', () => {
+    panelScale = 1;
+    applyScale(); updateZoomLabel(); savePrefs({ panelScale });
+  });
+
+  // Also update label on scroll/grip zoom
+  const origApplyScale = applyScale;
+  // Patch wheel and grip to update label
+  if (userPanel) {
+    userPanel.addEventListener('wheel', () => requestAnimationFrame(updateZoomLabel), { passive: true });
   }
 
   // Restore visual state from prefs
@@ -311,10 +337,6 @@ function processPendingResult(): void {
   if (!result) return;
   pendingResult = null;
 
-  if (!isTracking) {
-    isTracking = true;
-    setTrackingState(true);
-  }
   state.displayFlipped = !!result.flipped;
   state.currentResult = result;
 
@@ -353,8 +375,6 @@ window.chessRay.onSourceVisibility((visible) => {
 });
 
 window.chessRay.onStopTracking(() => {
-  isTracking = false;
-  setTrackingState(false);
   state.currentArrows = [];
   state.currentResult = null;
   renderArrows(state);

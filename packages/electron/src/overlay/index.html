@@ -28,8 +28,6 @@
     </div>
 
     <div class="panel-body" id="cv-panel-body">
-      <div class="status" id="cv-status">Waiting for source selection...</div>
-
       <div class="tracking-content" id="cv-tracking-content">
         <!-- Virtual board with SVG pieces -->
         <div class="board-frame">
@@ -79,6 +77,14 @@
           <div class="fen" id="cv-debug-fen">Waiting...</div>
           <div class="debug-orient" id="cv-orientation-info"></div>
           <div class="meta" id="cv-debug-info"></div>
+        </div>
+
+        <!-- Zoom controls -->
+        <div class="zoom-row">
+          <button class="zoom-btn" id="cv-zoom-out" title="Zoom out">&#x2212;</button>
+          <span class="zoom-label" id="cv-zoom-label">100%</span>
+          <button class="zoom-btn" id="cv-zoom-in" title="Zoom in">&#x2B;</button>
+          <button class="zoom-btn" id="cv-zoom-reset" title="Reset zoom">&#x21BA;</button>
         </div>
       </div>
     </div>
