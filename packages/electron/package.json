@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "license": "GPL-3.0-or-later",
+  "author": "chessraygg",
   "description": "Desktop app for real-time chess position recognition and evaluation from any screen/window",
   "main": ".vite/build/main.js",
   "scripts": {

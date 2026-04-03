@@ -33,7 +33,7 @@ const config: ForgeConfig = {
     {
       name: '@electron-forge/maker-squirrel',
       platforms: ['win32'],
-      config: { name: 'ChessRay' },
+      config: { name: 'ChessRay', authors: 'chessraygg' },
     },
     {
       name: '@electron-forge/maker-deb',
@@ -42,6 +42,7 @@ const config: ForgeConfig = {
         options: {
           name: 'chessray',
           productName: 'ChessRay',
+          bin: 'ChessRay',
           maintainer: 'chessraygg',
           homepage: 'https://github.com/chessraygg/chessray',
         },
