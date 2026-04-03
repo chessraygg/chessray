@@ -1,4 +1,3 @@
-import type { BoardBBox } from '@chessray/core';
 import { initEngine, initRecognizer, getOnnxSession } from './engine-init.js';
 
 export const TARGET_FPS = 2;
@@ -17,7 +16,7 @@ function debugLog(msg: string): void {
 
 export async function initAndStartCapture(
   sourceId: string,
-  onFrame: (imageData: ImageData) => void,
+  onFrame: (imageData: ImageData) => Promise<void>,
   resetState: () => void,
 ): Promise<void> {
   stopCapture(resetState);
@@ -159,23 +158,22 @@ export async function initAndStartCapture(
     debugLog(`Starting frame capture at ${TARGET_FPS}fps, canvas=${canvas.width}x${canvas.height}`);
 
     let isProcessing = false;
-    let cachedBboxRef: BoardBBox | null = null;
 
-    captureInterval = setInterval(() => {
+    captureInterval = setInterval(async () => {
       if (isProcessing) return;
       if (video.videoWidth > 0 && (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight)) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        // Signal to caller that bbox/sample caches should be reset
         resetState();
       }
       isProcessing = true;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      // The onFrame callback is expected to set isProcessing = false when done
-      // via the finally block in processFrame
-      onFrame(imageData);
-      isProcessing = false;
+      try {
+        await onFrame(imageData);
+      } finally {
+        isProcessing = false;
+      }
     }, 1000 / TARGET_FPS);
 
   } catch (err) {
