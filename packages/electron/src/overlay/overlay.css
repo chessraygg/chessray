@@ -128,9 +128,12 @@ canvas#video-overlay {
 
 .toggle-label { font-size: 9px; }
 
-/* Collapsed: icons only */
-.panel.collapsed .toggle-label { display: none; }
-.panel.collapsed .icon-toggle { padding: 5px 0; }
+/* Top bar layout: collapsed = icons only, expanded = full width with labels */
+.panel.collapsed .top-bar .toggle-label { display: none; }
+.panel.collapsed .top-bar .icon-toggle { padding: 5px 0; }
+.panel:not(.collapsed) .top-bar { flex-wrap: wrap; }
+.panel:not(.collapsed) .top-bar .toggle { flex: 1; }
+.panel:not(.collapsed) .top-bar .ctrl-btn { margin-left: 0; }
 
 /* ── Body ── */
 
