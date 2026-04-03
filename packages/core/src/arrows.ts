@@ -82,7 +82,7 @@ export function computePvArrows(pv: string[], turn: 'w' | 'b', maxMoves: number)
     // First move thick, subsequent thinner
     const width = Math.max(2, 5 - i);
     // Fade out progressively
-    const opacity = Math.max(0.225, 0.675 - i * 0.09);
+    const opacity = Math.max(0.4, 0.675 - i * 0.06);
 
     const arrow: ArrowDescriptor = {
       from, to, color, width, opacity,
