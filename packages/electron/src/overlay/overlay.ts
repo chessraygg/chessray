@@ -114,6 +114,36 @@ function initOverlay(): void {
     }, { passive: false });
   }
 
+  // ── Resize grip (drag to scale) ──
+  const resizeGrip = document.getElementById('cv-resize-grip');
+  if (resizeGrip && userPanel) {
+    let resizing = false;
+    let startY = 0;
+    let startScale = 1;
+
+    resizeGrip.addEventListener('mousedown', (e: MouseEvent) => {
+      e.stopPropagation();
+      resizing = true;
+      startY = e.clientY;
+      startScale = panelScale;
+    });
+
+    document.addEventListener('mousemove', (e: MouseEvent) => {
+      if (!resizing) return;
+      const dy = e.clientY - startY;
+      // ~200px drag = 1x scale change
+      panelScale = Math.min(2, Math.max(0.5, startScale + dy / 200));
+      applyScale();
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (resizing) {
+        resizing = false;
+        savePrefs({ panelScale });
+      }
+    });
+  }
+
   // Restore visual state from prefs
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
 

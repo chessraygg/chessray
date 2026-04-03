@@ -50,6 +50,27 @@ canvas#video-overlay {
 
 .panel:active { cursor: grabbing; }
 
+.resize-grip {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+
+.resize-grip::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid var(--text-faint);
+  border-bottom: 2px solid var(--text-faint);
+  opacity: 0.5;
+}
+
 .panel.hidden { display: none; }
 
 .user-panel {
