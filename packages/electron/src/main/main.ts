@@ -98,6 +98,9 @@ function createOverlayWindow(): BrowserWindow {
   // Click-through by default
   win.setIgnoreMouseEvents(true, { forward: true });
 
+  // Exclude overlay from screen capture to prevent self-detection
+  win.setContentProtection(true);
+
   // Platform-specific always-on-top and workspace behavior
   platform.configureOverlayWindow(win);
 
