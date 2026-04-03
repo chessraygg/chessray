@@ -126,6 +126,7 @@ canvas#video-overlay {
 }
 
 .ctrl-btn.chevron.collapsed { transform: rotate(-90deg); }
+.ctrl-btn.chevron.collapsed::after { transform: translateX(-50%) rotate(90deg); }
 
 /* ── Top bar: icons + collapse/close, always visible ── */
 
