@@ -258,6 +258,9 @@ async function processFrame(imageData: ImageData): Promise<void> {
 
     prevPositionFen = positionFen;
     lastPositionFen = positionFen;
+    // Clear stale eval so dedup frames don't show old position's eval
+    lastEval = null;
+    lastArrows = [];
 
     if (evalAbortController) {
       evalAbortController.abort();

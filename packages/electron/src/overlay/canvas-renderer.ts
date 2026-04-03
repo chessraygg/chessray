@@ -28,7 +28,10 @@ export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
   if (state.lineVisible && state.currentResult?.evaluation?.top_moves?.length) {
     const idx = Math.min(state.selectedLineIndex, state.currentResult.evaluation.top_moves.length - 1);
     const pv = state.currentResult.evaluation.top_moves[idx].pv;
-    const turn = state.currentResult.evaluation.fen?.split(' ')[1] as 'w' | 'b' || 'w';
+    // Prefer highlight-based turn (always current) over eval FEN turn (may be stale)
+    const turn = state.currentResult.turn
+      ?? state.currentResult.evaluation.fen?.split(' ')[1] as 'w' | 'b'
+      ?? 'w';
     return computePvArrows(pv, turn, state.pvDepth);
   }
   return state.currentArrows;
