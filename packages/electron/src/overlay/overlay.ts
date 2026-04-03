@@ -99,6 +99,12 @@ function initOverlay(): void {
     if (!userPanel) return;
     userPanel.style.transform = `scale(${panelScale})`;
     userPanel.style.transformOrigin = 'top left';
+    // Update zoom UI if it exists (called before zoom controls are wired)
+    const lbl = document.getElementById('cv-zoom-label');
+    const sld = document.getElementById('cv-zoom-slider') as HTMLInputElement | null;
+    const pct = Math.round(panelScale * 100);
+    if (lbl) lbl.textContent = `${pct}%`;
+    if (sld) sld.value = String(pct);
   }
   applyScale();
 
@@ -146,28 +152,25 @@ function initOverlay(): void {
     });
   }
 
-  // ── Zoom buttons ──
+  // ── Zoom controls ──
   const zoomLabel = document.getElementById('cv-zoom-label');
-  function updateZoomLabel(): void {
-    if (zoomLabel) zoomLabel.textContent = `${Math.round(panelScale * 100)}%`;
-  }
-  updateZoomLabel();
+  const zoomSlider = document.getElementById('cv-zoom-slider') as HTMLInputElement | null;
 
-  document.getElementById('cv-zoom-in')?.addEventListener('click', () => {
-    panelScale = Math.min(2, panelScale + 0.1);
-    applyScale(); updateZoomLabel(); savePrefs({ panelScale });
-  });
-  document.getElementById('cv-zoom-out')?.addEventListener('click', () => {
-    panelScale = Math.max(0.5, panelScale - 0.1);
-    applyScale(); updateZoomLabel(); savePrefs({ panelScale });
-  });
-
-  // Also update label on scroll/grip zoom
-  const origApplyScale = applyScale;
-  // Patch wheel and grip to update label
-  if (userPanel) {
-    userPanel.addEventListener('wheel', () => requestAnimationFrame(updateZoomLabel), { passive: true });
+  function updateZoomUI(): void {
+    const pct = Math.round(panelScale * 100);
+    if (zoomLabel) zoomLabel.textContent = `${pct}%`;
+    if (zoomSlider) zoomSlider.value = String(pct);
   }
+  updateZoomUI();
+
+  function setZoom(scale: number): void {
+    panelScale = Math.min(2, Math.max(0.5, scale));
+    applyScale(); updateZoomUI(); savePrefs({ panelScale });
+  }
+
+  document.getElementById('cv-zoom-in')?.addEventListener('click', () => setZoom(panelScale + 0.1));
+  document.getElementById('cv-zoom-out')?.addEventListener('click', () => setZoom(panelScale - 0.1));
+  zoomSlider?.addEventListener('input', () => setZoom(parseInt(zoomSlider.value, 10) / 100));
 
   // Restore visual state from prefs
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';

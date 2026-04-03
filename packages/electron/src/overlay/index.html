@@ -31,8 +31,9 @@
       <!-- Zoom controls: only in expanded view -->
       <div class="zoom-bar">
         <button class="zoom-btn" id="cv-zoom-out" data-tip="Zoom out">&#x2212;</button>
-        <span class="zoom-label" id="cv-zoom-label">100%</span>
+        <input type="range" id="cv-zoom-slider" min="50" max="200" value="100" class="zoom-slider">
         <button class="zoom-btn" id="cv-zoom-in" data-tip="Zoom in">&#x2B;</button>
+        <span class="zoom-label" id="cv-zoom-label">100%</span>
       </div>
       <div class="tracking-content" id="cv-tracking-content">
         <!-- Virtual board with SVG pieces -->

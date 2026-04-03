@@ -396,8 +396,13 @@ canvas#video-overlay {
 .zoom-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 4px;
+}
+
+.zoom-slider {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--text-muted);
 }
 
 .zoom-btn {
