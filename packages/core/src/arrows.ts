@@ -37,7 +37,7 @@ export function rankToWidth(rank: number): number {
  * Map move rank to opacity.
  */
 export function rankToOpacity(rank: number): number {
-  const opacities = [0.9, 0.7, 0.5];
+  const opacities = [0.675, 0.525, 0.375];
   return opacities[Math.min(rank, opacities.length - 1)];
 }
 
@@ -82,7 +82,7 @@ export function computePvArrows(pv: string[], turn: 'w' | 'b', maxMoves: number)
     // First move thick, subsequent thinner
     const width = Math.max(2, 5 - i);
     // Fade out progressively
-    const opacity = Math.max(0.3, 0.9 - i * 0.12);
+    const opacity = Math.max(0.225, 0.675 - i * 0.09);
 
     const arrow: ArrowDescriptor = {
       from, to, color, width, opacity,
