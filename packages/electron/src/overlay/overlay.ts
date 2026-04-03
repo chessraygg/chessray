@@ -29,7 +29,7 @@ let userPanel: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
 let debugFen: HTMLDivElement | null = null;
 let debugInfo: HTMLDivElement | null = null;
-let useSan: boolean;
+const useSan = true;
 
 const state: OverlayState = {
   videoCanvas: null,
@@ -58,7 +58,6 @@ function initOverlay(): void {
   state.lineVisible = prefs.lineVisible;
   state.pvDepth = prefs.pvDepth;
   state.evalBarVisible = prefs.evalBarVisible;
-  useSan = prefs.useSan;
 
   state.videoCanvas = document.getElementById('video-overlay') as HTMLCanvasElement;
   userPanel = document.getElementById('user-panel') as HTMLDivElement;
@@ -272,23 +271,6 @@ function initOverlay(): void {
       state.evalBarVisible = !state.evalBarVisible;
       evalBtn.classList.toggle('active', state.evalBarVisible);
       savePrefs({ evalBarVisible: state.evalBarVisible });
-    });
-  }
-
-  // ── SAN/UCI notation toggle ──
-  const notationBtn = document.getElementById('cv-notation-btn');
-  if (notationBtn) {
-    notationBtn.textContent = useSan ? 'SAN' : 'UCI';
-    notationBtn.classList.toggle('active', useSan);
-    notationBtn.addEventListener('click', () => {
-      useSan = !useSan;
-      notationBtn.textContent = useSan ? 'SAN' : 'UCI';
-      notationBtn.classList.toggle('active', useSan);
-      savePrefs({ useSan });
-      // Re-render current result with new notation
-      if (state.currentResult) {
-        updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, selectLine);
-      }
     });
   }
 
