@@ -56,7 +56,6 @@ canvas#video-overlay {
   z-index: 100;
 }
 
-.user-panel.collapsed { width: auto; }
 
 /* ── Inline debug section ── */
 
