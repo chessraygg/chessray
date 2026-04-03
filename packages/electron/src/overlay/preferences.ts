@@ -16,8 +16,8 @@ export interface Prefs {
 export const DEFAULT_PREFS: Prefs = {
   overlayVisible: true,
   borderVisible: false,
-  arrowsVisible: true,
-  lineVisible: false,
+  arrowsVisible: false,
+  lineVisible: true,
   pvDepth: 4,
   evalBarVisible: true,
   collapsed: false,

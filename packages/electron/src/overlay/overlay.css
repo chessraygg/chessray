@@ -119,12 +119,21 @@ canvas#video-overlay {
 .ctrl-btn.close:hover { background: #c53030; color: #fff; }
 
 .ctrl-btn.chevron {
-  font-size: 16px;
-  font-weight: 300;
+  font-size: 10px;
   transition: transform 0.2s ease, background 0.12s, color 0.12s;
 }
 
-.ctrl-btn.chevron.down { transform: rotate(-90deg); }
+.ctrl-btn.chevron.collapsed { transform: rotate(-90deg); }
+
+/* ── Collapsed bar: always visible toggles ── */
+
+.collapsed-bar {
+  display: none;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.panel.collapsed .collapsed-bar { display: flex; }
 
 /* ── Body ── */
 

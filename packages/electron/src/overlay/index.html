@@ -12,10 +12,17 @@
     <div class="panel-header">
       <div class="panel-title">ChessRay</div>
       <div class="panel-controls">
-        <button class="ctrl-btn chevron" id="cv-collapse-btn" title="Collapse">&#x2039;</button>
-        <button class="ctrl-btn" id="cv-minimize-btn" title="Minimize">&#x5F;</button>
+        <button class="ctrl-btn chevron" id="cv-collapse-btn" title="Expand/Collapse">&#x25BC;</button>
         <button class="ctrl-btn close" id="cv-close-btn" title="Close">&#xD7;</button>
       </div>
+    </div>
+
+    <!-- Always visible when collapsed: overlay toggle + key controls -->
+    <div class="collapsed-bar" id="cv-collapsed-bar">
+      <button class="toggle active" id="cv-overlay-btn">Overlay</button>
+      <button class="toggle active" id="cv-eval-btn">Eval</button>
+      <button class="toggle active" id="cv-line-btn">Line</button>
+      <button class="toggle active" id="cv-arrows-btn">Moves</button>
     </div>
 
     <div class="panel-body" id="cv-panel-body">
@@ -49,15 +56,13 @@
         <!-- Best moves -->
         <div class="best-moves" id="cv-best-moves"></div>
 
-        <!-- Toggles -->
-        <div class="toggle-row compact" id="cv-compact-toggles">
-          <button class="toggle active" id="cv-arrows-btn">Moves</button>
-          <button class="toggle" id="cv-line-btn">Line</button>
-          <button class="toggle active" id="cv-eval-btn">Eval</button>
+        <!-- Extra controls -->
+        <div class="toggle-row compact">
           <button class="toggle" id="cv-notation-btn" title="Toggle SAN/UCI notation">SAN</button>
+          <button class="toggle" id="cv-border-btn">Box</button>
         </div>
 
-        <div class="pv-depth-row" id="cv-pv-depth-row" style="display:none">
+        <div class="pv-depth-row" id="cv-pv-depth-row">
           <label>PV depth</label>
           <input type="range" id="cv-pv-depth" min="1" max="10" value="4">
           <span id="cv-pv-depth-val">4</span>
@@ -66,10 +71,6 @@
         <!-- Debug section (inline, collapsible) -->
         <button class="debug-toggle" id="cv-debug-toggle">Debug &#x25B8;</button>
         <div class="debug-section hidden" id="debug-section">
-          <div class="toggle-row">
-            <button class="toggle active" id="cv-overlay-btn">Overlay</button>
-            <button class="toggle" id="cv-border-btn">Box</button>
-          </div>
           <img id="cv-debug-img" src="" alt="Board capture">
           <div class="fen" id="cv-debug-fen">Waiting...</div>
           <div class="debug-orient" id="cv-orientation-info"></div>

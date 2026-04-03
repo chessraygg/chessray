@@ -200,7 +200,7 @@ function initOverlay(): void {
       notationBtn.classList.toggle('active', useSan);
       // Re-render current result with new notation
       if (state.currentResult) {
-        updateDebugPanel(state.currentResult, state.displayFlipped, debugPanelEl, debugImg, debugFen, debugInfo, useSan);
+        updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan);
       }
     });
   }
@@ -213,25 +213,18 @@ function initOverlay(): void {
     if (collapsed) {
       panelBody.classList.add('hidden');
       userPanel.classList.add('collapsed');
-      collapseBtn.classList.add('down');
+      collapseBtn.classList.add('collapsed');
     }
     collapseBtn.addEventListener('click', () => {
       collapsed = !collapsed;
       panelBody.classList.toggle('hidden', collapsed);
       userPanel!.classList.toggle('collapsed', collapsed);
-      collapseBtn.classList.toggle('down', collapsed);
+      collapseBtn.classList.toggle('collapsed', collapsed);
       savePrefs({ collapsed });
     });
   }
 
   // ── Window controls ──
-  const minimizeBtn = document.getElementById('cv-minimize-btn');
-  if (minimizeBtn) {
-    minimizeBtn.addEventListener('click', () => {
-      window.chessRay.minimizeApp();
-    });
-  }
-
   const closeBtn = document.getElementById('cv-close-btn');
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
