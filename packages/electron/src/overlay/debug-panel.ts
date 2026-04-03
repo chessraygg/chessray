@@ -1,5 +1,5 @@
 import type { PipelineResult } from '@chessray/core';
-import { uciToSan, formatMoveLine } from '@chessray/core';
+import { uciToSan, formatMoveLine, lossToColor } from '@chessray/core';
 import { savePrefs } from './preferences.js';
 import { pieceSvg } from './piece-svg.js';
 
@@ -119,17 +119,12 @@ function renderBestMoves(
       movesText = move.pv.slice(0, 5).join(' ');
     }
 
-    // Subtle background: green for best, yellow→red for increasing loss
-    let bg: string;
-    if (move.loss_cp === 0) {
-      bg = 'rgba(34,197,94,0.12)';  // green — best move
-    } else if (move.loss_cp < 50) {
-      bg = 'rgba(234,179,8,0.10)';  // yellow — slight inaccuracy
-    } else if (move.loss_cp < 150) {
-      bg = 'rgba(249,115,22,0.10)'; // orange — inaccuracy
-    } else {
-      bg = 'rgba(239,68,68,0.10)';  // red — mistake/blunder
-    }
+    // Subtle background matching arrow color gradient
+    const hex = lossToColor(move.loss_cp);
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const bg = `rgba(${r},${g},${b},0.12)`;
 
     html += `<div class="move-line${selected}" data-line="${i}" style="background:${bg}"><span class="move-score">${scoreStr}</span>${movesText}${lossStr}</div>`;
   }
