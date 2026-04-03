@@ -76,27 +76,6 @@ canvas#video-overlay {
   object-fit: cover;
 }
 
-/* ── Header ── */
-
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: grab;
-}
-
-.panel-header:active { cursor: grabbing; }
-
-.panel-title {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.panel-controls {
-  display: flex;
-  gap: 1px;
-}
 
 .ctrl-btn {
   background: none;
@@ -124,9 +103,19 @@ canvas#video-overlay {
 
 .ctrl-btn.chevron.collapsed { transform: rotate(-90deg); }
 
-/* ── Main toggles: always visible ── */
+/* ── Top bar: toggles + controls in one row ── */
 
-#cv-main-toggles { margin-top: 6px; }
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  cursor: grab;
+}
+
+.top-bar:active { cursor: grabbing; }
+
+.top-bar .ctrl-btn { margin-left: auto; }
+.top-bar .ctrl-btn + .ctrl-btn { margin-left: 0; }
 
 .icon-toggle {
   display: flex;

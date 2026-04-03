@@ -83,10 +83,10 @@ function initOverlay(): void {
     });
   }
 
-  // Make user panel draggable by its header
-  const header = userPanel?.querySelector('.panel-header') as HTMLElement | null;
-  if (header && userPanel) {
-    setupDrag(header, userPanel);
+  // Make user panel draggable by top bar
+  const topBar = document.getElementById('cv-main-toggles') as HTMLElement | null;
+  if (topBar && userPanel) {
+    setupDrag(topBar, userPanel);
   }
 
   // Restore panel position
