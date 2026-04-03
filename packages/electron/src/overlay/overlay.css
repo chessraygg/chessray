@@ -135,8 +135,6 @@ canvas#video-overlay {
   gap: 2px;
 }
 
-.top-bar .ctrl-btn { margin-left: auto; }
-.top-bar .ctrl-btn + .ctrl-btn { margin-left: 0; }
 
 
 .icon-toggle {
@@ -391,11 +389,11 @@ canvas#video-overlay {
 
 /* ── Zoom controls ── */
 
-.zoom-row {
+.top-zoom {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  gap: 2px;
+  margin-left: auto;
 }
 
 .zoom-btn {

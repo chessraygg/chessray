@@ -161,10 +161,6 @@ function initOverlay(): void {
     panelScale = Math.max(0.5, panelScale - 0.1);
     applyScale(); updateZoomLabel(); savePrefs({ panelScale });
   });
-  document.getElementById('cv-zoom-reset')?.addEventListener('click', () => {
-    panelScale = 1;
-    applyScale(); updateZoomLabel(); savePrefs({ panelScale });
-  });
 
   // Also update label on scroll/grip zoom
   const origApplyScale = applyScale;
