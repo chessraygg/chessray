@@ -338,7 +338,7 @@ canvas#video-overlay {
 
 .best-moves .move-line { cursor: pointer; }
 .best-moves .move-line:hover { filter: brightness(1.3); }
-.best-moves .move-line.selected { border-left: 2px solid var(--accent); padding-left: 4px; }
+.best-moves .move-line.selected { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); background-blend-mode: lighten; }
 .move-score { font-weight: 600; margin-right: 2px; }
 
 /* ── Debug toggle ── */
