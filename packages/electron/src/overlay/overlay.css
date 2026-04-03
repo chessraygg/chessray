@@ -57,6 +57,7 @@ canvas#video-overlay {
   width: 14px;
   height: 14px;
   cursor: nwse-resize;
+  user-select: none;
 }
 
 .resize-grip::after {

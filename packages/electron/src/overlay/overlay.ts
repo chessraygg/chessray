@@ -99,7 +99,7 @@ function initOverlay(): void {
   function applyScale(): void {
     if (!userPanel) return;
     userPanel.style.transform = `scale(${panelScale})`;
-    userPanel.style.transformOrigin = 'top right';
+    userPanel.style.transformOrigin = 'top left';
   }
   applyScale();
 
@@ -123,15 +123,17 @@ function initOverlay(): void {
 
     resizeGrip.addEventListener('mousedown', (e: MouseEvent) => {
       e.stopPropagation();
+      e.preventDefault();
       resizing = true;
       startY = e.clientY;
       startScale = panelScale;
+      document.body.style.userSelect = 'none';
     });
 
     document.addEventListener('mousemove', (e: MouseEvent) => {
       if (!resizing) return;
+      e.preventDefault();
       const dy = e.clientY - startY;
-      // ~200px drag = 1x scale change
       panelScale = Math.min(2, Math.max(0.5, startScale + dy / 200));
       applyScale();
     });
@@ -139,6 +141,7 @@ function initOverlay(): void {
     document.addEventListener('mouseup', () => {
       if (resizing) {
         resizing = false;
+        document.body.style.userSelect = '';
         savePrefs({ panelScale });
       }
     });
