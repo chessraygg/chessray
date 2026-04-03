@@ -119,13 +119,15 @@ function initOverlay(): void {
   }
 
   // ── Resize grips (drag to scale) ──
-  function setupResizeGrip(gripId: string): void {
+  function setupResizeGrip(gripId: string, anchorRight: boolean): void {
     const grip = document.getElementById(gripId);
     if (!grip || !userPanel) return;
 
     let resizing = false;
     let startY = 0;
     let startScale = 1;
+    let startLeft = 0;
+    let panelWidth = 0;
 
     grip.addEventListener('mousedown', (e: MouseEvent) => {
       e.stopPropagation();
@@ -133,6 +135,8 @@ function initOverlay(): void {
       resizing = true;
       startY = e.clientY;
       startScale = panelScale;
+      startLeft = userPanel!.offsetLeft;
+      panelWidth = userPanel!.offsetWidth;
       document.body.style.userSelect = 'none';
     });
 
@@ -140,7 +144,14 @@ function initOverlay(): void {
       if (!resizing) return;
       e.preventDefault();
       const dy = e.clientY - startY;
-      panelScale = Math.min(2, Math.max(0.5, startScale + dy / 200));
+      const newScale = Math.min(2, Math.max(0.5, startScale + dy / 200));
+      if (anchorRight) {
+        // Keep top-right corner fixed: adjust left position
+        const scaledWidthDiff = panelWidth * (newScale - startScale);
+        userPanel!.style.left = `${startLeft - scaledWidthDiff}px`;
+        userPanel!.style.right = 'auto';
+      }
+      panelScale = newScale;
       applyScale();
     });
 
@@ -148,12 +159,12 @@ function initOverlay(): void {
       if (resizing) {
         resizing = false;
         document.body.style.userSelect = '';
-        savePrefs({ panelScale });
+        savePrefs({ panelScale, panelLeft: userPanel!.offsetLeft, panelTop: userPanel!.offsetTop });
       }
     });
   }
-  setupResizeGrip('cv-resize-grip');
-  setupResizeGrip('cv-resize-grip-left');
+  setupResizeGrip('cv-resize-grip', false);
+  setupResizeGrip('cv-resize-grip-left', true);
 
   // ── Zoom controls ──
   const zoomLabel = document.getElementById('cv-zoom-label');
@@ -178,14 +189,13 @@ function initOverlay(): void {
   // Restore visual state from prefs
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
 
-  // ── Inline debug section toggle ──
+  // ── Inline debug section toggle (gear icon in top bar) ──
   const debugToggle = document.getElementById('cv-debug-toggle');
   const debugSection = document.getElementById('debug-section');
   if (debugToggle && debugSection) {
     debugToggle.addEventListener('click', () => {
       const isHidden = debugSection.classList.toggle('hidden');
       debugToggle.classList.toggle('active', !isHidden);
-      debugToggle.innerHTML = isHidden ? 'Debug &#x25B8;' : 'Debug &#x25BE;';
     });
   }
 
