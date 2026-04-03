@@ -13,3 +13,4 @@ test-results/
 .test-profile/
 .test-profile-live/
 *.traineddata
+packages/core/tsconfig.tsbuildinfo

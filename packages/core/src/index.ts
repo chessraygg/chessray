@@ -15,3 +15,4 @@ export * from './recognition-tiles.js';
 export * from './recognition.js';
 export * from './stockfish.js';
 export * from './stockfish-uci-parser.js';
+export * from './move-notation.js';

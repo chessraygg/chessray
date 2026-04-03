@@ -25,11 +25,13 @@ declare global {
 
 // ── Module-level state ──
 
-let debugPanel: HTMLDivElement | null = null;
+let userPanel: HTMLDivElement | null = null;
+let debugPanelEl: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
 let debugFen: HTMLDivElement | null = null;
 let debugInfo: HTMLDivElement | null = null;
 let isTracking = false;
+let useSan = true;
 
 const state: OverlayState = {
   videoCanvas: null,
@@ -59,39 +61,65 @@ function initOverlay(): void {
   state.evalBarVisible = prefs.evalBarVisible;
 
   state.videoCanvas = document.getElementById('video-overlay') as HTMLCanvasElement;
-  debugPanel = document.getElementById('debug-panel') as HTMLDivElement;
+  userPanel = document.getElementById('user-panel') as HTMLDivElement;
+  debugPanelEl = document.getElementById('debug-panel') as HTMLDivElement;
   debugImg = document.getElementById('cv-debug-img') as HTMLImageElement;
   debugFen = document.getElementById('cv-debug-fen') as HTMLDivElement;
   debugInfo = document.getElementById('cv-debug-info') as HTMLDivElement;
   state.canvas = document.getElementById('cv-arrow-canvas') as HTMLCanvasElement;
 
-  // Interactive debug panel: disable click-through on hover
-  if (debugPanel) {
-    debugPanel.addEventListener('mouseenter', () => {
-      window.chessRay.setMousePassthrough(false);
-    });
-    debugPanel.addEventListener('mouseleave', () => {
-      window.chessRay.setMousePassthrough(true);
-    });
+  // Update arrow canvas to match new board size (200x200)
+  if (state.canvas) {
+    state.canvas.width = 200;
+    state.canvas.height = 200;
   }
 
-  // Make debug panel draggable by its header
-  const header = document.querySelector('.panel-header') as HTMLElement | null;
-  if (header && debugPanel) {
-    setupDrag(header, debugPanel);
+  // Interactive panels: disable click-through on hover
+  for (const panel of [userPanel, debugPanelEl]) {
+    if (panel) {
+      panel.addEventListener('mouseenter', () => {
+        window.chessRay.setMousePassthrough(false);
+      });
+      panel.addEventListener('mouseleave', () => {
+        window.chessRay.setMousePassthrough(true);
+      });
+    }
+  }
+
+  // Make user panel draggable by its header
+  const header = userPanel?.querySelector('.panel-header') as HTMLElement | null;
+  if (header && userPanel) {
+    setupDrag(header, userPanel);
   }
 
   // Restore panel position
-  if (debugPanel && prefs.panelLeft != null && prefs.panelTop != null) {
-    debugPanel.style.left = `${prefs.panelLeft}px`;
-    debugPanel.style.top = `${prefs.panelTop}px`;
-    debugPanel.style.right = 'auto';
+  if (userPanel && prefs.panelLeft != null && prefs.panelTop != null) {
+    userPanel.style.left = `${prefs.panelLeft}px`;
+    userPanel.style.top = `${prefs.panelTop}px`;
+    userPanel.style.right = 'auto';
   }
 
   // Restore visual state from prefs
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
 
-  // Global overlay toggle
+  // ── Debug panel toggle ──
+  const debugToggle = document.getElementById('cv-debug-toggle');
+  if (debugToggle && debugPanelEl) {
+    debugToggle.addEventListener('click', () => {
+      const showing = debugPanelEl!.classList.toggle('hidden');
+      debugToggle.classList.toggle('active', !showing);
+    });
+  }
+
+  const debugClose = document.getElementById('cv-debug-close');
+  if (debugClose && debugPanelEl) {
+    debugClose.addEventListener('click', () => {
+      debugPanelEl!.classList.add('hidden');
+      debugToggle?.classList.remove('active');
+    });
+  }
+
+  // ── Overlay/Box toggles (debug panel) ──
   const overlayBtn = document.getElementById('cv-overlay-btn');
   if (overlayBtn) {
     overlayBtn.classList.toggle('active', state.overlayVisible);
@@ -99,14 +127,10 @@ function initOverlay(): void {
       state.overlayVisible = !state.overlayVisible;
       if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
       overlayBtn.classList.toggle('active', state.overlayVisible);
-      document.querySelectorAll('.vis-btn').forEach(btn => {
-        (btn as HTMLButtonElement).disabled = !state.overlayVisible;
-      });
       savePrefs({ overlayVisible: state.overlayVisible });
     });
   }
 
-  // Per-element visibility toggles
   const borderBtn = document.getElementById('cv-border-btn');
   if (borderBtn) {
     borderBtn.classList.toggle('active', state.borderVisible);
@@ -117,6 +141,7 @@ function initOverlay(): void {
     });
   }
 
+  // ── User panel toggles ──
   const arrowsBtn = document.getElementById('cv-arrows-btn');
   const lineBtn = document.getElementById('cv-line-btn');
   const pvDepthRow = document.getElementById('cv-pv-depth-row');
@@ -175,26 +200,41 @@ function initOverlay(): void {
     });
   }
 
-  // Collapse panel
+  // ── SAN/UCI notation toggle ──
+  const notationBtn = document.getElementById('cv-notation-btn');
+  if (notationBtn) {
+    notationBtn.classList.toggle('active', useSan);
+    notationBtn.addEventListener('click', () => {
+      useSan = !useSan;
+      notationBtn.textContent = useSan ? 'SAN' : 'UCI';
+      notationBtn.classList.toggle('active', useSan);
+      // Re-render current result with new notation
+      if (state.currentResult) {
+        updateDebugPanel(state.currentResult, state.displayFlipped, debugPanelEl, debugImg, debugFen, debugInfo, useSan);
+      }
+    });
+  }
+
+  // ── Collapse panel ──
   const collapseBtn = document.getElementById('cv-collapse-btn');
   const panelBody = document.getElementById('cv-panel-body');
-  if (collapseBtn && debugPanel && panelBody) {
+  if (collapseBtn && userPanel && panelBody) {
     let collapsed = prefs.collapsed;
     if (collapsed) {
       panelBody.classList.add('hidden');
-      debugPanel.classList.add('collapsed');
+      userPanel.classList.add('collapsed');
       collapseBtn.classList.add('down');
     }
     collapseBtn.addEventListener('click', () => {
       collapsed = !collapsed;
       panelBody.classList.toggle('hidden', collapsed);
-      debugPanel!.classList.toggle('collapsed', collapsed);
+      userPanel!.classList.toggle('collapsed', collapsed);
       collapseBtn.classList.toggle('down', collapsed);
       savePrefs({ collapsed });
     });
   }
 
-  // Window controls
+  // ── Window controls ──
   const minimizeBtn = document.getElementById('cv-minimize-btn');
   if (minimizeBtn) {
     minimizeBtn.addEventListener('click', () => {
@@ -230,7 +270,7 @@ function processPendingResult(): void {
   state.displayFlipped = !!result.flipped;
   state.currentResult = result;
 
-  updateDebugPanel(result, state.displayFlipped, debugPanel, debugImg, debugFen, debugInfo);
+  updateDebugPanel(result, state.displayFlipped, debugPanelEl, debugImg, debugFen, debugInfo, useSan);
   state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
   renderVideoOverlay(state);

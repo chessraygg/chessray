@@ -8,7 +8,8 @@
 <body>
   <canvas id="video-overlay"></canvas>
 
-  <div class="panel" id="debug-panel">
+  <!-- ── User Panel: clean analysis view ── -->
+  <div class="panel user-panel" id="user-panel">
     <div class="panel-header">
       <div class="panel-title">ChessRay</div>
       <div class="panel-controls">
@@ -18,47 +19,75 @@
       </div>
     </div>
 
-    <!-- Always visible: key toggles -->
-    <div class="toggle-row compact" id="cv-compact-toggles">
-      <button class="toggle active" id="cv-arrows-btn">Moves</button>
-      <button class="toggle" id="cv-line-btn">Line</button>
-      <button class="toggle active" id="cv-eval-btn">Eval</button>
-    </div>
-
     <div class="panel-body" id="cv-panel-body">
-      <div class="toggle-row">
-        <button class="toggle active" id="cv-overlay-btn">All</button>
-        <button class="toggle" id="cv-border-btn">Box</button>
-      </div>
-      <div class="pv-depth-row" id="cv-pv-depth-row" style="display:none">
-        <label>PV depth:</label>
-        <input type="range" id="cv-pv-depth" min="1" max="10" value="4">
-        <span id="cv-pv-depth-val">4</span>
-      </div>
-
       <div class="status" id="cv-status">Waiting for source selection...</div>
 
       <div class="tracking-content" id="cv-tracking-content">
-        <img id="cv-debug-img" src="" alt="Board preview">
-        <div class="fen" id="cv-debug-fen">Waiting...</div>
-        <div class="board-container">
-          <div class="piece-grid" id="cv-debug-grid"></div>
-          <canvas id="cv-arrow-canvas" width="192" height="192"></canvas>
+        <!-- Virtual board with SVG pieces -->
+        <div class="board-frame">
+          <div class="board-container">
+            <div class="piece-grid" id="cv-debug-grid"></div>
+            <canvas id="cv-arrow-canvas" width="192" height="192"></canvas>
+          </div>
+          <!-- Turn + orientation indicator integrated into board frame -->
+          <div class="board-status">
+            <span class="turn-indicator" id="cv-turn-indicator">
+              <span class="turn-dot white" id="cv-turn-dot"></span>
+              <span id="cv-turn-text">White</span>
+            </span>
+            <span class="orientation-badge" id="cv-orientation-badge">
+              <span class="orient-arrow" id="cv-pawn-dir"></span>
+            </span>
+          </div>
         </div>
-        <div class="turn-row">
-          <span class="turn-dot white" id="cv-turn-dot"></span>
-          <span id="cv-turn-text">White to move</span>
-          <span class="pawn-dir" id="cv-pawn-dir"></span>
-          <span class="orientation-info" id="cv-orientation-info"></span>
-        </div>
+
+        <!-- Eval bar -->
         <div class="eval-bar">
           <div class="eval-bar-fill" id="cv-eval-fill" style="width:50%"></div>
           <div class="eval-bar-label" id="cv-eval-label">0.0</div>
           <div class="eval-bar-depth" id="cv-eval-depth"></div>
         </div>
+
+        <!-- Best moves -->
         <div class="best-moves" id="cv-best-moves"></div>
-        <div class="meta" id="cv-debug-info"></div>
+
+        <!-- Toggles -->
+        <div class="toggle-row compact" id="cv-compact-toggles">
+          <button class="toggle active" id="cv-arrows-btn">Moves</button>
+          <button class="toggle" id="cv-line-btn">Line</button>
+          <button class="toggle active" id="cv-eval-btn">Eval</button>
+          <button class="toggle" id="cv-notation-btn" title="Toggle SAN/UCI notation">SAN</button>
+        </div>
+
+        <div class="pv-depth-row" id="cv-pv-depth-row" style="display:none">
+          <label>PV depth</label>
+          <input type="range" id="cv-pv-depth" min="1" max="10" value="4">
+          <span id="cv-pv-depth-val">4</span>
+        </div>
+
+        <!-- Debug toggle -->
+        <button class="debug-toggle" id="cv-debug-toggle">Debug</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ── Debug Panel: diagnostics ── -->
+  <div class="panel debug-panel hidden" id="debug-panel">
+    <div class="panel-header">
+      <div class="panel-title">Debug</div>
+      <div class="panel-controls">
+        <button class="ctrl-btn close" id="cv-debug-close" title="Close">&#xD7;</button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="toggle-row">
+        <button class="toggle active" id="cv-overlay-btn">Overlay</button>
+        <button class="toggle" id="cv-border-btn">Box</button>
+      </div>
+      <img id="cv-debug-img" src="" alt="Board capture">
+      <div class="fen" id="cv-debug-fen">Waiting...</div>
+      <div class="debug-orient" id="cv-orientation-info"></div>
+      <div class="meta" id="cv-debug-info"></div>
     </div>
   </div>
 

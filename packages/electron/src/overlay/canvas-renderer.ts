@@ -136,7 +136,7 @@ export function renderArrows(state: OverlayState): void {
   const ctx = state.canvas.getContext('2d')!;
   ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
 
-  const virtualBoard = { x: 0, y: 0, width: 192, height: 192 };
+  const virtualBoard = { x: 0, y: 0, width: 200, height: 200 };
   const arrows = getActiveArrows(state);
 
   if (arrows.length === 0) return;

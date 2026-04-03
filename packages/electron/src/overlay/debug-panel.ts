@@ -1,11 +1,7 @@
 import type { PipelineResult } from '@chessray/core';
+import { uciToSan, formatMoveLine } from '@chessray/core';
 import { savePrefs } from './preferences.js';
-
-export const PIECE_UNICODE: Record<string, string> = {
-  K: '\u2654', Q: '\u2655', R: '\u2656', B: '\u2657', N: '\u2658', P: '\u2659',
-  k: '\u265A', q: '\u265B', r: '\u265C', b: '\u265D', n: '\u265E', p: '\u265F',
-  '.': '\u00B7',
-};
+import { pieceSvg } from './piece-svg.js';
 
 export function setupDrag(handle: HTMLElement, panel: HTMLElement): void {
   let isDragging = false;
@@ -56,6 +52,73 @@ export function setTrackingState(tracking: boolean): void {
   }
 }
 
+/** Render the virtual board grid with SVG pieces */
+function renderBoardGrid(
+  grid: HTMLElement,
+  fen: string,
+  flipped: boolean,
+  highlightedSquares: number[],
+): void {
+  const rawHl = highlightedSquares || [];
+  const hl = new Set(flipped ? rawHl.map(i => 63 - i) : rawHl);
+
+  let fenRows = fen.split('/');
+  if (flipped) {
+    fenRows = fenRows.reverse().map(r => r.split('').reverse().join(''));
+  }
+
+  let html = '';
+  let rank = 0;
+  for (const row of fenRows) {
+    let file = 0;
+    for (const ch of row) {
+      if (ch >= '1' && ch <= '8') {
+        for (let i = 0; i < parseInt(ch); i++) {
+          const sq = (rank + file) % 2 === 0 ? 'light' : 'dark';
+          const hi = hl.has(rank * 8 + file) ? ' highlight' : '';
+          html += `<div class="sq ${sq}${hi}"></div>`;
+          file++;
+        }
+      } else {
+        const sq = (rank + file) % 2 === 0 ? 'light' : 'dark';
+        const hi = hl.has(rank * 8 + file) ? ' highlight' : '';
+        html += `<div class="sq ${sq}${hi}">${pieceSvg(ch, 22)}</div>`;
+        file++;
+      }
+    }
+    rank++;
+  }
+  grid.innerHTML = html;
+}
+
+/** Format best moves with SAN or UCI notation */
+function renderBestMoves(
+  container: HTMLElement,
+  result: PipelineResult,
+  useSan: boolean,
+): void {
+  if (!result.evaluation?.top_moves?.length) return;
+
+  const fen = result.evaluation.fen;
+  let html = '';
+  for (const move of result.evaluation.top_moves) {
+    const scoreStr = move.score_cp >= 0 ? `+${(move.score_cp/100).toFixed(1)}` : (move.score_cp/100).toFixed(1);
+    const lossStr = move.loss_cp > 0 ? ` (\u2212${move.loss_cp}cp)` : '';
+
+    let movesText: string;
+    if (useSan && fen) {
+      const sanMoves = uciToSan(fen, move.pv.slice(0, 5));
+      const turn = fen.split(' ')[1] as 'w' | 'b' || 'w';
+      movesText = formatMoveLine(sanMoves, turn);
+    } else {
+      movesText = move.pv.slice(0, 5).join(' ');
+    }
+
+    html += `<div class="move-line"><span class="move-score">${scoreStr}</span>${movesText}${lossStr}</div>`;
+  }
+  container.innerHTML = html;
+}
+
 export function updateDebugPanel(
   result: PipelineResult,
   displayFlipped: boolean,
@@ -63,9 +126,9 @@ export function updateDebugPanel(
   debugImg: HTMLImageElement | null,
   debugFen: HTMLDivElement | null,
   debugInfo: HTMLDivElement | null,
+  useSan: boolean,
 ): void {
-  if (!debugPanel) return;
-
+  // Update debug panel elements
   if (debugImg && result.board_image_url) {
     debugImg.src = result.board_image_url;
   }
@@ -74,40 +137,10 @@ export function updateDebugPanel(
     debugFen.textContent = result.recognition?.fen || 'No recognition';
   }
 
-  // Update piece grid
+  // Update virtual board grid (user panel)
   const grid = document.getElementById('cv-debug-grid');
-  // highlighted_squares are in corrected (standard) orientation after recognizeBoard().
-  // When flipped, the display grid is reversed — remap indices to display coords.
-  const rawHl = result.highlighted_squares || [];
-  const hl = new Set(result.flipped ? rawHl.map(i => 63 - i) : rawHl);
   if (grid && result.recognition?.fen) {
-    let fenRows = result.recognition.fen.split('/');
-    if (result.flipped) {
-      fenRows = fenRows.reverse().map(r => r.split('').reverse().join(''));
-    }
-
-    let html = '';
-    let rank = 0;
-    for (const row of fenRows) {
-      let file = 0;
-      for (const ch of row) {
-        if (ch >= '1' && ch <= '8') {
-          for (let i = 0; i < parseInt(ch); i++) {
-            const sq = (rank + file) % 2 === 0 ? 'light' : 'dark';
-            const hi = hl.has(rank * 8 + file) ? ' highlight' : '';
-            html += `<span class="${sq}${hi} empty">\u00B7</span>`;
-            file++;
-          }
-        } else {
-          const sq = (rank + file) % 2 === 0 ? 'light' : 'dark';
-          const hi = hl.has(rank * 8 + file) ? ' highlight' : '';
-          html += `<span class="${sq}${hi} piece">${PIECE_UNICODE[ch] || ch}</span>`;
-          file++;
-        }
-      }
-      rank++;
-    }
-    grid.innerHTML = html;
+    renderBoardGrid(grid, result.recognition.fen, !!result.flipped, result.highlighted_squares || []);
   }
 
   // Turn indicator
@@ -117,12 +150,16 @@ export function updateDebugPanel(
     const fenParts = result.evaluation.fen.split(' ');
     const turn = fenParts[1] || 'w';
     turnDot.className = `turn-dot ${turn === 'w' ? 'white' : 'black'}`;
-    turnText.textContent = turn === 'w' ? 'White to move' : 'Black to move';
+    turnText.textContent = turn === 'w' ? 'White' : 'Black';
   }
+
+  // Orientation arrow
   const pawnDir = document.getElementById('cv-pawn-dir');
   if (pawnDir) {
-    pawnDir.textContent = result.flipped ? '\u2193' : '\u2191';
+    pawnDir.textContent = result.flipped ? '\u2B07' : '\u2B06';
   }
+
+  // Debug orientation info
   const orientInfo = document.getElementById('cv-orientation-info');
   if (orientInfo) {
     const orientation = result.flipped ? 'white top' : 'white bottom';
@@ -165,16 +202,11 @@ export function updateDebugPanel(
 
   // Best moves
   const bestMoves = document.getElementById('cv-best-moves');
-  if (bestMoves && result.evaluation?.top_moves?.length) {
-    let html = '';
-    for (const move of result.evaluation.top_moves) {
-      const scoreStr = move.score_cp >= 0 ? `+${(move.score_cp/100).toFixed(1)}` : (move.score_cp/100).toFixed(1);
-      const lossStr = move.loss_cp > 0 ? ` (\u2212${move.loss_cp}cp)` : '';
-      html += `<div class="move-line"><span class="move-score">${scoreStr}</span>${move.pv.slice(0, 5).join(' ')}${lossStr}</div>`;
-    }
-    bestMoves.innerHTML = html;
+  if (bestMoves) {
+    renderBestMoves(bestMoves, result, useSan);
   }
 
+  // Debug meta info
   if (debugInfo) {
     const parts: string[] = [];
     if (result.recognition) {
