@@ -12,9 +12,8 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    // Disable dep optimization — re-optimization on restart causes the
-    // analysis module to hang, preventing capture from starting.
-    noDiscovery: true,
-    include: [],
+    // Pre-bundle CJS deps that don't work with Vite's ESM dev server.
+    // noDiscovery is off so Vite can discover and pre-bundle them.
+    include: ['tesseract.js'],
   },
 });
