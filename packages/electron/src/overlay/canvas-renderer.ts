@@ -14,6 +14,7 @@ export interface OverlayState {
   pvDepth: number;
   evalBarVisible: boolean;
   sourceVisible: boolean;
+  selectedLineIndex: number;
   displayInfo: {
     size: { width: number; height: number };
     workArea: { x: number; y: number; width: number; height: number };
@@ -25,7 +26,8 @@ export interface OverlayState {
 /** Get the arrows to display based on current mode (top moves vs PV line) */
 export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
   if (state.lineVisible && state.currentResult?.evaluation?.top_moves?.length) {
-    const pv = state.currentResult.evaluation.top_moves[0].pv;
+    const idx = Math.min(state.selectedLineIndex, state.currentResult.evaluation.top_moves.length - 1);
+    const pv = state.currentResult.evaluation.top_moves[idx].pv;
     const turn = state.currentResult.evaluation.fen?.split(' ')[1] as 'w' | 'b' || 'w';
     return computePvArrows(pv, turn, state.pvDepth);
   }

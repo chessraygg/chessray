@@ -45,6 +45,7 @@ const state: OverlayState = {
   pvDepth: 4,
   evalBarVisible: true,
   sourceVisible: true,
+  selectedLineIndex: 0,
   displayInfo: null,
 };
 
@@ -200,7 +201,7 @@ function initOverlay(): void {
       notationBtn.classList.toggle('active', useSan);
       // Re-render current result with new notation
       if (state.currentResult) {
-        updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan);
+        updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, selectLine);
       }
     });
   }
@@ -239,6 +240,16 @@ initOverlay();
 
 let pendingResult: PipelineResult | null = null;
 let rafScheduled = false;
+let lastEvalFen: string | null = null;
+
+function selectLine(index: number): void {
+  state.selectedLineIndex = index;
+  if (state.currentResult) {
+    updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, selectLine);
+    renderArrows(state);
+    renderVideoOverlay(state);
+  }
+}
 
 function processPendingResult(): void {
   rafScheduled = false;
@@ -253,7 +264,14 @@ function processPendingResult(): void {
   state.displayFlipped = !!result.flipped;
   state.currentResult = result;
 
-  updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan);
+  // Reset to best line when position changes
+  const evalFen = result.evaluation?.fen ?? null;
+  if (evalFen && evalFen !== lastEvalFen) {
+    state.selectedLineIndex = 0;
+    lastEvalFen = evalFen;
+  }
+
+  updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, selectLine);
   state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
   renderVideoOverlay(state);

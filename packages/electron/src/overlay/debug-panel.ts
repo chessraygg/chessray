@@ -91,19 +91,23 @@ function renderBoardGrid(
   grid.innerHTML = html;
 }
 
-/** Format best moves with SAN or UCI notation */
+/** Format best moves with SAN or UCI notation, clickable to select line */
 function renderBestMoves(
   container: HTMLElement,
   result: PipelineResult,
   useSan: boolean,
+  selectedLineIndex: number,
+  onSelectLine: (index: number) => void,
 ): void {
   if (!result.evaluation?.top_moves?.length) return;
 
   const fen = result.evaluation.fen;
   let html = '';
-  for (const move of result.evaluation.top_moves) {
+  for (let i = 0; i < result.evaluation.top_moves.length; i++) {
+    const move = result.evaluation.top_moves[i];
     const scoreStr = move.score_cp >= 0 ? `+${(move.score_cp/100).toFixed(1)}` : (move.score_cp/100).toFixed(1);
     const lossStr = move.loss_cp > 0 ? ` (\u2212${move.loss_cp}cp)` : '';
+    const selected = i === selectedLineIndex ? ' selected' : '';
 
     let movesText: string;
     if (useSan && fen) {
@@ -114,9 +118,17 @@ function renderBestMoves(
       movesText = move.pv.slice(0, 5).join(' ');
     }
 
-    html += `<div class="move-line"><span class="move-score">${scoreStr}</span>${movesText}${lossStr}</div>`;
+    html += `<div class="move-line${selected}" data-line="${i}"><span class="move-score">${scoreStr}</span>${movesText}${lossStr}</div>`;
   }
   container.innerHTML = html;
+
+  // Attach click handlers
+  container.querySelectorAll('.move-line').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt((el as HTMLElement).dataset.line!, 10);
+      onSelectLine(idx);
+    });
+  });
 }
 
 export function updateDebugPanel(
@@ -126,6 +138,8 @@ export function updateDebugPanel(
   debugFen: HTMLDivElement | null,
   debugInfo: HTMLDivElement | null,
   useSan: boolean,
+  selectedLineIndex: number,
+  onSelectLine: (index: number) => void,
 ): void {
   if (debugImg && result.board_image_url) {
     debugImg.src = result.board_image_url;
@@ -201,7 +215,7 @@ export function updateDebugPanel(
   // Best moves
   const bestMoves = document.getElementById('cv-best-moves');
   if (bestMoves) {
-    renderBestMoves(bestMoves, result, useSan);
+    renderBestMoves(bestMoves, result, useSan, selectedLineIndex, onSelectLine);
   }
 
   // Debug meta info
