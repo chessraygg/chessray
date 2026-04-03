@@ -128,6 +128,21 @@ canvas#video-overlay {
 
 #cv-main-toggles { margin-top: 6px; }
 
+.icon-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.icon-toggle svg { flex-shrink: 0; }
+
+.toggle-label { font-size: 9px; }
+
+/* Collapsed: icons only */
+.panel.collapsed .toggle-label { display: none; }
+.panel.collapsed .icon-toggle { padding: 5px 0; }
+
 /* ── Body ── */
 
 .panel-body {
