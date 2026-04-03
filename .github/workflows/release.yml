@@ -112,7 +112,7 @@ jobs:
           done
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Download vendor assets
         run: npm run setup
