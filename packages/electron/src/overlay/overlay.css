@@ -129,6 +129,9 @@ canvas#video-overlay {
 
 .ctrl-btn.chevron.collapsed { transform: rotate(-90deg); }
 
+/* Hide debug gear when panel is collapsed */
+.panel.collapsed #cv-debug-toggle { display: none; }
+
 /* ── Top bar: icons + collapse/close, always visible ── */
 
 .top-bar {
