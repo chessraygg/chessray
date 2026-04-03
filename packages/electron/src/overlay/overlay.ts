@@ -112,12 +112,20 @@ function initOverlay(): void {
 
   // ── Overlay/Box toggles (debug panel) ──
   const overlayBtn = document.getElementById('cv-overlay-btn');
+  const childToggles = document.querySelectorAll('#cv-eval-btn, #cv-line-btn, #cv-arrows-btn');
+
+  function updateChildToggles(): void {
+    childToggles.forEach(btn => btn.classList.toggle('parent-hidden', !state.overlayVisible));
+  }
+
   if (overlayBtn) {
     overlayBtn.classList.toggle('active', state.overlayVisible);
+    updateChildToggles();
     overlayBtn.addEventListener('click', () => {
       state.overlayVisible = !state.overlayVisible;
       if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
       overlayBtn.classList.toggle('active', state.overlayVisible);
+      updateChildToggles();
       savePrefs({ overlayVisible: state.overlayVisible });
     });
   }

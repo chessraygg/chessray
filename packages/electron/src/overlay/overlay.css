@@ -163,6 +163,7 @@ canvas#video-overlay {
 .toggle:hover { border-color: #3a3a3a; }
 .toggle.active { background: #272727; border-color: #3a3a3a; color: var(--text); }
 .toggle:disabled { opacity: 0.3; cursor: default; }
+.toggle.parent-hidden { opacity: 0.35; text-decoration: line-through; }
 
 .pv-depth-row {
   display: flex;
