@@ -14,11 +14,12 @@ export function setupDrag(handle: HTMLElement, panel: HTMLElement): void {
     // Don't drag when clicking interactive elements
     if ((e.target as HTMLElement).closest('button, input, select, textarea, .move-line')) return;
     isDragging = true;
-    const rect = panel.getBoundingClientRect();
     startX = e.clientX;
     startY = e.clientY;
-    startLeft = rect.left;
-    startTop = rect.top;
+    // Use offsetLeft/Top (unscaled CSS position) — getBoundingClientRect()
+    // returns scaled values which causes a jump when CSS transform:scale is applied.
+    startLeft = panel.offsetLeft;
+    startTop = panel.offsetTop;
     e.preventDefault();
   });
 
@@ -33,8 +34,7 @@ export function setupDrag(handle: HTMLElement, panel: HTMLElement): void {
 
   document.addEventListener('mouseup', () => {
     if (isDragging) {
-      const rect = panel.getBoundingClientRect();
-      savePrefs({ panelLeft: Math.round(rect.left), panelTop: Math.round(rect.top) });
+      savePrefs({ panelLeft: panel.offsetLeft, panelTop: panel.offsetTop });
     }
     isDragging = false;
   });
