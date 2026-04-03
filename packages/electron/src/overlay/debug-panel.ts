@@ -167,14 +167,15 @@ export function updateDebugPanel(
     renderBoardGrid(grid, result.recognition.fen, !!result.flipped, result.highlighted_squares || []);
   }
 
-  // Turn indicator
+  // Turn indicator — use highlight-based turn (always current), fall back to eval FEN
   const turnDot = document.getElementById('cv-turn-dot');
   const turnText = document.getElementById('cv-turn-text');
-  if (turnDot && turnText && result.evaluation?.fen) {
-    const fenParts = result.evaluation.fen.split(' ');
-    const turn = fenParts[1] || 'w';
-    turnDot.className = `turn-dot ${turn === 'w' ? 'white' : 'black'}`;
-    turnText.textContent = turn === 'w' ? 'White' : 'Black';
+  if (turnDot && turnText) {
+    const turn = result.turn ?? result.evaluation?.fen?.split(' ')[1] ?? null;
+    if (turn) {
+      turnDot.className = `turn-dot ${turn === 'w' ? 'white' : 'black'}`;
+      turnText.textContent = turn === 'w' ? 'White' : 'Black';
+    }
   }
 
   // Orientation arrow

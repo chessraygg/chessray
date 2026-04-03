@@ -6,7 +6,7 @@
  */
 
 import {
-  detectBoard, cropPixels, recognizeBoard, turnFromHighlight,
+  detectBoard, cropPixels, recognizeBoard,
   computeArrows, compareFen, guessTurn, buildFullFen,
 } from '@chessray/core';
 import type {
@@ -44,6 +44,7 @@ let lastRawFen: string = '';
 let lastIsFlipped = false;
 let lastOrientationSource: OrientationSource | undefined;
 let lastHighlightedSquares: number[] = [];
+let lastHighlightTurn: 'w' | 'b' | null = null;
 let lastArrows: ArrowDescriptor[] = [];
 let cachedBbox: BoardBBox | null = null;
 let frameCount = 0;
@@ -151,6 +152,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     let orientationSource: OrientationSource | undefined;
     let rawFen = '';
     let highlightedSquares: number[] = [];
+    let highlightTurn: 'w' | 'b' | null = null;
     let tRecog = 0;
 
     if (visuallyUnchanged && lastRecognitionResult) {
@@ -159,6 +161,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       isFlipped = lastIsFlipped;
       orientationSource = lastOrientationSource;
       highlightedSquares = lastHighlightedSquares;
+      highlightTurn = lastHighlightTurn;
     } else {
       t = Date.now();
       if (recognizer) {
@@ -168,6 +171,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
         isFlipped = boardResult.flipped;
         orientationSource = boardResult.orientationSource;
         highlightedSquares = boardResult.highlightedSquares;
+        highlightTurn = boardResult.turn;
         if (frameCount <= 3) {
           debugLog(`Recognition: rawFen=${rawFen} conf=${recognition.confidence.toFixed(2)}`);
         }
@@ -179,6 +183,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       lastIsFlipped = isFlipped;
       lastOrientationSource = orientationSource;
       lastHighlightedSquares = highlightedSquares;
+      lastHighlightTurn = highlightTurn;
 
     }
 
@@ -190,6 +195,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       eval_max_depth: opts.eval_max_depth,
       arrows: opts.arrows ?? [],
       highlighted_squares: highlightedSquares,
+      turn: highlightTurn ?? undefined,
       flipped: isFlipped,
       orientation_source: orientationSource,
       board_image_url: boardImageUrl,
@@ -246,8 +252,8 @@ async function processFrame(imageData: ImageData): Promise<void> {
       return;
     }
 
-    const highlightTurn = turnFromHighlight(highlightedSquares, positionFen);
     const turn = highlightTurn ?? guessTurn(prevPositionFen, positionFen);
+    debugLog(`Turn: highlight=${highlightTurn} guess=${guessTurn(prevPositionFen, positionFen)} final=${turn} hl=[${highlightedSquares}]`);
     const fullFen = buildFullFen(positionFen, turn);
 
     prevPositionFen = positionFen;
