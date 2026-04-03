@@ -158,7 +158,8 @@ export function updateDebugPanel(
   }
 
   if (debugFen) {
-    debugFen.textContent = result.recognition?.fen || 'No recognition';
+    // Show full FEN (with turn, castling rights) if available, else position-only
+    debugFen.textContent = result.evaluation?.fen || result.recognition?.fen || 'No recognition';
   }
 
   // Update virtual board grid (user panel)
