@@ -11,8 +11,8 @@ export function setupDrag(handle: HTMLElement, panel: HTMLElement): void {
   let startTop = 0;
 
   handle.addEventListener('mousedown', (e: MouseEvent) => {
-    // Don't drag when clicking buttons
-    if ((e.target as HTMLElement).closest('button')) return;
+    // Don't drag when clicking interactive elements
+    if ((e.target as HTMLElement).closest('button, input, select, textarea, .move-line')) return;
     isDragging = true;
     const rect = panel.getBoundingClientRect();
     startX = e.clientX;
