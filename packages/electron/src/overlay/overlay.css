@@ -53,24 +53,26 @@ canvas#video-overlay {
 .resize-grip {
   position: absolute;
   bottom: 0;
-  right: 0;
   width: 14px;
   height: 14px;
-  cursor: nwse-resize;
   user-select: none;
 }
+
+.resize-grip.right { right: 0; cursor: nwse-resize; }
+.resize-grip.left { left: 0; cursor: nesw-resize; }
 
 .resize-grip::after {
   content: '';
   position: absolute;
   bottom: 3px;
-  right: 3px;
   width: 6px;
   height: 6px;
-  border-right: 2px solid var(--text-faint);
   border-bottom: 2px solid var(--text-faint);
   opacity: 0.5;
 }
+
+.resize-grip.right::after { right: 3px; border-right: 2px solid var(--text-faint); }
+.resize-grip.left::after { left: 3px; border-left: 2px solid var(--text-faint); }
 
 .panel.hidden { display: none; }
 

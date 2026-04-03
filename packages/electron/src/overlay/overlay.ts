@@ -118,14 +118,16 @@ function initOverlay(): void {
     }, { passive: false });
   }
 
-  // ── Resize grip (drag to scale) ──
-  const resizeGrip = document.getElementById('cv-resize-grip');
-  if (resizeGrip && userPanel) {
+  // ── Resize grips (drag to scale) ──
+  function setupResizeGrip(gripId: string): void {
+    const grip = document.getElementById(gripId);
+    if (!grip || !userPanel) return;
+
     let resizing = false;
     let startY = 0;
     let startScale = 1;
 
-    resizeGrip.addEventListener('mousedown', (e: MouseEvent) => {
+    grip.addEventListener('mousedown', (e: MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
       resizing = true;
@@ -150,6 +152,8 @@ function initOverlay(): void {
       }
     });
   }
+  setupResizeGrip('cv-resize-grip');
+  setupResizeGrip('cv-resize-grip-left');
 
   // ── Zoom controls ──
   const zoomLabel = document.getElementById('cv-zoom-label');
