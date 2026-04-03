@@ -216,14 +216,12 @@ function initOverlay(): void {
 
   // ── Collapse panel ──
   const collapseBtn = document.getElementById('cv-collapse-btn');
-  const collapseBtnInline = document.getElementById('cv-collapse-btn-inline');
   const panelBody = document.getElementById('cv-panel-body');
 
   function setCollapsed(c: boolean): void {
     panelBody?.classList.toggle('hidden', c);
     userPanel?.classList.toggle('collapsed', c);
     collapseBtn?.classList.toggle('collapsed', c);
-    collapseBtnInline?.classList.toggle('collapsed', c);
     savePrefs({ collapsed: c });
   }
 
@@ -231,14 +229,10 @@ function initOverlay(): void {
   if (collapsed) setCollapsed(true);
 
   collapseBtn?.addEventListener('click', () => { collapsed = !collapsed; setCollapsed(collapsed); });
-  collapseBtnInline?.addEventListener('click', () => { collapsed = !collapsed; setCollapsed(collapsed); });
 
   // ── Window controls ──
   const closeBtn = document.getElementById('cv-close-btn');
-  const closeBtnInline = document.getElementById('cv-close-btn-inline');
-  const closeApp = () => window.chessRay.closeApp();
-  closeBtn?.addEventListener('click', closeApp);
-  closeBtnInline?.addEventListener('click', closeApp);
+  closeBtn?.addEventListener('click', () => window.chessRay.closeApp());
 }
 
 initOverlay();

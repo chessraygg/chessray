@@ -44,7 +44,7 @@ canvas#video-overlay {
   border-radius: var(--radius);
   padding: 10px;
   pointer-events: auto;
-  overflow: hidden;
+  overflow: visible;
   cursor: grab;
 }
 
@@ -105,18 +105,17 @@ canvas#video-overlay {
 
 .ctrl-btn.chevron.collapsed { transform: rotate(-90deg); }
 
-/* ── Controls row ── */
+/* ── Top bar: icons + collapse/close, always visible ── */
 
-.controls-row {
+.top-bar {
   display: flex;
-  justify-content: flex-end;
-  gap: 1px;
+  align-items: center;
+  gap: 2px;
 }
 
-/* Inline controls in toggle row: hidden by default, shown when collapsed */
-.inline-ctrl { display: none; }
-.panel.collapsed .controls-row { display: none; }
-.panel.collapsed .inline-ctrl { display: flex; }
+.top-bar .ctrl-btn { margin-left: auto; }
+.top-bar .ctrl-btn + .ctrl-btn { margin-left: 0; }
+
 
 .icon-toggle {
   display: flex;
@@ -128,10 +127,6 @@ canvas#video-overlay {
 .icon-toggle svg { flex-shrink: 0; }
 
 .toggle-label { font-size: 9px; }
-
-/* Collapsed: icons only */
-.panel.collapsed .toggle-label { display: none; }
-.panel.collapsed .icon-toggle { padding: 5px 0; }
 
 /* ── Body ── */
 
