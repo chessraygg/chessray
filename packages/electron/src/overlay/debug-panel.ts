@@ -120,6 +120,9 @@ function renderBestMoves(
 
     html += `<div class="move-line${selected}" data-line="${i}"><span class="move-score">${scoreStr}</span>${movesText}${lossStr}</div>`;
   }
+  // Skip DOM rebuild if content unchanged (prevents hover flicker at 2fps)
+  if (container.dataset.lastHtml === html) return;
+  container.dataset.lastHtml = html;
   container.innerHTML = html;
 
   // Attach click handlers
