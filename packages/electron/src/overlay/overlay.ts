@@ -30,7 +30,7 @@ let debugImg: HTMLImageElement | null = null;
 let debugFen: HTMLDivElement | null = null;
 let debugInfo: HTMLDivElement | null = null;
 let isTracking = false;
-let useSan = true;
+let useSan: boolean;
 
 const state: OverlayState = {
   videoCanvas: null,
@@ -59,6 +59,7 @@ function initOverlay(): void {
   state.lineVisible = prefs.lineVisible;
   state.pvDepth = prefs.pvDepth;
   state.evalBarVisible = prefs.evalBarVisible;
+  useSan = prefs.useSan;
 
   state.videoCanvas = document.getElementById('video-overlay') as HTMLCanvasElement;
   userPanel = document.getElementById('user-panel') as HTMLDivElement;
@@ -83,11 +84,8 @@ function initOverlay(): void {
     });
   }
 
-  // Make user panel draggable by controls row (expanded) and toggle row (collapsed)
-  const controlsRow = userPanel?.querySelector('.controls-row') as HTMLElement | null;
-  const toggleRow = document.getElementById('cv-main-toggles') as HTMLElement | null;
-  if (controlsRow && userPanel) setupDrag(controlsRow, userPanel);
-  if (toggleRow && userPanel) setupDrag(toggleRow, userPanel);
+  // Make entire panel draggable (setupDrag skips button clicks)
+  if (userPanel) setupDrag(userPanel, userPanel);
 
   // Restore panel position
   if (userPanel && prefs.panelLeft != null && prefs.panelTop != null) {
@@ -202,11 +200,13 @@ function initOverlay(): void {
   // ── SAN/UCI notation toggle ──
   const notationBtn = document.getElementById('cv-notation-btn');
   if (notationBtn) {
+    notationBtn.textContent = useSan ? 'SAN' : 'UCI';
     notationBtn.classList.toggle('active', useSan);
     notationBtn.addEventListener('click', () => {
       useSan = !useSan;
       notationBtn.textContent = useSan ? 'SAN' : 'UCI';
       notationBtn.classList.toggle('active', useSan);
+      savePrefs({ useSan });
       // Re-render current result with new notation
       if (state.currentResult) {
         updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, selectLine);

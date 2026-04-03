@@ -45,8 +45,10 @@ canvas#video-overlay {
   padding: 10px;
   pointer-events: auto;
   overflow: hidden;
-  cursor: default;
+  cursor: grab;
 }
+
+.panel:active { cursor: grabbing; }
 
 .panel.hidden { display: none; }
 
@@ -109,17 +111,12 @@ canvas#video-overlay {
   display: flex;
   justify-content: flex-end;
   gap: 1px;
-  cursor: grab;
 }
-
-.controls-row:active { cursor: grabbing; }
 
 /* Inline controls in toggle row: hidden by default, shown when collapsed */
 .inline-ctrl { display: none; }
 .panel.collapsed .controls-row { display: none; }
 .panel.collapsed .inline-ctrl { display: flex; }
-.panel.collapsed #cv-main-toggles { cursor: grab; }
-.panel.collapsed #cv-main-toggles:active { cursor: grabbing; }
 
 .icon-toggle {
   display: flex;
