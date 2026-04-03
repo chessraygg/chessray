@@ -340,11 +340,8 @@ canvas#video-overlay {
   gap: 4px;
 }
 
-.best-moves .move-line:nth-child(1) { background: rgba(229,229,229,0.08); color: var(--text); }
-.best-moves .move-line:nth-child(2) { background: rgba(229,229,229,0.04); color: var(--text-dim); }
-.best-moves .move-line:nth-child(3) { background: rgba(229,229,229,0.02); color: var(--text-muted); }
 .best-moves .move-line { cursor: pointer; }
-.best-moves .move-line:hover { background: rgba(229,229,229,0.12) !important; }
+.best-moves .move-line:hover { filter: brightness(1.3); }
 .best-moves .move-line.selected { border-left: 2px solid var(--accent); padding-left: 4px; }
 .move-score { font-weight: 600; margin-right: 2px; }
 
