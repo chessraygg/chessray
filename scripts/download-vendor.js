@@ -26,6 +26,13 @@ const ASSETS = [
       { name: 'ort-wasm-simd-threaded.asyncify.wasm', url: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/ort-wasm-simd-threaded.asyncify.wasm' },
     ],
   },
+  // YOLO chess piece detection model
+  {
+    dir: 'yolo-chess',
+    files: [
+      { name: 'chess-pieces.onnx', url: 'https://github.com/chessraygg/chessray/releases/download/v0.2.5/chess-pieces.onnx' },
+    ],
+  },
 ];
 
 function download(url, dest) {

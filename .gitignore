@@ -7,6 +7,7 @@ dist/
 .vite/
 vendor/stockfish/
 vendor/onnxruntime-web/
+vendor/yolo-chess/
 test/output/
 test/e2e/output/
 test-results/
