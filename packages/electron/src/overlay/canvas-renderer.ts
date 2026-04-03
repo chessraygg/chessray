@@ -87,13 +87,19 @@ export function drawArrow(
   const tipBackY = y2 - headLength * Math.sin(tipAngle);
 
   ctx.save();
-  ctx.globalAlpha = arrow.opacity;
-  ctx.strokeStyle = arrow.color;
-  ctx.fillStyle = arrow.color;
   ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
 
+  // Gradient stroke: transparent at source, full opacity at arrowhead
+  const grad = ctx.createLinearGradient(x1, y1, tipBackX, tipBackY);
+  const r = parseInt(arrow.color.slice(1, 3), 16);
+  const g = parseInt(arrow.color.slice(3, 5), 16);
+  const b = parseInt(arrow.color.slice(5, 7), 16);
+  grad.addColorStop(0, `rgba(${r},${g},${b},${(arrow.opacity * 0.15).toFixed(2)})`);
+  grad.addColorStop(1, `rgba(${r},${g},${b},${arrow.opacity.toFixed(2)})`);
+
   // Draw the shaft (quadratic bezier curve)
+  ctx.strokeStyle = grad;
   ctx.beginPath();
   ctx.moveTo(x1, y1);
   if (curveOffset === 0) {
@@ -103,7 +109,9 @@ export function drawArrow(
   }
   ctx.stroke();
 
-  // Draw the arrowhead
+  // Draw the arrowhead at full opacity
+  ctx.globalAlpha = arrow.opacity;
+  ctx.fillStyle = arrow.color;
   ctx.beginPath();
   ctx.moveTo(x2, y2);
   ctx.lineTo(x2 - headLength * Math.cos(tipAngle - Math.PI / 6), y2 - headLength * Math.sin(tipAngle - Math.PI / 6));
