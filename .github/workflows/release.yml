@@ -87,7 +87,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.version.outputs.tag }}
+          ref: main
           lfs: true
 
       - uses: actions/setup-node@v4
