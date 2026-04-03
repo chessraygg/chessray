@@ -87,8 +87,15 @@ export function compareFen(a: string, b: string): boolean {
 const STARTING_POSITION = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
 
 export function guessTurn(prevFen: string | null, currFen: string): 'w' | 'b' {
-  if (currFen.split(' ')[0] === STARTING_POSITION) return 'w';
+  const posOnly = currFen.split(' ')[0];
+  if (posOnly === STARTING_POSITION) return 'w';
   if (!prevFen) return 'w';
+
+  // If all pawns are on their starting ranks (no moves made), it's white to move
+  const ranks = posOnly.split('/');
+  if (ranks[1]?.replace(/[^p]/g, '').length === 8 && ranks[6]?.replace(/[^P]/g, '').length === 8) {
+    return 'w';
+  }
 
   const prevBoard = fenToBoard(prevFen);
   const currBoard = fenToBoard(currFen);
