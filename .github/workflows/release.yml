@@ -1,16 +1,11 @@
 name: Release
 
-# Triggered on every push to main (i.e., merged PRs).
-# Version bump is determined by PR labels: "major", "minor", or "patch" (default).
-
 on:
   push:
     branches: [main]
 
 jobs:
   version:
-    # Skip if this push is a version bump commit from this workflow (avoid infinite loop)
-    if: "!startsWith(github.event.head_commit.message, 'Release v')"
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -21,11 +16,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
 
       - name: Determine version bump from merged PR labels
         id: bump_type
@@ -33,7 +23,6 @@ jobs:
         with:
           result-encoding: string
           script: |
-            // Find the PR that was just merged into main
             const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -41,7 +30,7 @@ jobs:
             });
             const merged = prs.find(pr => pr.merged_at && pr.base.ref === 'main');
             if (!merged) {
-              core.info('No merged PR found for this commit — defaulting to patch');
+              core.info('No merged PR found — defaulting to patch');
               return 'patch';
             }
             const labels = merged.labels.map(l => l.name.toLowerCase());
@@ -50,11 +39,14 @@ jobs:
             if (labels.includes('minor')) return 'minor';
             return 'patch';
 
-      - name: Bump version and create tag
+      - name: Compute next version and create tag
         id: bump
         run: |
           BUMP="${{ steps.bump_type.outputs.result }}"
-          CURRENT="$(node -p "require('./package.json').version")"
+
+          LATEST_TAG="$(git tag -l 'v*' --sort=-v:refname | head -n1)"
+          CURRENT="${LATEST_TAG#v}"
+          CURRENT="${CURRENT:-0.0.0}"
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
 
           case "$BUMP" in
@@ -64,29 +56,13 @@ jobs:
           esac
 
           echo "Bumping $CURRENT → $NEW ($BUMP)"
-
-          # Update all package.json files
-          for pkg in package.json packages/*/package.json; do
-            if [ -f "$pkg" ]; then
-              node -e "
-                const fs = require('fs');
-                const pkg = JSON.parse(fs.readFileSync('$pkg', 'utf8'));
-                pkg.version = '$NEW';
-                fs.writeFileSync('$pkg', JSON.stringify(pkg, null, 2) + '\n');
-              "
-            fi
-          done
+          echo "new_version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEW" >> "$GITHUB_OUTPUT"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json packages/*/package.json
-          git commit -m "Release v$NEW"
           git tag -a "v$NEW" -m "v$NEW"
-          git push
           git push origin "v$NEW"
-
-          echo "new_version=$NEW" >> "$GITHUB_OUTPUT"
-          echo "tag=v$NEW" >> "$GITHUB_OUTPUT"
 
   build:
     needs: version
@@ -118,6 +94,22 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
+      # Inject tag version into package.json so forge uses it in filenames
+      - name: Set build version
+        shell: bash
+        run: |
+          VERSION="${{ needs.version.outputs.new_version }}"
+          for pkg in package.json packages/*/package.json; do
+            if [ -f "$pkg" ]; then
+              node -e "
+                const fs = require('fs');
+                const p = JSON.parse(fs.readFileSync('$pkg', 'utf8'));
+                p.version = '$VERSION';
+                fs.writeFileSync('$pkg', JSON.stringify(p, null, 2) + '\n');
+              "
+            fi
+          done
 
       - name: Install dependencies
         run: npm ci
