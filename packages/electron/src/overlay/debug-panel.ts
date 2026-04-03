@@ -97,6 +97,7 @@ function renderBestMoves(
   result: PipelineResult,
   useSan: boolean,
   selectedLineIndex: number,
+  lineVisible: boolean,
   onSelectLine: (index: number) => void,
 ): void {
   if (!result.evaluation?.top_moves?.length) return;
@@ -107,7 +108,7 @@ function renderBestMoves(
     const move = result.evaluation.top_moves[i];
     const scoreStr = move.score_cp >= 0 ? `+${(move.score_cp/100).toFixed(1)}` : (move.score_cp/100).toFixed(1);
     const lossStr = move.loss_cp > 0 ? ` (\u2212${move.loss_cp}cp)` : '';
-    const selected = i === selectedLineIndex ? ' selected' : '';
+    const selected = lineVisible && i === selectedLineIndex ? ' selected' : '';
 
     let movesText: string;
     if (useSan && fen) {
@@ -142,6 +143,7 @@ export function updateDebugPanel(
   debugInfo: HTMLDivElement | null,
   useSan: boolean,
   selectedLineIndex: number,
+  lineVisible: boolean,
   onSelectLine: (index: number) => void,
 ): void {
   if (debugImg && result.board_image_url) {
@@ -218,7 +220,7 @@ export function updateDebugPanel(
   // Best moves
   const bestMoves = document.getElementById('cv-best-moves');
   if (bestMoves) {
-    renderBestMoves(bestMoves, result, useSan, selectedLineIndex, onSelectLine);
+    renderBestMoves(bestMoves, result, useSan, selectedLineIndex, lineVisible, onSelectLine);
   }
 
   // Debug meta info

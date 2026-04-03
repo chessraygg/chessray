@@ -209,7 +209,7 @@ function initOverlay(): void {
       notationBtn.classList.toggle('active', useSan);
       // Re-render current result with new notation
       if (state.currentResult) {
-        updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, selectLine);
+        updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, selectLine);
       }
     });
   }
@@ -253,7 +253,7 @@ let lastEvalFen: string | null = null;
 function selectLine(index: number): void {
   state.selectedLineIndex = index;
   if (state.currentResult) {
-    updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, selectLine);
+    updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, selectLine);
     renderArrows(state);
     renderVideoOverlay(state);
   }
@@ -279,7 +279,7 @@ function processPendingResult(): void {
     lastEvalFen = evalFen;
   }
 
-  updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, selectLine);
+  updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, selectLine);
   state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
   renderVideoOverlay(state);
