@@ -83,11 +83,11 @@ function initOverlay(): void {
     });
   }
 
-  // Make user panel draggable by top bar
-  const topBar = document.getElementById('cv-main-toggles') as HTMLElement | null;
-  if (topBar && userPanel) {
-    setupDrag(topBar, userPanel);
-  }
+  // Make user panel draggable by controls row (expanded) and toggle row (collapsed)
+  const controlsRow = userPanel?.querySelector('.controls-row') as HTMLElement | null;
+  const toggleRow = document.getElementById('cv-main-toggles') as HTMLElement | null;
+  if (controlsRow && userPanel) setupDrag(controlsRow, userPanel);
+  if (toggleRow && userPanel) setupDrag(toggleRow, userPanel);
 
   // Restore panel position
   if (userPanel && prefs.panelLeft != null && prefs.panelTop != null) {
@@ -216,30 +216,29 @@ function initOverlay(): void {
 
   // ── Collapse panel ──
   const collapseBtn = document.getElementById('cv-collapse-btn');
+  const collapseBtnInline = document.getElementById('cv-collapse-btn-inline');
   const panelBody = document.getElementById('cv-panel-body');
-  if (collapseBtn && userPanel && panelBody) {
-    let collapsed = prefs.collapsed;
-    if (collapsed) {
-      panelBody.classList.add('hidden');
-      userPanel.classList.add('collapsed');
-      collapseBtn.classList.add('collapsed');
-    }
-    collapseBtn.addEventListener('click', () => {
-      collapsed = !collapsed;
-      panelBody.classList.toggle('hidden', collapsed);
-      userPanel!.classList.toggle('collapsed', collapsed);
-      collapseBtn.classList.toggle('collapsed', collapsed);
-      savePrefs({ collapsed });
-    });
+
+  function setCollapsed(c: boolean): void {
+    panelBody?.classList.toggle('hidden', c);
+    userPanel?.classList.toggle('collapsed', c);
+    collapseBtn?.classList.toggle('collapsed', c);
+    collapseBtnInline?.classList.toggle('collapsed', c);
+    savePrefs({ collapsed: c });
   }
+
+  let collapsed = prefs.collapsed;
+  if (collapsed) setCollapsed(true);
+
+  collapseBtn?.addEventListener('click', () => { collapsed = !collapsed; setCollapsed(collapsed); });
+  collapseBtnInline?.addEventListener('click', () => { collapsed = !collapsed; setCollapsed(collapsed); });
 
   // ── Window controls ──
   const closeBtn = document.getElementById('cv-close-btn');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
-      window.chessRay.closeApp();
-    });
-  }
+  const closeBtnInline = document.getElementById('cv-close-btn-inline');
+  const closeApp = () => window.chessRay.closeApp();
+  closeBtn?.addEventListener('click', closeApp);
+  closeBtnInline?.addEventListener('click', closeApp);
 }
 
 initOverlay();

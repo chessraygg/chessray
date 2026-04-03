@@ -103,29 +103,23 @@ canvas#video-overlay {
 
 .ctrl-btn.chevron.collapsed { transform: rotate(-90deg); }
 
-/* ── Top bar: toggles left, controls pinned right ── */
+/* ── Controls row ── */
 
-.top-bar {
+.controls-row {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  justify-content: flex-end;
+  gap: 1px;
   cursor: grab;
 }
 
-.top-bar:active { cursor: grabbing; }
+.controls-row:active { cursor: grabbing; }
 
-.top-bar-toggles {
-  display: flex;
-  flex: 1;
-  gap: 2px;
-  min-width: 0;
-}
-
-.top-bar-controls {
-  display: flex;
-  gap: 1px;
-  flex-shrink: 0;
-}
+/* Inline controls in toggle row: hidden by default, shown when collapsed */
+.inline-ctrl { display: none; }
+.panel.collapsed .controls-row { display: none; }
+.panel.collapsed .inline-ctrl { display: flex; }
+.panel.collapsed #cv-main-toggles { cursor: grab; }
+.panel.collapsed #cv-main-toggles:active { cursor: grabbing; }
 
 .icon-toggle {
   display: flex;
