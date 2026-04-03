@@ -112,7 +112,10 @@ jobs:
           done
 
       - name: Install dependencies
-        run: npm install
+        shell: bash
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
 
       - name: Download vendor assets
         run: npm run setup
