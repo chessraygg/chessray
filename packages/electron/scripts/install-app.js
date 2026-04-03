@@ -11,20 +11,17 @@ if (process.platform === 'darwin') {
   // Find the .app bundle in out/
   const archDir = `ChessRay-darwin-${process.arch}`;
   const src = path.join(outDir, 'out', archDir, 'ChessRay.app');
-  const dest = path.join(os.homedir(), 'Applications', 'ChessRay.app');
+  const dest = '/Applications/ChessRay.app';
+  const userDest = path.join(os.homedir(), 'Applications', 'ChessRay.app');
 
   if (!fs.existsSync(src)) {
     console.error(`Packaged app not found at: ${src}`);
     process.exit(1);
   }
 
-  // Remove from both ~/Applications and /Applications to avoid duplicates
-  const systemDest = '/Applications/ChessRay.app';
+  // Remove from both locations to avoid duplicates
+  if (fs.existsSync(userDest)) execSync(`rm -rf "${userDest}"`);
   execSync(`rm -rf "${dest}"`);
-  if (fs.existsSync(systemDest)) {
-    execSync(`rm -rf "${systemDest}"`);
-    console.log(`Removed stale ${systemDest}`);
-  }
   execSync(`cp -R "${src}" "${dest}"`);
   console.log(`Installed to ${dest}`);
 
