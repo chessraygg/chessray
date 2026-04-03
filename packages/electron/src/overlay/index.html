@@ -17,12 +17,12 @@
       </div>
     </div>
 
-    <!-- Always visible when collapsed: overlay toggle + key controls -->
-    <div class="collapsed-bar" id="cv-collapsed-bar">
+    <!-- Always visible: overlay toggle + key controls -->
+    <div class="toggle-row compact" id="cv-main-toggles">
       <button class="toggle active" id="cv-overlay-btn">Overlay</button>
       <button class="toggle active" id="cv-eval-btn">Eval</button>
       <button class="toggle active" id="cv-line-btn">Line</button>
-      <button class="toggle active" id="cv-arrows-btn">Moves</button>
+      <button class="toggle" id="cv-arrows-btn">Moves</button>
     </div>
 
     <div class="panel-body" id="cv-panel-body">
@@ -59,7 +59,6 @@
         <!-- Extra controls -->
         <div class="toggle-row compact">
           <button class="toggle" id="cv-notation-btn" title="Toggle SAN/UCI notation">SAN</button>
-          <button class="toggle" id="cv-border-btn">Box</button>
         </div>
 
         <div class="pv-depth-row" id="cv-pv-depth-row">
@@ -71,6 +70,9 @@
         <!-- Debug section (inline, collapsible) -->
         <button class="debug-toggle" id="cv-debug-toggle">Debug &#x25B8;</button>
         <div class="debug-section hidden" id="debug-section">
+          <div class="toggle-row">
+            <button class="toggle" id="cv-border-btn">Box</button>
+          </div>
           <img id="cv-debug-img" src="" alt="Board capture">
           <div class="fen" id="cv-debug-fen">Waiting...</div>
           <div class="debug-orient" id="cv-orientation-info"></div>

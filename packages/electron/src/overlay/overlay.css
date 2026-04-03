@@ -125,15 +125,9 @@ canvas#video-overlay {
 
 .ctrl-btn.chevron.collapsed { transform: rotate(-90deg); }
 
-/* ── Collapsed bar: always visible toggles ── */
+/* ── Main toggles: always visible ── */
 
-.collapsed-bar {
-  display: none;
-  gap: 2px;
-  margin-top: 6px;
-}
-
-.panel.collapsed .collapsed-bar { display: flex; }
+#cv-main-toggles { margin-top: 6px; }
 
 /* ── Body ── */
 
