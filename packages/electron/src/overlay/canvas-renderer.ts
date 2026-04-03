@@ -128,7 +128,7 @@ export function drawArrow(
     ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.globalAlpha = Math.min(1, arrow.opacity + 0.2);
+    ctx.globalAlpha = arrow.opacity * 0.5;
     // Small circle offset from arrow start
     const r = fontSize * 0.55;
     const ox = x1 - r * 1.5;
