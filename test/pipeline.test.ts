@@ -5,7 +5,7 @@ import path from 'path';
 import { PNG } from 'pngjs';
 import { detectBoard, cropPixels, detectHighlightedSquares, indexToSquare, flipFen, recognizeBoard, YoloPieceRecognizer } from '@chessray/core';
 import type { BoardBBox } from '@chessray/core';
-import { HIGHLIGHT_CASES } from './fixtures/highlight-cases.js';
+import { PIPELINE_CASES } from './fixtures/pipeline-cases.js';
 
 const MODEL_PATH = path.join(__dirname, '../vendor/yolo-chess/chess-pieces.onnx');
 let session: ort.InferenceSession;
@@ -21,7 +21,7 @@ function indexToChess(idx: number): string {
   return indexToSquare(Math.floor(idx / 8), idx % 8);
 }
 
-describe('highlight detection', () => {
+describe('end-to-end detection pipeline', () => {
   beforeAll(async () => {
     session = await ort.InferenceSession.create(MODEL_PATH);
     recognizer = new YoloPieceRecognizer('');
@@ -29,7 +29,7 @@ describe('highlight detection', () => {
     recognizer.ort = ort;
   }, 30000);
 
-  for (const tc of HIGHLIGHT_CASES) {
+  for (const tc of PIPELINE_CASES) {
     it(`${tc.file}: ${tc.highlighted[0]}→${tc.highlighted[1]}, ${tc.turn} to move`, async () => {
       const t0 = Date.now();
       const { data, width, height } = loadPng(tc.file);

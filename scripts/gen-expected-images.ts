@@ -1,7 +1,7 @@
 /**
- * Generate expected-output images for highlight detection test cases.
+ * Generate expected-output images for pipeline test cases.
  *
- * Reads test/fixtures/highlight-cases.ts and produces annotated PNGs in
+ * Reads test/fixtures/pipeline-cases.ts and produces annotated PNGs in
  * test/fixtures/expected-images/ showing:
  *   - Left: original screenshot with magenta bbox and cyan grid
  *   - Right: virtual board rendered from expectedFen with piece symbols and highlights
@@ -15,7 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { PNG } from 'pngjs';
-import { HIGHLIGHT_CASES, type HighlightTestCase } from '../test/fixtures/highlight-cases.js';
+import { PIPELINE_CASES, type PipelineTestCase } from '../test/fixtures/pipeline-cases.js';
 import { buildFullFen, flipFen } from '@chessray/core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -286,7 +286,7 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
 const filter = process.argv[2];
 let generated = 0;
 
-for (const tc of HIGHLIGHT_CASES) {
+for (const tc of PIPELINE_CASES) {
   if (filter && !tc.file.includes(filter)) continue;
 
   const srcPath = path.join(SCREENSHOTS_DIR, tc.file);

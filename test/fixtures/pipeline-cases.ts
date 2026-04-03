@@ -1,4 +1,4 @@
-export interface HighlightTestCase {
+export interface PipelineTestCase {
   /** Screenshot filename in test/screenshots/ */
   file: string;
   /** Which direction white pawns move: 'up' (normal) or 'down' (flipped) */
@@ -17,7 +17,7 @@ export interface HighlightTestCase {
   orientation_source: 'label' | 'pawn_move' | 'piece_count';
 }
 
-export const HIGHLIGHT_CASES: HighlightTestCase[] = [
+export const PIPELINE_CASES: PipelineTestCase[] = [
   {
     file: 'test-oro-aronian.png',
     white_pawns: 'down',
