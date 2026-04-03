@@ -26,7 +26,6 @@ declare global {
 // ── Module-level state ──
 
 let userPanel: HTMLDivElement | null = null;
-let debugPanelEl: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
 let debugFen: HTMLDivElement | null = null;
 let debugInfo: HTMLDivElement | null = null;
@@ -62,7 +61,6 @@ function initOverlay(): void {
 
   state.videoCanvas = document.getElementById('video-overlay') as HTMLCanvasElement;
   userPanel = document.getElementById('user-panel') as HTMLDivElement;
-  debugPanelEl = document.getElementById('debug-panel') as HTMLDivElement;
   debugImg = document.getElementById('cv-debug-img') as HTMLImageElement;
   debugFen = document.getElementById('cv-debug-fen') as HTMLDivElement;
   debugInfo = document.getElementById('cv-debug-info') as HTMLDivElement;
@@ -74,16 +72,14 @@ function initOverlay(): void {
     state.canvas.height = 200;
   }
 
-  // Interactive panels: disable click-through on hover
-  for (const panel of [userPanel, debugPanelEl]) {
-    if (panel) {
-      panel.addEventListener('mouseenter', () => {
-        window.chessRay.setMousePassthrough(false);
-      });
-      panel.addEventListener('mouseleave', () => {
-        window.chessRay.setMousePassthrough(true);
-      });
-    }
+  // Interactive panel: disable click-through on hover
+  if (userPanel) {
+    userPanel.addEventListener('mouseenter', () => {
+      window.chessRay.setMousePassthrough(false);
+    });
+    userPanel.addEventListener('mouseleave', () => {
+      window.chessRay.setMousePassthrough(true);
+    });
   }
 
   // Make user panel draggable by its header
@@ -102,20 +98,14 @@ function initOverlay(): void {
   // Restore visual state from prefs
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
 
-  // ── Debug panel toggle ──
+  // ── Inline debug section toggle ──
   const debugToggle = document.getElementById('cv-debug-toggle');
-  if (debugToggle && debugPanelEl) {
+  const debugSection = document.getElementById('debug-section');
+  if (debugToggle && debugSection) {
     debugToggle.addEventListener('click', () => {
-      const showing = debugPanelEl!.classList.toggle('hidden');
-      debugToggle.classList.toggle('active', !showing);
-    });
-  }
-
-  const debugClose = document.getElementById('cv-debug-close');
-  if (debugClose && debugPanelEl) {
-    debugClose.addEventListener('click', () => {
-      debugPanelEl!.classList.add('hidden');
-      debugToggle?.classList.remove('active');
+      const isHidden = debugSection.classList.toggle('hidden');
+      debugToggle.classList.toggle('active', !isHidden);
+      debugToggle.innerHTML = isHidden ? 'Debug &#x25B8;' : 'Debug &#x25BE;';
     });
   }
 
@@ -270,7 +260,7 @@ function processPendingResult(): void {
   state.displayFlipped = !!result.flipped;
   state.currentResult = result;
 
-  updateDebugPanel(result, state.displayFlipped, debugPanelEl, debugImg, debugFen, debugInfo, useSan);
+  updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan);
   state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
   renderVideoOverlay(state);

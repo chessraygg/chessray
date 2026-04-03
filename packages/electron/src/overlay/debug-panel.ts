@@ -122,13 +122,11 @@ function renderBestMoves(
 export function updateDebugPanel(
   result: PipelineResult,
   displayFlipped: boolean,
-  debugPanel: HTMLDivElement | null,
   debugImg: HTMLImageElement | null,
   debugFen: HTMLDivElement | null,
   debugInfo: HTMLDivElement | null,
   useSan: boolean,
 ): void {
-  // Update debug panel elements
   if (debugImg && result.board_image_url) {
     debugImg.src = result.board_image_url;
   }
