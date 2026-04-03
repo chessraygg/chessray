@@ -94,6 +94,26 @@ function initOverlay(): void {
     userPanel.style.right = 'auto';
   }
 
+  // ── Panel zoom (Cmd+scroll) ──
+  let panelScale = prefs.panelScale;
+  function applyScale(): void {
+    if (!userPanel) return;
+    userPanel.style.transform = `scale(${panelScale})`;
+    userPanel.style.transformOrigin = 'top right';
+  }
+  applyScale();
+
+  if (userPanel) {
+    userPanel.addEventListener('wheel', (e: WheelEvent) => {
+      if (!e.metaKey && !e.ctrlKey) return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.05 : 0.05;
+      panelScale = Math.min(2, Math.max(0.5, panelScale + delta));
+      applyScale();
+      savePrefs({ panelScale });
+    }, { passive: false });
+  }
+
   // Restore visual state from prefs
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
 

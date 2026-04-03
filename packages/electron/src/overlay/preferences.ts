@@ -9,6 +9,7 @@ export interface Prefs {
   pvDepth: number;
   evalBarVisible: boolean;
   useSan: boolean;
+  panelScale: number;
   collapsed: boolean;
   panelLeft: number | null;
   panelTop: number | null;
@@ -22,6 +23,7 @@ export const DEFAULT_PREFS: Prefs = {
   pvDepth: 4,
   evalBarVisible: true,
   useSan: true,
+  panelScale: 1,
   collapsed: false,
   panelLeft: null,
   panelTop: null,
