@@ -169,6 +169,26 @@ export function renderArrows(state: OverlayState): void {
   ctx.clearRect(0, 0, size, size);
 
   const virtualBoard = { x: 0, y: 0, width: size, height: size };
+
+  // Game over overlay on virtual board
+  if (state.currentResult?.game_over) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillRect(0, 0, size, size);
+
+    const bannerH = size * 0.18;
+    const bannerY = (size - bannerH) / 2;
+    ctx.fillStyle = state.currentResult.game_over === 'checkmate' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(80, 80, 80, 0.7)';
+    ctx.fillRect(0, bannerY, size, bannerH);
+
+    const fontSize = Math.max(10, Math.round(size * 0.07));
+    ctx.font = `600 ${fontSize}px -apple-system, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(state.currentResult.game_over === 'checkmate' ? 'Checkmate' : 'Stalemate', size / 2, bannerY + bannerH / 2);
+    return;
+  }
+
   const arrows = getActiveArrows(state);
 
   if (arrows.length === 0) return;
@@ -272,6 +292,31 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.strokeStyle = '#555';
     ctx.lineWidth = 1;
     ctx.strokeRect(barX, by, barW, bh);
+  }
+
+  // Game over overlay on the actual board
+  if (result.game_over) {
+    // Semi-transparent dark overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.fillRect(bx, by, bw, bh);
+
+    // Banner in the center
+    const bannerH = bh * 0.18;
+    const bannerY = by + (bh - bannerH) / 2;
+    ctx.fillStyle = result.game_over === 'checkmate' ? 'rgba(0, 0, 0, 0.75)' : 'rgba(80, 80, 80, 0.75)';
+    ctx.fillRect(bx, bannerY, bw, bannerH);
+
+    // Text
+    const fontSize = Math.max(14, Math.round(bw * 0.06));
+    ctx.font = `600 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+
+    const text = result.game_over === 'checkmate'
+      ? `Checkmate — ${result.turn === 'w' ? 'Black' : 'White'} wins`
+      : 'Stalemate — Draw';
+    ctx.fillText(text, bx + bw / 2, bannerY + bannerH / 2);
   }
 }
 
