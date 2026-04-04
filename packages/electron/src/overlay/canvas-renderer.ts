@@ -15,6 +15,7 @@ export interface OverlayState {
   evalBarVisible: boolean;
   sourceVisible: boolean;
   selectedLineIndex: number;
+  panelScale: number;
   displayInfo: {
     size: { width: number; height: number };
     workArea: { x: number; y: number; width: number; height: number };
@@ -149,17 +150,20 @@ export function renderArrows(state: OverlayState): void {
 
   const size = 200;
   const dpr = window.devicePixelRatio || 1;
+  // Compensate for CSS transform:scale() on the panel — render at
+  // the effective pixel ratio so the canvas stays crisp at any zoom
+  const effectiveDpr = dpr * (state.panelScale || 1);
+  const bufferSize = Math.ceil(size * effectiveDpr);
 
-  // Scale canvas buffer for Retina sharpness
-  if (state.canvas.width !== size * dpr || state.canvas.height !== size * dpr) {
-    state.canvas.width = size * dpr;
-    state.canvas.height = size * dpr;
+  if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
+    state.canvas.width = bufferSize;
+    state.canvas.height = bufferSize;
     state.canvas.style.width = `${size}px`;
     state.canvas.style.height = `${size}px`;
   }
 
   const ctx = state.canvas.getContext('2d')!;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
   ctx.clearRect(0, 0, size, size);
 
   const virtualBoard = { x: 0, y: 0, width: size, height: size };

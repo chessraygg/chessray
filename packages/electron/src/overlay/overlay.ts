@@ -45,6 +45,7 @@ const state: OverlayState = {
   evalBarVisible: true,
   sourceVisible: true,
   selectedLineIndex: 0,
+  panelScale: 1,
   displayInfo: null,
 };
 
@@ -94,10 +95,12 @@ function initOverlay(): void {
 
   // ── Panel zoom (Cmd+scroll) ──
   let panelScale = prefs.panelScale;
+  state.panelScale = panelScale;
   function applyScale(): void {
     if (!userPanel) return;
     userPanel.style.transform = `scale(${panelScale})`;
     userPanel.style.transformOrigin = 'top left';
+    state.panelScale = panelScale;
     // Update zoom UI if it exists (called before zoom controls are wired)
     const lbl = document.getElementById('cv-zoom-label');
     const sld = document.getElementById('cv-zoom-slider') as HTMLInputElement | null;
