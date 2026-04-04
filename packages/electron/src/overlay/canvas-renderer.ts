@@ -146,10 +146,23 @@ export function drawArrow(
 
 export function renderArrows(state: OverlayState): void {
   if (!state.canvas) return;
-  const ctx = state.canvas.getContext('2d')!;
-  ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
 
-  const virtualBoard = { x: 0, y: 0, width: 200, height: 200 };
+  const size = 200;
+  const dpr = window.devicePixelRatio || 1;
+
+  // Scale canvas buffer for Retina sharpness
+  if (state.canvas.width !== size * dpr || state.canvas.height !== size * dpr) {
+    state.canvas.width = size * dpr;
+    state.canvas.height = size * dpr;
+    state.canvas.style.width = `${size}px`;
+    state.canvas.style.height = `${size}px`;
+  }
+
+  const ctx = state.canvas.getContext('2d')!;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, size, size);
+
+  const virtualBoard = { x: 0, y: 0, width: size, height: size };
   const arrows = getActiveArrows(state);
 
   if (arrows.length === 0) return;
