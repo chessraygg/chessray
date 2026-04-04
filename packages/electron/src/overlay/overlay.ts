@@ -66,10 +66,10 @@ function initOverlay(): void {
   debugInfo = document.getElementById('cv-debug-info') as HTMLDivElement;
   state.canvas = document.getElementById('cv-arrow-canvas') as HTMLCanvasElement;
 
-  // Update arrow canvas to match new board size (200x200)
+  // Arrow canvas size is set in renderArrows() with DPR scaling
   if (state.canvas) {
-    state.canvas.width = 200;
-    state.canvas.height = 200;
+    state.canvas.style.width = '200px';
+    state.canvas.style.height = '200px';
   }
 
   // Interactive panel: disable click-through on hover
