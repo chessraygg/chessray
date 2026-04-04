@@ -158,19 +158,23 @@ export function computeCurveOffsets(arrows: ArrowDescriptor[]): number[] {
   const offsets = new Array<number>(arrows.length).fill(0);
   if (arrows.length < 2) return offsets;
 
-  // Get the set of squares each arrow passes through
+  // Get the set of middle squares each arrow passes through (excluding endpoints)
   const squareSets = arrows.map((a) => {
     const f1 = a.from.charCodeAt(0) - 97;
     const r1 = parseInt(a.from[1], 10) - 1;
     const f2 = a.to.charCodeAt(0) - 97;
     const r2 = parseInt(a.to[1], 10) - 1;
-    return bresenhamSquares(f1, r1, f2, r2);
+    const all = bresenhamSquares(f1, r1, f2, r2);
+    // Remove start and end squares — only keep middle squares
+    all.delete(`${f1},${r1}`);
+    all.delete(`${f2},${r2}`);
+    return all;
   });
 
   for (let i = 0; i < arrows.length; i++) {
     for (let j = i + 1; j < arrows.length; j++) {
       const shared = countSharedSquares(squareSets[i], squareSets[j]);
-      if (shared < 2) continue;
+      if (shared < 1) continue;
 
       // Push the lower-priority arrow (higher index) outward.
       // Best move (index 0) stays straight unless it also overlaps.
