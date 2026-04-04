@@ -45,6 +45,7 @@ const state: OverlayState = {
   evalBarVisible: true,
   sourceVisible: true,
   selectedLineIndex: 0,
+  lossThreshold: 50,
   panelScale: 1,
   displayInfo: null,
 };
@@ -296,6 +297,22 @@ function initOverlay(): void {
     });
   }
 
+  // ── Loss threshold slider ──
+  const lossSlider = document.getElementById('cv-loss-threshold') as HTMLInputElement | null;
+  const lossVal = document.getElementById('cv-loss-threshold-val');
+  state.lossThreshold = prefs.lossThreshold;
+  if (lossSlider && lossVal) {
+    lossSlider.value = String(state.lossThreshold);
+    lossVal.textContent = String(state.lossThreshold);
+    lossSlider.addEventListener('input', () => {
+      state.lossThreshold = parseInt(lossSlider.value, 10);
+      lossVal.textContent = String(state.lossThreshold);
+      savePrefs({ lossThreshold: state.lossThreshold });
+      renderArrows(state);
+      renderVideoOverlay(state);
+    });
+  }
+
   const evalBtn = document.getElementById('cv-eval-btn');
   if (evalBtn) {
     evalBtn.classList.toggle('active', state.evalBarVisible);
@@ -338,7 +355,7 @@ let lastEvalFen: string | null = null;
 function selectLine(index: number): void {
   state.selectedLineIndex = index;
   if (state.currentResult) {
-    updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, selectLine);
+    updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine);
     renderArrows(state);
     renderVideoOverlay(state);
   }
@@ -360,7 +377,7 @@ function processPendingResult(): void {
     lastEvalFen = evalFen;
   }
 
-  updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, selectLine);
+  updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine);
   state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
   renderVideoOverlay(state);

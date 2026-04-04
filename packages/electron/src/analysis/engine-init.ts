@@ -22,7 +22,7 @@ function debugLog(msg: string): void {
 export async function initEngine(): Promise<void> {
   if (!engineInitPromise) {
     engineInitPromise = (async () => {
-      engine = new StockfishEngine({ depth: EVAL_START_DEPTH, multiPV: 3 });
+      engine = new StockfishEngine({ depth: EVAL_START_DEPTH, multiPV: 5 });
       const sfUrl = 'chess-vendor://stockfish/stockfish-18-lite-single.js';
       await engine.init(sfUrl);
       debugLog('Stockfish 18 initialized');

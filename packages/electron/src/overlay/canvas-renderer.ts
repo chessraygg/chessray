@@ -15,6 +15,7 @@ export interface OverlayState {
   evalBarVisible: boolean;
   sourceVisible: boolean;
   selectedLineIndex: number;
+  lossThreshold: number;
   panelScale: number;
   displayInfo: {
     size: { width: number; height: number };
@@ -35,7 +36,8 @@ export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
       ?? 'w';
     return computePvArrows(pv, turn, state.pvDepth);
   }
-  return state.currentArrows;
+  // Filter arrows by centipawn loss threshold
+  return state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold);
 }
 
 export function drawArrow(

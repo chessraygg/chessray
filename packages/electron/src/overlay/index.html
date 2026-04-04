@@ -64,6 +64,12 @@
         <!-- Best moves -->
         <div class="best-moves" id="cv-best-moves"></div>
 
+        <div class="pv-depth-row">
+          <label data-tip="Max centipawn loss for showing alternative moves">CP loss</label>
+          <input type="range" id="cv-loss-threshold" min="0" max="200" value="50" step="10">
+          <span id="cv-loss-threshold-val">50</span>
+        </div>
+
         <div class="pv-depth-row" id="cv-pv-depth-row">
           <label>PV depth</label>
           <input type="range" id="cv-pv-depth" min="1" max="10" value="4">

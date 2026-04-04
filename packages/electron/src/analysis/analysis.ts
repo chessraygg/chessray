@@ -290,7 +290,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
         (async () => {
           for (let depth = nextDepth; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
             if (signal.aborted) break;
-            const result = await engine!.runDepth(fullFen, depth, 3, signal);
+            const result = await engine!.runDepth(fullFen, depth, 5, signal);
             if (!result) break;
             if (!result.top_moves[0]?.pv?.length) {
               debugLog(`Engine returned empty PV at depth ${depth} — reinitializing`);
@@ -315,7 +315,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     }
 
     t = Date.now();
-    const firstResult = await engine.runDepth(fullFen, EVAL_START_DEPTH, 3, signal);
+    const firstResult = await engine.runDepth(fullFen, EVAL_START_DEPTH, 5, signal);
     const tEval = Date.now() - t;
 
     // Detect broken eval (no PV = engine in bad state)
@@ -347,7 +347,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       (async () => {
         for (let depth = EVAL_START_DEPTH + EVAL_DEPTH_STEP; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
           if (signal.aborted) break;
-          const result = await engine!.runDepth(fullFen, depth, 3, signal);
+          const result = await engine!.runDepth(fullFen, depth, 5, signal);
           if (!result) break;
           // Detect broken eval during deepening
           if (!result.top_moves[0]?.pv?.length) {

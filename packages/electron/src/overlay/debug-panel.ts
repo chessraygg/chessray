@@ -98,17 +98,20 @@ function renderBestMoves(
   useSan: boolean,
   selectedLineIndex: number,
   lineVisible: boolean,
+  lossThreshold: number,
   onSelectLine: (index: number) => void,
 ): void {
   if (!result.evaluation?.top_moves?.length) return;
 
   const fen = result.evaluation.fen;
   let html = '';
-  for (let i = 0; i < result.evaluation.top_moves.length; i++) {
-    const move = result.evaluation.top_moves[i];
+  const moves = result.evaluation.top_moves.filter(m => m.loss_cp <= lossThreshold);
+  for (let i = 0; i < moves.length; i++) {
+    const move = moves[i];
+    const origIdx = result.evaluation.top_moves.indexOf(move);
     const scoreStr = move.score_cp >= 0 ? `+${(move.score_cp/100).toFixed(1)}` : (move.score_cp/100).toFixed(1);
     const lossStr = move.loss_cp > 0 ? ` (\u2212${move.loss_cp}cp)` : '';
-    const selected = lineVisible && i === selectedLineIndex ? ' selected' : '';
+    const selected = lineVisible && origIdx === selectedLineIndex ? ' selected' : '';
 
     let movesText: string;
     if (useSan && fen) {
@@ -126,7 +129,7 @@ function renderBestMoves(
     const b = parseInt(hex.slice(5, 7), 16);
     const bg = `rgba(${r},${g},${b},0.12)`;
 
-    html += `<div class="move-line${selected}" data-line="${i}" style="background:${bg}"><span class="move-score">${scoreStr}</span>${movesText}${lossStr}</div>`;
+    html += `<div class="move-line${selected}" data-line="${origIdx}" style="background:${bg}"><span class="move-score">${scoreStr}</span>${movesText}${lossStr}</div>`;
   }
   // Skip DOM rebuild if content unchanged (prevents hover flicker at 2fps)
   if (container.dataset.lastHtml === html) return;
@@ -151,6 +154,7 @@ export function updateDebugPanel(
   useSan: boolean,
   selectedLineIndex: number,
   lineVisible: boolean,
+  lossThreshold: number,
   onSelectLine: (index: number) => void,
 ): void {
   if (debugImg && result.board_image_url) {
@@ -229,7 +233,7 @@ export function updateDebugPanel(
   // Best moves
   const bestMoves = document.getElementById('cv-best-moves');
   if (bestMoves) {
-    renderBestMoves(bestMoves, result, useSan, selectedLineIndex, lineVisible, onSelectLine);
+    renderBestMoves(bestMoves, result, useSan, selectedLineIndex, lineVisible, lossThreshold, onSelectLine);
   }
 
   // Debug meta info
