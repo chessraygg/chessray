@@ -52,27 +52,28 @@ canvas#video-overlay {
 
 .resize-grip {
   position: absolute;
-  bottom: 0;
   width: 14px;
   height: 14px;
   user-select: none;
 }
 
-.resize-grip.right { right: 0; cursor: nwse-resize; }
-.resize-grip.left { left: 0; cursor: nesw-resize; }
+.resize-grip.bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
+.resize-grip.bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
+.resize-grip.top-right { top: 0; right: 0; cursor: nesw-resize; }
+.resize-grip.top-left { top: 0; left: 0; cursor: nwse-resize; }
 
 .resize-grip::after {
   content: '';
   position: absolute;
-  bottom: 3px;
   width: 6px;
   height: 6px;
-  border-bottom: 2px solid var(--text-faint);
   opacity: 0.5;
 }
 
-.resize-grip.right::after { right: 3px; border-right: 2px solid var(--text-faint); }
-.resize-grip.left::after { left: 3px; border-left: 2px solid var(--text-faint); }
+.resize-grip.bottom-right::after { bottom: 3px; right: 3px; border-bottom: 2px solid var(--text-faint); border-right: 2px solid var(--text-faint); }
+.resize-grip.bottom-left::after { bottom: 3px; left: 3px; border-bottom: 2px solid var(--text-faint); border-left: 2px solid var(--text-faint); }
+.resize-grip.top-right::after { top: 3px; right: 3px; border-top: 2px solid var(--text-faint); border-right: 2px solid var(--text-faint); }
+.resize-grip.top-left::after { top: 3px; left: 3px; border-top: 2px solid var(--text-faint); border-left: 2px solid var(--text-faint); }
 
 .panel.hidden { display: none; }
 

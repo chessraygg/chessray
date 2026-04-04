@@ -119,7 +119,9 @@ function initOverlay(): void {
   }
 
   // ── Resize grips (drag to scale) ──
-  function setupResizeGrip(gripId: string, anchorRight: boolean): void {
+  // anchorRight: adjust left so right edge stays fixed
+  // anchorBottom: drag up = enlarge (invert Y), adjust top so bottom edge stays fixed
+  function setupResizeGrip(gripId: string, anchorRight: boolean, anchorBottom: boolean): void {
     const grip = document.getElementById(gripId);
     if (!grip || !userPanel) return;
 
@@ -127,7 +129,9 @@ function initOverlay(): void {
     let startY = 0;
     let startScale = 1;
     let startLeft = 0;
+    let startTop = 0;
     let panelWidth = 0;
+    let panelHeight = 0;
 
     grip.addEventListener('mousedown', (e: MouseEvent) => {
       e.stopPropagation();
@@ -136,7 +140,9 @@ function initOverlay(): void {
       startY = e.clientY;
       startScale = panelScale;
       startLeft = userPanel!.offsetLeft;
+      startTop = userPanel!.offsetTop;
       panelWidth = userPanel!.offsetWidth;
+      panelHeight = userPanel!.offsetHeight;
       document.body.style.userSelect = 'none';
     });
 
@@ -144,13 +150,20 @@ function initOverlay(): void {
       if (!resizing) return;
       e.preventDefault();
       const dy = e.clientY - startY;
-      const newScale = Math.min(2, Math.max(0.5, startScale + dy / 200));
+      // Top grips: drag up = enlarge (invert), bottom grips: drag down = enlarge
+      const scaleDelta = anchorBottom ? -dy / 200 : dy / 200;
+      const newScale = Math.min(2, Math.max(0.5, startScale + scaleDelta));
+
       if (anchorRight) {
-        // Keep top-right corner fixed: adjust left position
         const scaledWidthDiff = panelWidth * (newScale - startScale);
         userPanel!.style.left = `${startLeft - scaledWidthDiff}px`;
         userPanel!.style.right = 'auto';
       }
+      if (anchorBottom) {
+        const scaledHeightDiff = panelHeight * (newScale - startScale);
+        userPanel!.style.top = `${startTop - scaledHeightDiff}px`;
+      }
+
       panelScale = newScale;
       applyScale();
     });
@@ -163,8 +176,10 @@ function initOverlay(): void {
       }
     });
   }
-  setupResizeGrip('cv-resize-grip', false);
-  setupResizeGrip('cv-resize-grip-left', true);
+  setupResizeGrip('cv-resize-grip-br', false, false);   // anchor top-left
+  setupResizeGrip('cv-resize-grip-bl', true, false);     // anchor top-right
+  setupResizeGrip('cv-resize-grip-tr', false, true);     // anchor bottom-left
+  setupResizeGrip('cv-resize-grip-tl', true, true);      // anchor bottom-right
 
   // ── Zoom controls ──
   const zoomLabel = document.getElementById('cv-zoom-label');
