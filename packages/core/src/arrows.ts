@@ -150,34 +150,28 @@ export function arrowGeometry(
 
 /**
  * Compute perpendicular curve offsets for overlapping arrows.
- * Two arrows "overlap" if they pass through at least 2 common board squares.
- * Returns an array of offset fractions (0 = straight, nonzero = curve).
- * The offset is a fraction of the square size, applied perpendicular to the arrow.
+ * Uses geometric line-segment intersection (not square-level).
+ * Two arrows overlap if their straight-line segments intersect at a point
+ * that is not a shared endpoint (start/end square center).
+ * All intersections are computed on straight lines upfront, then curves applied.
  */
 export function computeCurveOffsets(arrows: ArrowDescriptor[]): number[] {
   const offsets = new Array<number>(arrows.length).fill(0);
   if (arrows.length < 2) return offsets;
 
-  // Get the set of middle squares each arrow passes through (excluding endpoints)
-  const squareSets = arrows.map((a) => {
-    const f1 = a.from.charCodeAt(0) - 97;
-    const r1 = parseInt(a.from[1], 10) - 1;
-    const f2 = a.to.charCodeAt(0) - 97;
-    const r2 = parseInt(a.to[1], 10) - 1;
-    const all = bresenhamSquares(f1, r1, f2, r2);
-    // Remove start and end squares — only keep middle squares
-    all.delete(`${f1},${r1}`);
-    all.delete(`${f2},${r2}`);
-    return all;
-  });
+  // Convert arrows to line segments (square center coordinates)
+  const segments = arrows.map((a) => ({
+    x1: a.from.charCodeAt(0) - 97,
+    y1: parseInt(a.from[1], 10) - 1,
+    x2: a.to.charCodeAt(0) - 97,
+    y2: parseInt(a.to[1], 10) - 1,
+  }));
 
   for (let i = 0; i < arrows.length; i++) {
     for (let j = i + 1; j < arrows.length; j++) {
-      const shared = countSharedSquares(squareSets[i], squareSets[j]);
-      if (shared < 1) continue;
+      if (!segmentsIntersect(segments[i], segments[j])) continue;
 
       // Push the lower-priority arrow (higher index) outward.
-      // Best move (index 0) stays straight unless it also overlaps.
       if (offsets[j] === 0) offsets[j] = 0.35;
       else offsets[j] += 0.15;
 
@@ -188,35 +182,72 @@ export function computeCurveOffsets(arrows: ArrowDescriptor[]): number[] {
   return offsets;
 }
 
-/** Get all board squares a line passes through using Bresenham's algorithm. */
-function bresenhamSquares(x0: number, y0: number, x1: number, y1: number): Set<string> {
-  const squares = new Set<string>();
-  let dx = Math.abs(x1 - x0);
-  let dy = Math.abs(y1 - y0);
-  const sx = x0 < x1 ? 1 : -1;
-  const sy = y0 < y1 ? 1 : -1;
-  let err = dx - dy;
-  let cx = x0;
-  let cy = y0;
+/**
+ * Check if two line segments intersect, excluding shared endpoints.
+ * Returns true if the segments cross at a point that is not a common start/end.
+ */
+function segmentsIntersect(
+  a: { x1: number; y1: number; x2: number; y2: number },
+  b: { x1: number; y1: number; x2: number; y2: number },
+): boolean {
+  // Check if they share an endpoint — if so, that's not a real intersection
+  const sharedEndpoints =
+    (a.x1 === b.x1 && a.y1 === b.y1) || (a.x1 === b.x2 && a.y1 === b.y2) ||
+    (a.x2 === b.x1 && a.y2 === b.y1) || (a.x2 === b.x2 && a.y2 === b.y2);
 
-  while (true) {
-    squares.add(`${cx},${cy}`);
-    if (cx === x1 && cy === y1) break;
-    const e2 = 2 * err;
-    if (e2 > -dy) { err -= dy; cx += sx; }
-    if (e2 < dx) { err += dx; cy += sy; }
+  // Cross product helper
+  const cross = (ox: number, oy: number, ax: number, ay: number, bx: number, by: number) =>
+    (ax - ox) * (by - oy) - (ay - oy) * (bx - ox);
+
+  const d1 = cross(b.x1, b.y1, b.x2, b.y2, a.x1, a.y1);
+  const d2 = cross(b.x1, b.y1, b.x2, b.y2, a.x2, a.y2);
+  const d3 = cross(a.x1, a.y1, a.x2, a.y2, b.x1, b.y1);
+  const d4 = cross(a.x1, a.y1, a.x2, a.y2, b.x2, b.y2);
+
+  // Standard segment intersection test
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+      ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+    return true; // Proper intersection (not at endpoints)
   }
 
-  return squares;
+  // Collinear overlap check: segments on the same line
+  if (d1 === 0 && d2 === 0) {
+    // Both segments are collinear — check if they overlap beyond shared endpoints
+    const aMinX = Math.min(a.x1, a.x2), aMaxX = Math.max(a.x1, a.x2);
+    const aMinY = Math.min(a.y1, a.y2), aMaxY = Math.max(a.y1, a.y2);
+    const bMinX = Math.min(b.x1, b.x2), bMaxX = Math.max(b.x1, b.x2);
+    const bMinY = Math.min(b.y1, b.y2), bMaxY = Math.max(b.y1, b.y2);
+
+    const overlapX = aMinX <= bMaxX && bMinX <= aMaxX;
+    const overlapY = aMinY <= bMaxY && bMinY <= aMaxY;
+    if (overlapX && overlapY) {
+      // They overlap — but if they only touch at a shared endpoint, skip
+      if (sharedEndpoints) {
+        // Check if overlap extends beyond the shared point
+        const overlapLenX = Math.min(aMaxX, bMaxX) - Math.max(aMinX, bMinX);
+        const overlapLenY = Math.min(aMaxY, bMaxY) - Math.max(aMinY, bMinY);
+        return overlapLenX > 0 || overlapLenY > 0;
+      }
+      return true;
+    }
+  }
+
+  // Endpoint-on-segment: one endpoint touches the other segment's interior
+  if (d1 === 0 && onSegment(b, a.x1, a.y1) && !isEndpoint(b, a.x1, a.y1)) return true;
+  if (d2 === 0 && onSegment(b, a.x2, a.y2) && !isEndpoint(b, a.x2, a.y2)) return true;
+  if (d3 === 0 && onSegment(a, b.x1, b.y1) && !isEndpoint(a, b.x1, b.y1)) return true;
+  if (d4 === 0 && onSegment(a, b.x2, b.y2) && !isEndpoint(a, b.x2, b.y2)) return true;
+
+  return false;
 }
 
-/** Count how many squares two sets have in common. */
-function countSharedSquares(a: Set<string>, b: Set<string>): number {
-  let count = 0;
-  for (const sq of a) {
-    if (b.has(sq)) count++;
-  }
-  return count;
+function onSegment(seg: { x1: number; y1: number; x2: number; y2: number }, px: number, py: number): boolean {
+  return px >= Math.min(seg.x1, seg.x2) && px <= Math.max(seg.x1, seg.x2) &&
+         py >= Math.min(seg.y1, seg.y2) && py <= Math.max(seg.y1, seg.y2);
+}
+
+function isEndpoint(seg: { x1: number; y1: number; x2: number; y2: number }, px: number, py: number): boolean {
+  return (px === seg.x1 && py === seg.y1) || (px === seg.x2 && py === seg.y2);
 }
 
 /** Linearly interpolate between two hex colors */
