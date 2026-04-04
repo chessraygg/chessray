@@ -125,17 +125,17 @@ export function drawArrow(
   ctx.closePath();
   ctx.fill();
 
-  // Draw label near arrow start (e.g. move number for PV line)
+  // Draw label at midpoint of arrow
   if (arrow.label) {
     const fontSize = Math.max(6, lineWidth * 2);
     ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.globalAlpha = arrow.opacity;
-    // Small circle offset from arrow start
     const r = fontSize * 0.55;
-    const ox = x1 - r * 1.5;
-    const oy = y1 - r * 1.5;
+    // Midpoint: for curved arrows use the control point, for straight use midpoint
+    const ox = curveOffset === 0 ? (x1 + x2) / 2 : mx;
+    const oy = curveOffset === 0 ? (y1 + y2) / 2 : my;
     ctx.beginPath();
     ctx.arc(ox, oy, r, 0, Math.PI * 2);
     ctx.fillStyle = arrow.color;
