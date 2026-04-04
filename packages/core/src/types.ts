@@ -64,6 +64,7 @@ export interface PipelineResult {
   highlighted_squares?: number[]; // indices of highlighted squares (0-63, corrected orientation)
   flipped?: boolean; // true = board is flipped (white at top in video)
   turn?: 'w' | 'b'; // whose turn it is (from highlight detection)
+  game_over?: 'checkmate' | 'stalemate'; // detected end-of-game state
   orientation_source?: 'label' | 'pawn_move' | 'piece_count'; // how orientation was detected
   board_image_url?: string; // data URL of the cropped board for debug display
   frame_dimensions?: { width: number; height: number }; // capture frame size for coordinate mapping

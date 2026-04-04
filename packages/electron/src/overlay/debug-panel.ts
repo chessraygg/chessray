@@ -205,35 +205,62 @@ export function updateDebugPanel(
   // Eval bar
   const evalFill = document.getElementById('cv-eval-fill') as HTMLDivElement | null;
   const evalLabel = document.getElementById('cv-eval-label');
-  if (evalFill && evalLabel && result.evaluation?.top_moves?.length) {
-    const sideScore = result.evaluation.top_moves[0].score_cp;
-    const turn = result.evaluation.fen?.split(' ')[1] || 'w';
-    const bestScore = turn === 'b' ? -sideScore : sideScore;
-    const winProb = 1 / (1 + Math.pow(10, -bestScore / 400));
-    const fillPct = displayFlipped ? (1 - winProb) * 100 : winProb * 100;
-    evalFill.style.width = `${fillPct.toFixed(1)}%`;
-    evalFill.style.background = displayFlipped ? '#272727' : '#d4d4d4';
-    evalFill.parentElement!.style.background = displayFlipped ? '#d4d4d4' : '#272727';
-
-    if (Math.abs(bestScore) >= 9000) {
-      const mateIn = bestScore > 0 ? 10000 - bestScore : -(10000 + bestScore);
-      evalLabel.textContent = `M${Math.abs(mateIn)}`;
-    } else {
-      const scoreStr = bestScore >= 0 ? `+${(bestScore/100).toFixed(1)}` : (bestScore/100).toFixed(1);
-      evalLabel.textContent = scoreStr;
-    }
-  }
-
-  // Depth
   const depthLabel = document.getElementById('cv-eval-depth');
-  if (depthLabel && result.eval_depth) {
-    depthLabel.textContent = `d${result.eval_depth}`;
+
+  if (evalFill && evalLabel) {
+    if (result.game_over === 'checkmate') {
+      // Checkmate: loser's turn, so winner is opposite
+      const loserIsWhite = result.turn === 'w';
+      evalFill.style.width = loserIsWhite ? '0%' : '100%';
+      evalFill.style.background = '#d4d4d4';
+      evalFill.parentElement!.style.background = '#272727';
+      evalLabel.textContent = '#';
+      if (depthLabel) depthLabel.textContent = '';
+    } else if (result.game_over === 'stalemate') {
+      evalFill.style.width = '50%';
+      evalFill.style.background = '#888';
+      evalFill.parentElement!.style.background = '#888';
+      evalLabel.textContent = '½–½';
+      if (depthLabel) depthLabel.textContent = '';
+    } else if (result.evaluation?.top_moves?.length) {
+      const sideScore = result.evaluation.top_moves[0].score_cp;
+      const turn = result.evaluation.fen?.split(' ')[1] || 'w';
+      const bestScore = turn === 'b' ? -sideScore : sideScore;
+      const winProb = 1 / (1 + Math.pow(10, -bestScore / 400));
+      const fillPct = displayFlipped ? (1 - winProb) * 100 : winProb * 100;
+      evalFill.style.width = `${fillPct.toFixed(1)}%`;
+      evalFill.style.background = displayFlipped ? '#272727' : '#d4d4d4';
+      evalFill.parentElement!.style.background = displayFlipped ? '#d4d4d4' : '#272727';
+
+      if (Math.abs(bestScore) >= 9000) {
+        const mateIn = bestScore > 0 ? 10000 - bestScore : -(10000 + bestScore);
+        evalLabel.textContent = `M${Math.abs(mateIn)}`;
+      } else {
+        const scoreStr = bestScore >= 0 ? `+${(bestScore/100).toFixed(1)}` : (bestScore/100).toFixed(1);
+        evalLabel.textContent = scoreStr;
+      }
+
+      if (depthLabel && result.eval_depth) {
+        depthLabel.textContent = `d${result.eval_depth}`;
+      }
+    }
   }
 
   // Best moves
   const bestMoves = document.getElementById('cv-best-moves');
   if (bestMoves) {
-    renderBestMoves(bestMoves, result, useSan, selectedLineIndex, lineVisible, lossThreshold, onSelectLine);
+    if (result.game_over) {
+      const msg = result.game_over === 'checkmate'
+        ? `Checkmate — ${result.turn === 'w' ? 'Black' : 'White'} wins`
+        : 'Stalemate — Draw';
+      const html = `<div class="move-line" style="background:rgba(255,255,255,0.05);justify-content:center;color:var(--text-dim)">${msg}</div>`;
+      if (bestMoves.dataset.lastHtml !== html) {
+        bestMoves.dataset.lastHtml = html;
+        bestMoves.innerHTML = html;
+      }
+    } else {
+      renderBestMoves(bestMoves, result, useSan, selectedLineIndex, lineVisible, lossThreshold, onSelectLine);
+    }
   }
 
   // Debug meta info

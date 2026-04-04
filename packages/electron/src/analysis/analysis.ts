@@ -9,6 +9,7 @@ import {
   detectBoard, cropPixels, recognizeBoard,
   computeArrows, compareFen, guessTurn, buildFullFen,
 } from '@chessray/core';
+import { Chess } from 'chess.js';
 import type {
   PixelBuffer, PipelineResult, EvalResult, RecognitionResult, BoardBBox, ArrowDescriptor,
   OrientationSource,
@@ -187,7 +188,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
 
     }
 
-    const makeResult = (opts: { evaluation?: EvalResult | null; arrows?: ArrowDescriptor[]; eval_depth?: number; eval_max_depth?: number }): PipelineResult => ({
+    const makeResult = (opts: { evaluation?: EvalResult | null; arrows?: ArrowDescriptor[]; eval_depth?: number; eval_max_depth?: number; game_over?: 'checkmate' | 'stalemate' }): PipelineResult => ({
       board_detection: { found: true, bbox: activeBbox!, confidence: detectionConf },
       recognition,
       evaluation: opts.evaluation ?? null,
@@ -196,6 +197,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       arrows: opts.arrows ?? [],
       highlighted_squares: highlightedSquares,
       turn: highlightTurn ?? undefined,
+      game_over: opts.game_over,
       flipped: isFlipped,
       orientation_source: orientationSource,
       board_image_url: boardImageUrl,
@@ -255,6 +257,20 @@ async function processFrame(imageData: ImageData): Promise<void> {
     const turn = highlightTurn ?? guessTurn(prevPositionFen, positionFen);
     debugLog(`Turn: highlight=${highlightTurn} guess=${guessTurn(prevPositionFen, positionFen)} final=${turn} hl=[${highlightedSquares}]`);
     const fullFen = buildFullFen(positionFen, turn);
+
+    // Detect checkmate/stalemate — skip engine if game is over
+    let gameOver: 'checkmate' | 'stalemate' | undefined;
+    try {
+      const chess = new Chess(fullFen);
+      if (chess.isCheckmate()) gameOver = 'checkmate';
+      else if (chess.isStalemate()) gameOver = 'stalemate';
+    } catch { /* invalid FEN — continue to engine */ }
+
+    if (gameOver) {
+      debugLog(`Game over: ${gameOver}`);
+      sendResult(makeResult({ game_over: gameOver }));
+      return;
+    }
 
     prevPositionFen = positionFen;
     lastPositionFen = positionFen;
