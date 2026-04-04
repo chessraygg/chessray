@@ -46,6 +46,12 @@ const api = {
   reopenPicker: () =>
     ipcRenderer.send('reopen-picker'),
 
+  // Engine settings
+  setMaxDepth: (depth: number) =>
+    ipcRenderer.send('set-max-depth', depth),
+  onSetMaxDepth: (cb: (depth: number) => void) =>
+    ipcRenderer.on('set-max-depth', (_e, depth: number) => cb(depth)),
+
   // Window controls
   minimizeApp: () =>
     ipcRenderer.send('minimize-app'),

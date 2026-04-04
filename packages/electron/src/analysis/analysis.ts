@@ -15,7 +15,7 @@ import type {
   OrientationSource,
 } from '@chessray/core';
 
-import { EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH, cacheGet, cachePut } from './eval-cache.js';
+import { EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH, cacheGet, cachePut } from './eval-cache.js';
 import { sampleBoardPixels, boardUnchanged } from './change-detect.js';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
 import { initAndStartCapture, stopCapture } from './frame-capture.js';
@@ -31,6 +31,7 @@ declare global {
       sendDebugLog: (msg: string) => void;
       getSources: () => Promise<Array<{ id: string; name: string; thumbnailDataUrl: string; display_id: string }>>;
       selectSource: (id: string) => void;
+      onSetMaxDepth: (cb: (depth: number) => void) => void;
     };
   }
 }
@@ -49,6 +50,7 @@ let lastHighlightTurn: 'w' | 'b' | null = null;
 let lastArrows: ArrowDescriptor[] = [];
 let cachedBbox: BoardBBox | null = null;
 let frameCount = 0;
+let EVAL_MAX_DEPTH = DEFAULT_MAX_DEPTH;
 let evalAbortController: AbortController | null = null;
 
 let previewCanvas: HTMLCanvasElement | null = null;
@@ -399,6 +401,11 @@ window.chessRay.onStartCapture((sourceId) => {
 
 window.chessRay.onStopCapture(() => {
   stopCapture(resetPipelineState);
+});
+
+window.chessRay.onSetMaxDepth((depth: number) => {
+  debugLog(`Max depth changed to ${depth}`);
+  EVAL_MAX_DEPTH = depth;
 });
 
 // Signal to main that all IPC listeners are registered

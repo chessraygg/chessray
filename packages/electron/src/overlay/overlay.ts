@@ -17,6 +17,7 @@ declare global {
       onDisplayInfo: (cb: (info: any) => void) => void;
       onSourceVisibility: (cb: (visible: boolean) => void) => void;
       reopenPicker: () => void;
+      setMaxDepth: (depth: number) => void;
       minimizeApp: () => void;
       closeApp: () => void;
     };
@@ -320,6 +321,22 @@ function initOverlay(): void {
       state.evalBarVisible = !state.evalBarVisible;
       evalBtn.classList.toggle('active', state.evalBarVisible);
       savePrefs({ evalBarVisible: state.evalBarVisible });
+    });
+  }
+
+  // ── Max engine depth slider ──
+  const maxDepthSlider = document.getElementById('cv-max-depth') as HTMLInputElement | null;
+  const maxDepthVal = document.getElementById('cv-max-depth-val');
+  const savedMaxDepth = prefs.maxDepth;
+  if (maxDepthSlider && maxDepthVal) {
+    maxDepthSlider.value = String(savedMaxDepth);
+    maxDepthVal.textContent = String(savedMaxDepth);
+    window.chessRay.setMaxDepth(savedMaxDepth);
+    maxDepthSlider.addEventListener('input', () => {
+      const depth = parseInt(maxDepthSlider.value, 10);
+      maxDepthVal.textContent = String(depth);
+      savePrefs({ maxDepth: depth });
+      window.chessRay.setMaxDepth(depth);
     });
   }
 

@@ -8,6 +8,7 @@ export interface Prefs {
   lineVisible: boolean;
   pvDepth: number;
   lossThreshold: number;
+  maxDepth: number;
   evalBarVisible: boolean;
   panelScale: number;
   collapsed: boolean;
@@ -21,7 +22,8 @@ export const DEFAULT_PREFS: Prefs = {
   arrowsVisible: false,
   lineVisible: true,
   pvDepth: 4,
-  lossThreshold: 50,
+  lossThreshold: 0,
+  maxDepth: 28,
   evalBarVisible: true,
   panelScale: 1,
   collapsed: false,

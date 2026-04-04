@@ -292,6 +292,12 @@ ipcMain.on('close-app', () => {
   app.quit();
 });
 
+ipcMain.on('set-max-depth', (_e, depth: number) => {
+  if (analysisWindow && !analysisWindow.isDestroyed()) {
+    analysisWindow.webContents.send('set-max-depth', depth);
+  }
+});
+
 // ── App lifecycle ──
 
 // Enforce single instance — quit if another copy is already running
