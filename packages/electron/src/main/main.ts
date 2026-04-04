@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, protocol, screen, session, systemPreferences } from 'electron';
+import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, protocol, screen, session, systemPreferences } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { platform } from './platform.js';
@@ -72,16 +72,24 @@ function createAnalysisWindow(): BrowserWindow {
   return win;
 }
 
+function getActiveDisplay(): Electron.Display {
+  if (activeDisplayId != null) {
+    const match = screen.getAllDisplays().find(d => d.id === activeDisplayId);
+    if (match) return match;
+  }
+  return screen.getPrimaryDisplay();
+}
+
 function createOverlayWindow(): BrowserWindow {
-  const display = screen.getPrimaryDisplay();
-  // Use full display size so overlay covers fullscreen apps too
+  const display = getActiveDisplay();
+  const { x, y } = display.bounds;
   const { width, height } = display.size;
 
   const win = new BrowserWindow({
     width,
     height,
-    x: 0,
-    y: 0,
+    x,
+    y,
     transparent: true,
     frame: false,
     hasShadow: false,
@@ -113,17 +121,8 @@ function createOverlayWindow(): BrowserWindow {
   // Send display metrics so the overlay can map frame→screen coordinates.
   // Also re-send when the overlay moves/resizes (e.g. entering/leaving fullscreen).
   const sendDisplayInfo = () => {
-    const display = screen.getPrimaryDisplay();
-    const bounds = win.getBounds();
-    const info = {
-      size: display.size,
-      workArea: display.workArea,
-      scaleFactor: display.scaleFactor,
-      overlayBounds: bounds,
-    };
-    fs.appendFileSync(LOG,
-      `[chessray] Display: size=${JSON.stringify(display.size)} workArea=${JSON.stringify(display.workArea)} scale=${display.scaleFactor} overlayBounds=${JSON.stringify(bounds)}\n`);
-    win.webContents.send('display-info', info);
+    const display = getActiveDisplay();
+    sendDisplayInfoForDisplay(display);
   };
   win.webContents.once('did-finish-load', sendDisplayInfo);
   win.on('move', sendDisplayInfo);
@@ -133,16 +132,114 @@ function createOverlayWindow(): BrowserWindow {
   return win;
 }
 
-/** Get the primary screen source ID */
-async function getPrimaryScreenSourceId(): Promise<string> {
+let activeDisplayId: number | null = null;
+
+/** Get the capture source ID for a specific Electron display */
+async function getScreenSourceId(displayId?: number): Promise<string> {
   const sources = await desktopCapturer.getSources({
     types: ['screen'],
     thumbnailSize: { width: 1, height: 1 },
   });
+  if (sources.length === 0) throw new Error('No screen source found');
+
+  if (displayId != null) {
+    const match = sources.find(s => s.display_id === String(displayId));
+    if (match) {
+      console.log(`[chessray] Matched display ${displayId} → source ${match.id} (${match.name})`);
+      return match.id;
+    }
+    console.log(`[chessray] No source for display ${displayId}, falling back to first`);
+  }
+
   const primary = sources[0];
-  if (!primary) throw new Error('No screen source found');
   console.log(`[chessray] Auto-selected screen source: ${primary.id} (${primary.name})`);
   return primary.id;
+}
+
+/** Move the overlay window to cover a specific display */
+function moveOverlayToDisplay(display: Electron.Display): void {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const { x, y } = display.bounds;
+  const { width, height } = display.size;
+  overlayWindow.setBounds({ x, y, width, height });
+  fs.appendFileSync(LOG, `[chessray] Overlay moved to display ${display.id}: ${x},${y} ${width}x${height}\n`);
+}
+
+/** Send display info for the given display (not always primary) */
+function sendDisplayInfoForDisplay(display: Electron.Display): void {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const bounds = overlayWindow.getBounds();
+  const info = {
+    size: display.size,
+    workArea: display.workArea,
+    scaleFactor: display.scaleFactor,
+    overlayBounds: bounds,
+    displayBounds: display.bounds,
+  };
+  fs.appendFileSync(LOG,
+    `[chessray] Display: size=${JSON.stringify(display.size)} workArea=${JSON.stringify(display.workArea)} scale=${display.scaleFactor} overlayBounds=${JSON.stringify(bounds)} displayBounds=${JSON.stringify(display.bounds)}\n`);
+  overlayWindow.webContents.send('display-info', info);
+}
+
+/** Switch capture and overlay to a different display */
+async function switchDisplay(displayId: number): Promise<void> {
+  const display = screen.getAllDisplays().find(d => d.id === displayId);
+  if (!display) return;
+
+  activeDisplayId = displayId;
+  fs.appendFileSync(LOG, `[chessray] Switching to display ${displayId}\n`);
+
+  // Stop current capture
+  if (analysisWindow && !analysisWindow.isDestroyed()) {
+    analysisWindow.webContents.send('stop-capture');
+  }
+  stopVisibilityTracking();
+
+  // Reposition overlay
+  moveOverlayToDisplay(display);
+  sendDisplayInfoForDisplay(display);
+
+  // Start capture on new display
+  const sourceId = await getScreenSourceId(displayId);
+  startCapture(sourceId);
+
+  // Update dock menu to reflect new selection
+  buildDockMenu();
+}
+
+/** Build the dock menu with display list and panel reset */
+function buildDockMenu(): void {
+  if (process.platform !== 'darwin') return;
+
+  const displays = screen.getAllDisplays();
+  const template: Electron.MenuItemConstructorOptions[] = [];
+
+  if (displays.length > 1) {
+    for (const display of displays) {
+      const isPrimary = display.id === screen.getPrimaryDisplay().id;
+      const label = isPrimary
+        ? `Built-in Display (${display.size.width}\u00d7${display.size.height})`
+        : `Display (${display.size.width}\u00d7${display.size.height})`;
+      template.push({
+        label,
+        type: 'checkbox',
+        checked: display.id === activeDisplayId,
+        click: () => switchDisplay(display.id),
+      });
+    }
+    template.push({ type: 'separator' });
+  }
+
+  template.push({
+    label: 'Reset Panel Position',
+    click: () => {
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send('reset-panel-position');
+      }
+    },
+  });
+
+  (app as any).dock?.setMenu(Menu.buildFromTemplate(template));
 }
 
 // Serve vendor files via custom protocol so renderers can load them
@@ -309,6 +406,21 @@ if (!gotLock) {
 app.whenReady().then(() => {
   app.setName('ChessRay');
   platform.showInDock(app);
+
+  // Set initial display to primary
+  activeDisplayId = screen.getPrimaryDisplay().id;
+  buildDockMenu();
+
+  // Rebuild dock menu when displays change
+  screen.on('display-added', () => buildDockMenu());
+  screen.on('display-removed', () => {
+    // If active display was removed, fall back to primary
+    if (activeDisplayId != null && !screen.getAllDisplays().some(d => d.id === activeDisplayId)) {
+      switchDisplay(screen.getPrimaryDisplay().id);
+    }
+    buildDockMenu();
+  });
+
   registerVendorProtocol();
 
   // Grant screen capture permissions
@@ -319,7 +431,7 @@ app.whenReady().then(() => {
 
   const screenStatus = platform.getScreenCaptureStatus(systemPreferences);
   fs.writeFileSync(LOG, `[chessray] App ready. Screen status=${screenStatus} platform=${process.platform} (trying capture)\n`);
-  getPrimaryScreenSourceId()
+  getScreenSourceId(activeDisplayId!)
     .then((sourceId) => startCapture(sourceId))
     .catch((err) => {
       fs.appendFileSync(LOG, `[chessray] Failed to get screen source: ${err}\n`);

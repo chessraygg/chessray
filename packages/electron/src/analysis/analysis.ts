@@ -218,7 +218,9 @@ async function processFrame(imageData: ImageData): Promise<void> {
     }
 
     const positionFen = recognition.fen;
-    if (lastPositionFen && compareFen(lastPositionFen, positionFen)) {
+    // Dedup: same position AND turn hasn't been corrected by highlight detection
+    const evalTurnMismatch = highlightTurn && lastEval?.fen?.split(' ')[1] && lastEval.fen.split(' ')[1] !== highlightTurn;
+    if (lastPositionFen && compareFen(lastPositionFen, positionFen) && !evalTurnMismatch) {
       debugLog(`Timing: detect=${tDetect}ms preview=${tPreview}ms ${recogDetail} [dedup] total=${Date.now() - startTime}ms`);
       sendResult(makeResult({
         evaluation: lastEval,
@@ -227,6 +229,9 @@ async function processFrame(imageData: ImageData): Promise<void> {
         eval_max_depth: lastEval && lastEval.depth < EVAL_MAX_DEPTH ? EVAL_MAX_DEPTH : undefined,
       }));
       return;
+    }
+    if (evalTurnMismatch) {
+      debugLog(`Turn corrected by highlight: eval had '${lastEval!.fen.split(' ')[1]}' but highlight says '${highlightTurn}' — re-evaluating`);
     }
 
     const whiteKings = (positionFen.match(/K/g) || []).length;

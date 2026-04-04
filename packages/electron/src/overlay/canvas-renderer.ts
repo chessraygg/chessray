@@ -232,12 +232,13 @@ export function renderVideoOverlay(state: OverlayState): void {
 
   // Frame is in physical pixels, overlay canvas is in CSS pixels.
   // Divide by devicePixelRatio to convert frame → CSS pixels.
-  // The overlay window may be offset from the top of the screen (e.g. macOS
-  // menu bar pushes it to y=25). Use the actual overlay bounds to compute the
-  // offset between frame coordinates (screen-relative) and overlay coordinates.
+  // The overlay window may be offset from the top of the display (e.g. macOS
+  // menu bar pushes it down). Compute the offset relative to the display origin,
+  // not the absolute screen position (which differs on secondary monitors).
   const dpr = state.displayInfo?.scaleFactor ?? window.devicePixelRatio;
-  // overlayBounds.y is in screen points (from Electron getBounds), not physical pixels.
-  const overlayYOffset = state.displayInfo?.overlayBounds?.y ?? 0;
+  const overlayY = state.displayInfo?.overlayBounds?.y ?? 0;
+  const displayY = state.displayInfo?.displayBounds?.y ?? 0;
+  const overlayYOffset = overlayY - displayY;
 
   const bbox = result.board_detection.bbox;
   const bx = bbox.x / dpr;

@@ -18,6 +18,7 @@ declare global {
       onSourceVisibility: (cb: (visible: boolean) => void) => void;
       reopenPicker: () => void;
       setMaxDepth: (depth: number) => void;
+      onResetPanelPosition: (cb: () => void) => void;
       minimizeApp: () => void;
       closeApp: () => void;
     };
@@ -355,6 +356,26 @@ function initOverlay(): void {
   if (collapsed) setCollapsed(true);
 
   collapseBtn?.addEventListener('click', () => { collapsed = !collapsed; setCollapsed(collapsed); });
+
+  // ── Reset panel position (triggered from dock menu) ──
+  window.chessRay.onResetPanelPosition(() => {
+    if (userPanel) {
+      userPanel.style.left = '20px';
+      userPanel.style.top = '20px';
+      userPanel.style.right = 'auto';
+      savePrefs({ panelLeft: 20, panelTop: 20 });
+      // Dim everything and highlight the panel
+      document.querySelectorAll('.reset-dim').forEach(el => el.remove());
+      const dim = document.createElement('div');
+      dim.className = 'reset-dim';
+      document.body.appendChild(dim);
+      dim.addEventListener('animationend', () => dim.remove());
+      userPanel.classList.remove('flash');
+      void userPanel.offsetWidth;
+      userPanel.classList.add('flash');
+      userPanel.addEventListener('animationend', () => userPanel.classList.remove('flash'), { once: true });
+    }
+  });
 
   // ── Window controls ──
   const closeBtn = document.getElementById('cv-close-btn');

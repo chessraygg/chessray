@@ -52,6 +52,10 @@ const api = {
   onSetMaxDepth: (cb: (depth: number) => void) =>
     ipcRenderer.on('set-max-depth', (_e, depth: number) => cb(depth)),
 
+  // Panel reset
+  onResetPanelPosition: (cb: () => void) =>
+    ipcRenderer.on('reset-panel-position', () => cb()),
+
   // Window controls
   minimizeApp: () =>
     ipcRenderer.send('minimize-app'),

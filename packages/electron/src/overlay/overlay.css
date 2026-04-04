@@ -50,6 +50,33 @@ canvas#video-overlay {
 
 .panel:active { cursor: grabbing; }
 
+/* Full-screen dim backdrop for reset highlight */
+.reset-dim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 99;
+  pointer-events: none;
+  animation: dim-fade 1.2s ease-out forwards;
+}
+
+@keyframes dim-fade {
+  0%   { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.panel.flash {
+  z-index: 100;
+  animation: panel-highlight 1.2s ease-out;
+}
+
+@keyframes panel-highlight {
+  0%   { box-shadow: 0 0 20px rgba(34, 197, 94, 0.7), 0 0 40px rgba(34, 197, 94, 0.3); border-color: var(--accent); }
+  70%  { box-shadow: 0 0 20px rgba(34, 197, 94, 0.7), 0 0 40px rgba(34, 197, 94, 0.3); border-color: var(--accent); }
+  100% { box-shadow: none; border-color: var(--border); }
+}
+
 .resize-grip {
   position: absolute;
   width: 14px;
