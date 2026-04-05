@@ -382,12 +382,12 @@ for (const tc of PIPELINE_CASES) {
   labelY += lineH;
 
   // Turn
-  const turnLabel = `TURN: ${tc.turn === 'w' ? 'WHITE' : 'BLACK'}`;
+  const turnLabel = `TURN: ${tc.turn === 'w' ? 'WHITE' : tc.turn === 'b' ? 'BLACK' : 'UNKNOWN'}`;
   drawText(out, turnLabel, labelX, labelY, 200, 200, 200, textScale);
   labelY += lineH;
 
   // Move (highlighted squares)
-  const moveLabel = `MOVE: ${tc.highlighted[0]}.${tc.highlighted[1]}`;
+  const moveLabel = tc.highlighted ? `MOVE: ${tc.highlighted[0]}.${tc.highlighted[1]}` : 'MOVE: none';
   drawText(out, moveLabel, labelX, labelY, 200, 200, 200, textScale);
   labelY += lineH;
 
