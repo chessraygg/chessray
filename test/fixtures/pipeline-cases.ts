@@ -253,9 +253,9 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     white_pawns: 'up',
     highlighted: null,
     turn: null,
-    bbox: { x: 278, y: 369, width: 459, height: 459 },
+    bbox: { x: 280, y: 402, width: 455, height: 455 },
     squareSize: 57,
-    expectedFen: '8/rnbbknqr/pppppppp/8/8/8/8/PPPPKPPP',
+    expectedFen: 'rnbbknqr/pppppppp/8/8/8/8/PPPPPPPP/RNBBKNQR',
     orientation_source: 'piece_count',
   },
 ];

@@ -23,11 +23,20 @@ export function refineBbox(pixels: PixelBuffer, rough: BoardBBox): BoardBBox {
   const rw = rough.width;
   const rh = rough.height;
 
+  // Inset the scan area by 5% on each side to exclude border/header artifacts
+  // that the YOLO rough bbox may include. The grid lines are all interior so
+  // they survive the inset, but edge noise (text, borders) is excluded.
+  const inset = Math.round(Math.min(rw, rh) * 0.05);
+  const scanX0 = inset;
+  const scanX1 = rw - inset;
+  const scanY0 = inset;
+  const scanY1 = rh - inset;
+
   // Column projection: sum of horizontal gradients per column
   const colSignal = new Float64Array(rw);
-  for (let cx = 1; cx < rw; cx++) {
+  for (let cx = Math.max(1, scanX0); cx < scanX1; cx++) {
     let sum = 0;
-    for (let ry = 0; ry < rh; ry++) {
+    for (let ry = scanY0; ry < scanY1; ry++) {
       const px = rough.x + cx;
       const py = rough.y + ry;
       sum += Math.abs(lum(px, py) - lum(px - 1, py));
@@ -37,9 +46,9 @@ export function refineBbox(pixels: PixelBuffer, rough: BoardBBox): BoardBBox {
 
   // Row projection: sum of vertical gradients per row
   const rowSignal = new Float64Array(rh);
-  for (let ry = 1; ry < rh; ry++) {
+  for (let ry = Math.max(1, scanY0); ry < scanY1; ry++) {
     let sum = 0;
-    for (let cx = 0; cx < rw; cx++) {
+    for (let cx = scanX0; cx < scanX1; cx++) {
       const px = rough.x + cx;
       const py = rough.y + ry;
       sum += Math.abs(lum(px, py) - lum(px, py - 1));
