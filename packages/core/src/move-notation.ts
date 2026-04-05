@@ -25,6 +25,26 @@ export function uciToSan(fen: string, uciMoves: string[]): string[] {
 }
 
 /**
+ * Apply N UCI moves to a FEN position and return the resulting position-only FEN
+ * plus the from/to square indices of the last move applied.
+ */
+export function applyUciMoves(fen: string, uciMoves: string[], count: number): { fen: string; highlight: number[] } | null {
+  try {
+    const chess = new Chess(fen);
+    let lastFrom = -1, lastTo = -1;
+    for (let i = 0; i < count && i < uciMoves.length; i++) {
+      const from = uciMoves[i].slice(0, 2);
+      const to = uciMoves[i].slice(2, 4);
+      const promotion = uciMoves[i].length > 4 ? uciMoves[i][4] : undefined;
+      chess.move({ from, to, promotion });
+      lastFrom = (8 - parseInt(from[1])) * 8 + (from.charCodeAt(0) - 97);
+      lastTo = (8 - parseInt(to[1])) * 8 + (to.charCodeAt(0) - 97);
+    }
+    return { fen: chess.fen().split(' ')[0], highlight: lastFrom >= 0 ? [lastFrom, lastTo] : [] };
+  } catch { return null; }
+}
+
+/**
  * Format an array of SAN moves into standard notation with move numbers.
  * e.g. ["e4", "e5", "Nf3"] with startTurn 'w' -> "1.e4 e5 2.Nf3"
  * If starting as black, first move uses "1..." prefix.

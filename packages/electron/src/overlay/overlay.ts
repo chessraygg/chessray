@@ -4,9 +4,10 @@
  */
 
 import type { PipelineResult } from '@chessray/core';
+import { applyUciMoves } from '@chessray/core';
 import { loadPrefs, savePrefs } from './preferences.js';
 import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay } from './canvas-renderer.js';
-import { setupDrag, updateDebugPanel, clearDebugPanel } from './debug-panel.js';
+import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid } from './debug-panel.js';
 
 declare global {
   interface Window {
@@ -242,6 +243,16 @@ function initOverlay(): void {
       overlayBtn.classList.toggle('active', state.overlayVisible);
       updateChildToggles();
       savePrefs({ overlayVisible: state.overlayVisible });
+      if (state.overlayVisible) {
+        // Restart auto mode + grow when overlay becomes visible again
+        (window as any).__chessrayResetAutoTimer?.();
+        if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
+      } else {
+        // Stop everything when overlay is hidden
+        (window as any).__chessrayClearAutoTimer?.();
+        (window as any).__chessrayPvGrowStop?.();
+        (window as any).__chessrayPvPlayStop?.();
+      }
     });
   }
 
@@ -292,7 +303,7 @@ function initOverlay(): void {
         state.arrowsVisible = false;
       }
       // Reset grow on mode change
-      if (state.lineVisible) { pvGrowStart(); } else { pvGrowStop(); }
+      if (state.lineVisible) { pvPlayStop(); pvGrowStart(); } else { pvGrowStop(); pvPlayStop(); }
       syncModeButtons();
       savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
       renderArrows(state);
@@ -359,6 +370,75 @@ function initOverlay(): void {
   function pvGrowStop(): void {
     if (pvGrowTimer !== null) { clearInterval(pvGrowTimer); pvGrowTimer = null; }
     pvGrowLastPv = [];
+    // When grow completes at max depth, start virtual board playback after a pause
+    if (state.lineVisible && state.pvDisplayDepth >= state.pvDepth) {
+      pvPlaySchedule();
+    }
+  }
+
+  // ── PV virtual board playback ──
+  let pvPlayTimer: ReturnType<typeof setInterval> | null = null;
+  let pvPlayPauseTimer: ReturnType<typeof setTimeout> | null = null;
+  let pvPlayStep = 0;
+  let pvPlayPv: string[] = [];
+  let pvPlayBaseFen = '';
+  let pvPlayFlipped = false;
+
+  function pvPlaySchedule(): void {
+    pvPlayStop();
+    // Snapshot the current PV
+    const result = state.currentResult;
+    if (!result?.evaluation?.top_moves?.length) return;
+    const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
+    const pv = result.evaluation.top_moves[idx].pv;
+    const baseFen = result.evaluation.fen;
+    if (!baseFen || pv.length === 0) return;
+    pvPlayPv = [...pv];
+    pvPlayBaseFen = baseFen;
+    pvPlayFlipped = !!result.flipped;
+    pvPlayStep = 0;
+
+    // Start after a pause equal to grow delay
+    pvPlayPauseTimer = setTimeout(() => {
+      pvPlayPauseTimer = null;
+      (window as any).__chessrayPvPlaying = true;
+      // Clear virtual board arrows when playback starts
+      if (state.canvas) {
+        const ctx = state.canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+      }
+      pvPlayTimer = setInterval(() => {
+        pvPlayStep++;
+        if (pvPlayStep > pvPlayPv.length) {
+          // Reset to start position and replay after pause
+          pvPlayStep = 0;
+          const grid = document.getElementById('cv-debug-grid');
+          if (grid) renderBoardGrid(grid, pvPlayBaseFen.split(' ')[0], pvPlayFlipped, []);
+          // Redraw arrows on virtual board for the replay loop
+          renderArrows(state);
+          return;
+        }
+        // Clear virtual board arrows as moves are executed
+        if (state.canvas) {
+          const ctx = state.canvas.getContext('2d');
+          if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+        }
+        const applied = applyUciMoves(pvPlayBaseFen, pvPlayPv, pvPlayStep);
+        if (!applied) { pvPlayStop(); return; }
+        const grid = document.getElementById('cv-debug-grid');
+        if (grid) renderBoardGrid(grid, applied.fen, pvPlayFlipped, applied.highlight);
+      }, pvGrowDelaySec * 1000);
+    }, pvGrowDelaySec * 1000);
+  }
+
+  function pvPlayStop(): void {
+    if (pvPlayPauseTimer !== null) { clearTimeout(pvPlayPauseTimer); pvPlayPauseTimer = null; }
+    if (pvPlayTimer !== null) { clearInterval(pvPlayTimer); pvPlayTimer = null; }
+    const wasPlaying = (window as any).__chessrayPvPlaying;
+    (window as any).__chessrayPvPlaying = false;
+    pvPlayStep = 0;
+    // Restore virtual board to current position when stopping
+    if (wasPlaying) renderArrows(state);
   }
 
   function getCurrentPv(): string[] {
@@ -368,9 +448,10 @@ function initOverlay(): void {
     return result.evaluation.top_moves[idx].pv;
   }
 
-  (window as any).__chessrayPvGrowStart = pvGrowStart;
+  (window as any).__chessrayPvGrowStart = () => { pvPlayStop(); pvGrowStart(); };
   (window as any).__chessrayPvGrowContinue = pvGrowContinue;
-  (window as any).__chessrayPvGrowStop = pvGrowStop;
+  (window as any).__chessrayPvGrowStop = () => { pvGrowStop(); };
+  (window as any).__chessrayPvPlayStop = pvPlayStop;
 
   if (pvGrowSlider && pvGrowVal) {
     pvGrowSlider.value = String(pvGrowDelaySec);
@@ -599,6 +680,7 @@ function processPendingResult(): void {
     state.currentResult = null;
     state.currentArrows = [];
     lastEvalFen = null;
+    (window as any).__chessrayPvPlayStop?.();
     renderArrows(state);
     clearVideoOverlay(state);
     clearDebugPanel(debugImg, debugFen, debugInfo);
@@ -663,6 +745,7 @@ window.chessRay.onStopTracking(() => {
   state.currentResult = null;
   (window as any).__chessrayClearAutoTimer?.();
   (window as any).__chessrayPvGrowStop?.();
+  (window as any).__chessrayPvPlayStop?.();
   renderArrows(state);
   clearVideoOverlay(state);
 });

@@ -14,7 +14,7 @@ export function clearDebugPanel(
   if (debugInfo) debugInfo.textContent = '';
 
   const grid = document.getElementById('cv-debug-grid');
-  if (grid) grid.innerHTML = '';
+  if (grid && !(window as any).__chessrayPvPlaying) grid.innerHTML = '';
 
   const bestMoves = document.getElementById('cv-best-moves');
   if (bestMoves) { bestMoves.innerHTML = ''; bestMoves.dataset.lastHtml = ''; }
@@ -82,7 +82,7 @@ export function setTrackingState(tracking: boolean): void {
 }
 
 /** Render the virtual board grid with SVG pieces */
-function renderBoardGrid(
+export function renderBoardGrid(
   grid: HTMLElement,
   fen: string,
   flipped: boolean,
@@ -196,9 +196,9 @@ export function updateDebugPanel(
     debugFen.textContent = result.evaluation?.fen || result.recognition?.fen || 'No recognition';
   }
 
-  // Update virtual board grid (user panel)
+  // Update virtual board grid (user panel) — skip while PV playback is animating
   const grid = document.getElementById('cv-debug-grid');
-  if (grid && result.recognition?.fen) {
+  if (grid && result.recognition?.fen && !(window as any).__chessrayPvPlaying) {
     renderBoardGrid(grid, result.recognition.fen, !!result.flipped, result.highlighted_squares || []);
   }
 

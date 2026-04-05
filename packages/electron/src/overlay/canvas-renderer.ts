@@ -152,6 +152,8 @@ export function drawArrow(
 }
 
 export function renderArrows(state: OverlayState): void {
+  // Skip virtual board arrow rendering while PV playback is animating
+  if ((window as any).__chessrayPvPlaying) return;
   if (!state.canvas) return;
 
   const size = 200;
