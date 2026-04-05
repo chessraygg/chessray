@@ -286,6 +286,8 @@ function initOverlay(): void {
       state.arrowsVisible = !state.arrowsVisible;
       if (state.arrowsVisible && state.lineVisible) {
         state.lineVisible = false;
+        pvGrowStop();
+        pvPlayStop();
       }
       syncModeButtons();
       savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
@@ -410,12 +412,10 @@ function initOverlay(): void {
       pvPlayTimer = setInterval(() => {
         pvPlayStep++;
         if (pvPlayStep > pvPlayPv.length) {
-          // Reset to start position and replay after pause
+          // Reset to start position and replay
           pvPlayStep = 0;
           const grid = document.getElementById('cv-debug-grid');
           if (grid) renderBoardGrid(grid, pvPlayBaseFen.split(' ')[0], pvPlayFlipped, []);
-          // Redraw arrows on virtual board for the replay loop
-          renderArrows(state);
           return;
         }
         // Clear virtual board arrows as moves are executed
@@ -604,6 +604,8 @@ function initOverlay(): void {
       resetAutoTimer();
     } else {
       if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
+      pvGrowStop();
+      pvPlayStop();
     }
     savePrefs({ autoMode: state.autoMode });
   });
@@ -656,6 +658,7 @@ initOverlay();
 let pendingResult: PipelineResult | null = null;
 let rafScheduled = false;
 let lastEvalFen: string | null = null;
+let lastRecogFen: string | null = null;
 let lastEvalDepth: number = 0;
 
 function selectLine(index: number): void {
@@ -689,6 +692,13 @@ function processPendingResult(): void {
 
   state.displayFlipped = !!result.flipped;
   state.currentResult = result;
+
+  // Stop playback immediately when recognition FEN changes (before eval arrives)
+  const recogFen = result.recognition?.fen ?? null;
+  if (recogFen && recogFen !== lastRecogFen) {
+    lastRecogFen = recogFen;
+    (window as any).__chessrayPvPlayStop?.();
+  }
 
   // Reset to best line when position changes
   const evalFen = result.evaluation?.fen ?? null;
