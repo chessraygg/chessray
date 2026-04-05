@@ -132,9 +132,12 @@ export function detectOrientationFromLabels(pixels: PixelBuffer): boolean | null
 export function detectBoardFlipped(
   fen: string,
   highlightedIndices?: number[],
+  options?: { skipPawnMove?: boolean },
 ): OrientationResult {
   // Strategy 1: pawn move direction from highlights
-  if (highlightedIndices && highlightedIndices.length === 2) {
+  // Skip when piece_count alone is reliable (20+ pieces) — pawn_move can
+  // misfire when highlight detection picks wrong squares.
+  if (!options?.skipPawnMove && highlightedIndices && highlightedIndices.length === 2) {
     const rows = fen.split('/');
     const board: (string | null)[] = new Array(64).fill(null);
     for (let rank = 0; rank < 8; rank++) {

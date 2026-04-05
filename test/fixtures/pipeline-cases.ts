@@ -36,7 +36,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     bbox: { x: 704, y: 15, width: 537, height: 537 },
     squareSize: 67,
     expectedFen: '1K1RQ2R/1PP3P1/PNN1PPB1/2BP2p1/5p2/2nppn2/pppbbq2/1k3rr1',
-    orientation_source: 'pawn_move',
+    orientation_source: 'piece_count',
   },
   {
     file: 'test-carlsen-titled.png',
@@ -56,7 +56,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     bbox: { x: 88, y: 144, width: 1123, height: 1123 },
     squareSize: 140,
     expectedFen: '2r1k2r/pp2bppp/1qn1p3/2ppPn1P/3P4/2PQ1NP1/PP2NP2/R1B2RK1',
-    orientation_source: 'pawn_move',
+    orientation_source: 'piece_count',
   },
   {
     file: 'test-caruana-american2.png',
@@ -126,7 +126,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     bbox: { x: 47, y: 73, width: 699, height: 699 },
     squareSize: 87,
     expectedFen: 'R2KQ2R/PBP2PP1/3B1N1P/3PN3/1P4p1/3pp2p/ppp1n1b1/r1bkq1nr',
-    orientation_source: 'pawn_move',
+    orientation_source: 'piece_count',
   },
   {
     file: 'test-carlsen-titled4.png',
@@ -166,7 +166,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     bbox: { x: 642, y: 42, width: 709, height: 709 },
     squareSize: 89,
     expectedFen: '1K2R2R/1BP1N1PP/PP3Q2/3P4/8/p1np1pqb/1pp4p/1kr4r',
-    orientation_source: 'pawn_move',
+    orientation_source: 'piece_count',
   },
   {
     file: 'test-eric-rosen.png',
@@ -216,7 +216,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     bbox: { x: 112, y: 130, width: 543, height: 543 },
     squareSize: 68,
     expectedFen: '1r2rn2/kp3qp1/p1p1p2n/P1Np1p2/1RPP1P2/3P1QPB/1P6/1KR5',
-    orientation_source: 'pawn_move',
+    orientation_source: 'piece_count',
   },
   {
     file: 'test-carlsen-titled7.png',
@@ -226,6 +226,16 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     bbox: { x: 20, y: 89, width: 1052, height: 1052 },
     squareSize: 132,
     expectedFen: '1K6/1BB3R1/PP3P2/3P4/pp1b1p2/1nq1p2Q/1k6/2r5',
+    orientation_source: 'piece_count',
+  },
+  {
+    file: 'test-grenke-kamsky.png',
+    white_pawns: 'up',
+    highlighted: ['c5', 'd6'],
+    turn: 'b',
+    bbox: { x: 89, y: 252, width: 595, height: 595 },
+    squareSize: 74,
+    expectedFen: '2rqr1kb/1b1n1p1p/n1pP2p1/8/1p1PPp2/1P1N2P1/1BQN3P/R4RKB',
     orientation_source: 'piece_count',
   },
   {

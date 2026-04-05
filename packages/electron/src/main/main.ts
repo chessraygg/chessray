@@ -134,6 +134,27 @@ function createOverlayWindow(): BrowserWindow {
 
 let activeDisplayId: number | null = null;
 
+function getPrefsPath(): string {
+  return path.join(app.getPath('userData'), 'chessray-prefs.json');
+}
+
+function saveDisplayPref(displayId: number): void {
+  try {
+    const prefsPath = getPrefsPath();
+    let prefs: Record<string, unknown> = {};
+    try { prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf8')); } catch { /* new file */ }
+    prefs.displayId = displayId;
+    fs.writeFileSync(prefsPath, JSON.stringify(prefs));
+  } catch { /* ignore */ }
+}
+
+function loadDisplayPref(): number | null {
+  try {
+    const prefs = JSON.parse(fs.readFileSync(getPrefsPath(), 'utf8'));
+    return typeof prefs.displayId === 'number' ? prefs.displayId : null;
+  } catch { return null; }
+}
+
 /** Get the capture source ID for a specific Electron display */
 async function getScreenSourceId(displayId?: number): Promise<string> {
   const sources = await desktopCapturer.getSources({
@@ -187,6 +208,7 @@ async function switchDisplay(displayId: number): Promise<void> {
   if (!display) return;
 
   activeDisplayId = displayId;
+  saveDisplayPref(displayId);
   fs.appendFileSync(LOG, `[chessray] Switching to display ${displayId}\n`);
 
   // Stop current capture
@@ -407,8 +429,10 @@ app.whenReady().then(() => {
   app.setName('ChessRay');
   platform.showInDock(app);
 
-  // Set initial display to primary
-  activeDisplayId = screen.getPrimaryDisplay().id;
+  // Restore saved display choice, fall back to primary
+  const savedDisplayId = loadDisplayPref();
+  const savedDisplayExists = savedDisplayId != null && screen.getAllDisplays().some(d => d.id === savedDisplayId);
+  activeDisplayId = savedDisplayExists ? savedDisplayId! : screen.getPrimaryDisplay().id;
   buildDockMenu();
 
   // Rebuild dock menu when displays change

@@ -3,6 +3,7 @@ import type { PixelBuffer } from './pixel-utils.js';
 export interface HighlightResult {
   highlighted: number[];
   patches: Array<[number, number, number, number]>;
+  scores?: Array<{ idx: number; dist: number }>;
 }
 
 export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
@@ -141,15 +142,32 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   // No highlights: gap is tiny relative to top score (e.g., 50→48 = gap 2).
   if (maxGap < scores[0].dist * 0.3) return { highlighted: [], patches };
 
-  const aboveThreshold = scores.slice(0, cutIdx).map(s => s.idx);
-  return { highlighted: aboveThreshold, patches };
+  const primary = scores.slice(0, cutIdx).map(s => s.idx);
+
+  // Include runner-up candidates that score well above the noise floor.
+  // These enable disambiguateHighlights to find valid move pairs when the
+  // top 2 don't form a legal move (e.g., false positive on a nearby square).
+  const noiseFloor = scores[Math.min(7, scores.length - 1)].dist;
+  const runnerUpThreshold = Math.max(minAbsolute * 3, noiseFloor * 10);
+  let extendedCount = cutIdx;
+  while (extendedCount < Math.min(6, scores.length) && scores[extendedCount].dist >= runnerUpThreshold) {
+    extendedCount++;
+  }
+  const highlighted = scores.slice(0, extendedCount).map(s => s.idx);
+
+  return { highlighted, patches, scores };
 }
 
 /**
  * Check if a piece could legally move from (fromRank, fromFile) to (toRank, toFile).
  * Basic geometric check — does not verify path obstruction or board state.
  */
-function isLegalPieceMove(piece: string, fromRank: number, fromFile: number, toRank: number, toFile: number): boolean {
+/**
+ * Check if a piece could legally move from (fromRank, fromFile) to (toRank, toFile).
+ * Basic geometric check — does not verify path obstruction or board state.
+ * @param flipped If provided, enforces pawn direction (false = white pawns move to lower rows)
+ */
+function isLegalPieceMove(piece: string, fromRank: number, fromFile: number, toRank: number, toFile: number, flipped?: boolean): boolean {
   const dr = Math.abs(toRank - fromRank);
   const df = Math.abs(toFile - fromFile);
   switch (piece.toLowerCase()) {
@@ -158,7 +176,16 @@ function isLegalPieceMove(piece: string, fromRank: number, fromFile: number, toR
     case 'q': return dr === 0 || df === 0 || (dr === df && dr > 0);
     case 'n': return (dr === 1 && df === 2) || (dr === 2 && df === 1);
     case 'k': return dr <= 1 && df <= 1 && (dr + df > 0);
-    case 'p': return df <= 1 && dr >= 1 && dr <= 2;
+    case 'p': {
+      if (df > 1 || dr < 1 || dr > 2) return false;
+      if (flipped == null) return true; // no orientation info, accept either direction
+      // White pawns (P) move toward lower rows in standard, higher in flipped
+      // Black pawns (p) move toward higher rows in standard, lower in flipped
+      const isWhite = piece === 'P';
+      const movesUp = toRank < fromRank;
+      if (!flipped) return isWhite ? movesUp : !movesUp;
+      return isWhite ? !movesUp : movesUp;
+    }
     default: return false;
   }
 }
@@ -175,8 +202,12 @@ function isLegalPieceMove(piece: string, fromRank: number, fromFile: number, toR
  * @param fen Position-only FEN (raw image orientation)
  * @returns Exactly 2 indices [source, destination] or fewer if not enough candidates
  */
-export function disambiguateHighlights(candidates: number[], fen: string): number[] {
-  if (candidates.length <= 2) return candidates;
+export function disambiguateHighlights(
+  candidates: number[],
+  fen: string,
+  scores?: Array<{ idx: number; dist: number }>,
+): number[] {
+  if (candidates.length < 2) return candidates;
 
   const rows = fen.split('/');
   const board: (string | null)[] = new Array(64).fill(null);
@@ -188,16 +219,33 @@ export function disambiguateHighlights(candidates: number[], fen: string): numbe
     }
   }
 
+  // Build score lookup for ranking pairs
+  const scoreMap = new Map<number, number>();
+  if (scores) {
+    for (const s of scores) scoreMap.set(s.idx, s.dist);
+  }
+
   // Find candidates that have a piece vs empty
   const withPiece = candidates.filter(idx => board[idx] !== null);
   const empty = candidates.filter(idx => board[idx] === null);
 
+  // Determine likely orientation from piece positions for pawn direction validation.
+  // Count white vs black pieces in bottom half of image.
+  let whiteBottom = 0, blackBottom = 0;
+  for (let rank = 0; rank < 8; rank++) {
+    for (const ch of rows[rank]) {
+      if (ch >= '1' && ch <= '8') continue;
+      const isWhite = ch === ch.toUpperCase();
+      if (rank >= 4) { if (isWhite) whiteBottom++; else blackBottom++; }
+    }
+  }
+  const likelyFlipped = blackBottom > whiteBottom;
+
   // Try to find a valid (empty_source, piece_destination) pair.
   // The source must be empty (the piece left it) and the destination has the piece.
-  const validPairs: Array<{ src: number; dest: number; scoreRank: number }> = [];
-  const piecesToCheck = withPiece.length === 1 ? withPiece : withPiece;
+  const validPairs: Array<{ src: number; dest: number; combinedScore: number }> = [];
 
-  for (const dest of piecesToCheck) {
+  for (const dest of withPiece) {
     const piece = board[dest]!;
     const destRank = Math.floor(dest / 8);
     const destFile = dest % 8;
@@ -205,18 +253,17 @@ export function disambiguateHighlights(candidates: number[], fen: string): numbe
     for (const src of empty) {
       const srcRank = Math.floor(src / 8);
       const srcFile = src % 8;
-      if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile)) {
-        // scoreRank: sum of position indices in the candidates array (lower = higher score)
-        const srcPos = candidates.indexOf(src);
-        const destPos = candidates.indexOf(dest);
-        validPairs.push({ src, dest, scoreRank: srcPos + destPos });
+      // Use piece_count orientation for pawn direction validation
+      if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, likelyFlipped)) {
+        const srcScore = scoreMap.get(src) ?? 0;
+        const destScore = scoreMap.get(dest) ?? 0;
+        validPairs.push({ src, dest, combinedScore: srcScore + destScore });
       }
     }
   }
 
   if (validPairs.length > 0) {
-    // Pick the pair with the best combined detection score (lowest scoreRank)
-    validPairs.sort((a, b) => a.scoreRank - b.scoreRank);
+    validPairs.sort((a, b) => b.combinedScore - a.combinedScore);
     return [validPairs[0].src, validPairs[0].dest];
   }
 

@@ -39,8 +39,8 @@ export async function recognizeBoard(
   const rawFen = recognition.fen;
 
   // Step 2: Detect and disambiguate highlights
-  let highlightedSquares = detectHighlightedSquares(cropped).highlighted;
-  highlightedSquares = disambiguateHighlights(highlightedSquares, rawFen);
+  const hlResult = detectHighlightedSquares(cropped);
+  let highlightedSquares = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores);
 
   // Step 3: Detect orientation
   // With 20+ pieces, heuristic (pawn_move / piece_count) is fast and reliable.
@@ -48,7 +48,7 @@ export async function recognizeBoard(
   const pieceCount = rawFen.replace(/[0-8/]/g, '').length;
   let orientation: import('./image-utils.js').OrientationResult;
   if (pieceCount >= 20) {
-    orientation = detectBoardFlipped(rawFen, highlightedSquares);
+    orientation = detectBoardFlipped(rawFen, highlightedSquares, { skipPawnMove: true });
   } else {
     const labelResult = await detectLabels(cropped);
     orientation = labelResult ?? detectBoardFlipped(rawFen, highlightedSquares);
