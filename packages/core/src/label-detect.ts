@@ -81,16 +81,35 @@ export async function detectLabels(pixels: PixelBuffer): Promise<OrientationResu
     const outW = sW * scale;
     const outH = sH * scale;
 
+    // Global contrast stretch: normalize luminance to 0-255.
+    // This amplifies subtle label text on both light and dark squares.
+    let minLum = 255, maxLum = 0;
+    for (let y = 0; y < sH; y++) {
+      for (let x = 0; x < sW; x++) {
+        const srcX = sx0 + x;
+        const srcY = sy0 + y;
+        if (srcX >= bw || srcY >= bh) continue;
+        const si = (srcY * bw + srcX) * 4;
+        const lum = 0.299 * pixels.data[si] + 0.587 * pixels.data[si + 1] + 0.114 * pixels.data[si + 2];
+        if (lum < minLum) minLum = lum;
+        if (lum > maxLum) maxLum = lum;
+      }
+    }
+    const lumRange = maxLum - minLum;
+    const lumScale = lumRange > 1 ? 255 / lumRange : 1;
+
     const data = new Uint8ClampedArray(outW * outH * 4);
     for (let y = 0; y < outH; y++) {
       for (let x = 0; x < outW; x++) {
         const srcX = sx0 + Math.floor(x / scale);
         const srcY = sy0 + Math.floor(y / scale);
         const si = (srcY * bw + srcX) * 4;
+        const lum = 0.299 * pixels.data[si] + 0.587 * pixels.data[si + 1] + 0.114 * pixels.data[si + 2];
+        const stretched = Math.round((lum - minLum) * lumScale);
         const di = (y * outW + x) * 4;
-        data[di] = pixels.data[si];
-        data[di + 1] = pixels.data[si + 1];
-        data[di + 2] = pixels.data[si + 2];
+        data[di] = stretched;
+        data[di + 1] = stretched;
+        data[di + 2] = stretched;
         data[di + 3] = 255;
       }
     }
