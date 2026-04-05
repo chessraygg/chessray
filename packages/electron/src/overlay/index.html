@@ -79,6 +79,18 @@
           <span id="cv-pv-depth-val">4</span>
         </div>
 
+        <div class="pv-depth-row" id="cv-pv-grow-row">
+          <label data-tip="Seconds between adding each new line arrow (starts at 4, grows to PV depth)">Grow</label>
+          <input type="range" id="cv-pv-grow-delay" min="1" max="10" value="3" step="1">
+          <span id="cv-pv-grow-delay-val">3</span><span style="font-size:8px;color:var(--text-faint)">s</span>
+        </div>
+
+        <div class="pv-depth-row" id="cv-pv-colors-row">
+          <label data-tip="Line arrow colors for white and black moves">Line</label>
+          <input type="color" id="cv-pv-white-color" value="#facc15" class="color-pick">
+          <input type="color" id="cv-pv-black-color" value="#a855f7" class="color-pick">
+        </div>
+
         <div class="pv-depth-row" id="cv-auto-delay-row" style="display:none">
           <label data-tip="Seconds to show top moves before switching to best line">Delay</label>
           <input type="range" id="cv-auto-delay" min="1" max="15" value="5" step="1">

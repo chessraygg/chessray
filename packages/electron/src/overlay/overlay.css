@@ -77,6 +77,20 @@ canvas#video-overlay {
   100% { box-shadow: none; border-color: var(--border); }
 }
 
+.color-pick {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.color-pick::-webkit-color-swatch-wrapper { padding: 1px; }
+.color-pick::-webkit-color-swatch { border: none; border-radius: 2px; }
+
 .toggle.auto-disabled {
   opacity: 0.25;
   pointer-events: none;
