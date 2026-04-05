@@ -219,6 +219,16 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     orientation_source: 'pawn_move',
   },
   {
+    file: 'test-carlsen-titled7.png',
+    white_pawns: 'down',
+    highlighted: ['f1', 'g2'],
+    turn: 'b',
+    bbox: { x: 20, y: 89, width: 1052, height: 1052 },
+    squareSize: 132,
+    expectedFen: '1K6/1BB3R1/PP3P2/3P4/pp1b1p2/1nq1p2Q/1k6/2r5',
+    orientation_source: 'piece_count',
+  },
+  {
     file: 'test-grenke-dominguez.png',
     white_pawns: 'up',
     highlighted: ['f6', 'g7'],

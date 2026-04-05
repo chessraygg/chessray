@@ -6,7 +6,7 @@
 import type { PipelineResult } from '@chessray/core';
 import { loadPrefs, savePrefs } from './preferences.js';
 import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay } from './canvas-renderer.js';
-import { setupDrag, updateDebugPanel } from './debug-panel.js';
+import { setupDrag, updateDebugPanel, clearDebugPanel } from './debug-panel.js';
 
 declare global {
   interface Window {
@@ -405,6 +405,17 @@ function processPendingResult(): void {
   if (!result) return;
   pendingResult = null;
 
+  // No board detected — clear everything
+  if (!result.board_detection?.found) {
+    state.currentResult = null;
+    state.currentArrows = [];
+    lastEvalFen = null;
+    renderArrows(state);
+    clearVideoOverlay(state);
+    clearDebugPanel(debugImg, debugFen, debugInfo);
+    return;
+  }
+
   state.displayFlipped = !!result.flipped;
   state.currentResult = result;
 
@@ -413,6 +424,13 @@ function processPendingResult(): void {
   if (evalFen && evalFen !== lastEvalFen) {
     state.selectedLineIndex = 0;
     lastEvalFen = evalFen;
+  }
+
+  // Update arrows tooltip with actual multiPV count from engine
+  if (result.evaluation?.top_moves?.length) {
+    const n = result.evaluation.top_moves.length;
+    const arrowsBtn = document.getElementById('cv-arrows-btn');
+    if (arrowsBtn) arrowsBtn.setAttribute('data-tip', `Show top ${n} engine moves as arrows on board`);
   }
 
   updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine);

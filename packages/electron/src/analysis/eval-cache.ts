@@ -3,6 +3,7 @@ import type { EvalResult, ArrowDescriptor } from '@chessray/core';
 export const EVAL_START_DEPTH = 12;
 export const EVAL_DEPTH_STEP = 4;
 export const EVAL_MAX_DEPTH = 28;
+export const EVAL_MULTI_PV = 5;
 export const EVAL_CACHE_SIZE = 32;
 export const ENGINE_ID = 'stockfish-18-lite-single';
 

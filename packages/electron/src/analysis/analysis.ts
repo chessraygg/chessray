@@ -15,7 +15,7 @@ import type {
   OrientationSource,
 } from '@chessray/core';
 
-import { EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH, cacheGet, cachePut } from './eval-cache.js';
+import { EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH, EVAL_MULTI_PV, cacheGet, cachePut } from './eval-cache.js';
 import { sampleBoardPixels, boardUnchanged } from './change-detect.js';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
 import { initAndStartCapture, stopCapture } from './frame-capture.js';
@@ -313,7 +313,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
         (async () => {
           for (let depth = nextDepth; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
             if (signal.aborted) break;
-            const result = await engine!.runDepth(fullFen, depth, 5, signal);
+            const result = await engine!.runDepth(fullFen, depth, EVAL_MULTI_PV, signal);
             if (!result) break;
             if (!result.top_moves[0]?.pv?.length) {
               debugLog(`Engine returned empty PV at depth ${depth} — reinitializing`);
@@ -338,7 +338,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     }
 
     t = Date.now();
-    const firstResult = await engine.runDepth(fullFen, EVAL_START_DEPTH, 5, signal);
+    const firstResult = await engine.runDepth(fullFen, EVAL_START_DEPTH, EVAL_MULTI_PV, signal);
     const tEval = Date.now() - t;
 
     // Detect broken eval (no PV = engine in bad state)
@@ -370,7 +370,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       (async () => {
         for (let depth = EVAL_START_DEPTH + EVAL_DEPTH_STEP; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
           if (signal.aborted) break;
-          const result = await engine!.runDepth(fullFen, depth, 5, signal);
+          const result = await engine!.runDepth(fullFen, depth, EVAL_MULTI_PV, signal);
           if (!result) break;
           // Detect broken eval during deepening
           if (!result.top_moves[0]?.pv?.length) {

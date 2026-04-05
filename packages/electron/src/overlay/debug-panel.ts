@@ -3,6 +3,35 @@ import { uciToSan, formatMoveLine, lossToColor } from '@chessray/core';
 import { savePrefs } from './preferences.js';
 import { pieceSvg } from './piece-svg.js';
 
+/** Clear all debug panel content when no board is detected */
+export function clearDebugPanel(
+  debugImg: HTMLImageElement | null,
+  debugFen: HTMLDivElement | null,
+  debugInfo: HTMLDivElement | null,
+): void {
+  if (debugImg) { debugImg.src = ''; debugImg.style.display = 'none'; }
+  if (debugFen) debugFen.textContent = 'No board detected';
+  if (debugInfo) debugInfo.textContent = '';
+
+  const grid = document.getElementById('cv-debug-grid');
+  if (grid) grid.innerHTML = '';
+
+  const bestMoves = document.getElementById('cv-best-moves');
+  if (bestMoves) { bestMoves.innerHTML = ''; bestMoves.dataset.lastHtml = ''; }
+
+  const evalFill = document.getElementById('cv-eval-fill') as HTMLDivElement | null;
+  const evalLabel = document.getElementById('cv-eval-label');
+  const depthLabel = document.getElementById('cv-eval-depth');
+  if (evalFill) { evalFill.style.width = '50%'; evalFill.style.background = '#d4d4d4'; evalFill.parentElement!.style.background = '#272727'; }
+  if (evalLabel) evalLabel.textContent = '';
+  if (depthLabel) depthLabel.textContent = '';
+
+  const turnDot = document.getElementById('cv-turn-dot');
+  const turnText = document.getElementById('cv-turn-text');
+  if (turnDot) turnDot.className = 'turn-dot';
+  if (turnText) turnText.textContent = '';
+}
+
 export function setupDrag(handle: HTMLElement, panel: HTMLElement): void {
   let isDragging = false;
   let startX = 0;
@@ -159,6 +188,7 @@ export function updateDebugPanel(
 ): void {
   if (debugImg && result.board_image_url) {
     debugImg.src = result.board_image_url;
+    debugImg.style.display = '';
   }
 
   if (debugFen) {
