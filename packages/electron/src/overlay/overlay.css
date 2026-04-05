@@ -310,6 +310,12 @@ canvas#video-overlay {
 .piece-grid .light.highlight { background: #f5f682; }
 .piece-grid .dark.highlight { background: #bbca2b; }
 
+/* Analysis/PV mode: cooler blue-gray tint to indicate virtual position */
+.piece-grid.analysis .light { background: #cdd5de; }
+.piece-grid.analysis .dark { background: #7e8ea3; }
+.piece-grid.analysis .light.highlight { background: #a8c4f0; }
+.piece-grid.analysis .dark.highlight { background: #6a8fc4; }
+
 .piece-anim {
   position: absolute;
   display: flex;

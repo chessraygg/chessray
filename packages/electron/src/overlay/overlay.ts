@@ -486,8 +486,8 @@ function initOverlay(): void {
       const isWhite = (step % 2 === 1) === (turn === 'w');
       const arrow = {
         from: fromSq, to: toSq,
-        color: isWhite ? state.pvWhiteColor : state.pvBlackColor,
-        width: 5, opacity: 0.8, loss_cp: 0,
+        color: isWhite ? '#e5e5e5' : '#1a1a1a',
+        width: 3, opacity: 0.8, loss_cp: 0,
         label: String(step),
       };
       drawArrow(ctx, arrow, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped);
@@ -511,6 +511,7 @@ function initOverlay(): void {
     pvCycleLastPv = [...pv];
     state.pvDisplayDepth = 0;
     (window as any).__chessrayPvPlaying = true;
+    document.getElementById('cv-debug-grid')?.classList.add('analysis');
 
     // First step immediately
     pvCycleStep();
@@ -540,6 +541,7 @@ function initOverlay(): void {
     if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
     const wasPlaying = (window as any).__chessrayPvPlaying;
     (window as any).__chessrayPvPlaying = false;
+    document.getElementById('cv-debug-grid')?.classList.remove('analysis');
     document.querySelectorAll('.piece-anim').forEach(el => el.remove());
     if (wasPlaying) {
       state.pvDisplayDepth = state.pvDepth; // restore full depth
