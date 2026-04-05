@@ -141,7 +141,10 @@ export function drawArrow(
     ctx.arc(ox, oy, r, 0, Math.PI * 2);
     ctx.fillStyle = arrow.color;
     ctx.fill();
-    ctx.fillStyle = '#fff';
+    // Contrast text: dark text on light arrows, white text on dark arrows
+    const hex = arrow.color.replace('#', '');
+    const lum = (parseInt(hex.substring(0, 2), 16) * 299 + parseInt(hex.substring(2, 4), 16) * 587 + parseInt(hex.substring(4, 6), 16) * 114) / 1000;
+    ctx.fillStyle = lum > 140 ? '#000' : '#fff';
     ctx.fillText(arrow.label, ox, oy);
   }
 

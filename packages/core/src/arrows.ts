@@ -76,8 +76,8 @@ export function computePvArrows(pv: string[], turn: 'w' | 'b', maxMoves: number)
     const to = uci.slice(2, 4);
     const isWhite = side === 'w';
 
-    // Alternate colors: green/blue for white moves, orange/red for black moves
-    const color = isWhite ? '#22c55e' : '#ef4444';
+    // Alternate colors: white for white moves, black for black moves
+    const color = isWhite ? '#e5e5e5' : '#1a1a1a';
 
     // First move thick, subsequent thinner
     const width = Math.max(2, 5 - i);
