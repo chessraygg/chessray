@@ -30,7 +30,7 @@ describe('end-to-end detection pipeline', () => {
   }, 30000);
 
   for (const tc of PIPELINE_CASES) {
-    it(`${tc.file}: ${tc.highlighted[0]}→${tc.highlighted[1]}, ${tc.turn} to move`, async () => {
+    it(`${tc.file}: ${tc.highlighted ? `${tc.highlighted[0]}→${tc.highlighted[1]}` : 'no highlights'}, ${tc.turn ?? 'unknown'} to move`, async () => {
       const t0 = Date.now();
       const { data, width, height } = loadPng(tc.file);
 
@@ -64,9 +64,11 @@ describe('end-to-end detection pipeline', () => {
       expect(result.rawFen).toBe(tc.expectedFen);
 
       // Verify highlights
-      expect(result.highlightedSquares.length).toBe(2);
-      expect(squares).toContain(tc.highlighted[0]);
-      expect(squares).toContain(tc.highlighted[1]);
+      if (tc.highlighted) {
+        expect(result.highlightedSquares.length).toBe(2);
+        expect(squares).toContain(tc.highlighted[0]);
+        expect(squares).toContain(tc.highlighted[1]);
+      }
 
       // Verify orientation
       const expectedFlipped = tc.white_pawns === 'down';
@@ -82,9 +84,13 @@ describe('end-to-end detection pipeline', () => {
       // Verify turn
       expect(result.turn).toBe(tc.turn);
 
-      // Verify full FEN
-      expect(result.fullFen).toBeTruthy();
-      expect(result.fullFen!.split(' ').length).toBe(6);
+      // Verify full FEN (null when turn can't be determined)
+      if (tc.turn) {
+        expect(result.fullFen).toBeTruthy();
+        expect(result.fullFen!.split(' ').length).toBe(6);
+      } else {
+        expect(result.fullFen).toBeNull();
+      }
       console.log(`  fullFen=${result.fullFen}`);
 
       // Save annotated debug image

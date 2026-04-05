@@ -3,10 +3,10 @@ export interface PipelineTestCase {
   file: string;
   /** Which direction white pawns move: 'up' (normal) or 'down' (flipped) */
   white_pawns: 'up' | 'down';
-  /** Highlighted squares in correct chess notation (e.g. ['c1', 'f4']) */
-  highlighted: [string, string];
-  /** Whose turn it is after this move */
-  turn: 'w' | 'b';
+  /** Highlighted squares in correct chess notation (e.g. ['c1', 'f4']). Null for starting positions with no highlights. */
+  highlighted: [string, string] | null;
+  /** Whose turn it is after this move. Null if turn can't be determined from highlights (starting positions). */
+  turn: 'w' | 'b' | null;
   /** Expected refined board bounding box (pixel coordinates) */
   bbox: { x: number; y: number; width: number; height: number };
   /** Expected grid square size in pixels (bbox.width / 8) */
@@ -247,5 +247,15 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 54,
     expectedFen: '4r2k/pppq1r1p/4Np2/3n2Q1/5P2/8/PPP5/2KR3R',
     orientation_source: 'pawn_move',
+  },
+  {
+    file: 'test-freestyle-starting.png',
+    white_pawns: 'up',
+    highlighted: null,
+    turn: null,
+    bbox: { x: 278, y: 369, width: 459, height: 459 },
+    squareSize: 57,
+    expectedFen: '8/rnbbknqr/pppppppp/8/8/8/8/PPPPKPPP',
+    orientation_source: 'piece_count',
   },
 ];

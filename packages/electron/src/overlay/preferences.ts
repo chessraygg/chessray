@@ -14,6 +14,9 @@ export interface Prefs {
   collapsed: boolean;
   autoMode: boolean;
   autoDelaySec: number;
+  pvGrowDelaySec: number;
+  pvWhiteColor: string;
+  pvBlackColor: string;
   panelLeft: number | null;
   panelTop: number | null;
 }
@@ -25,7 +28,10 @@ export const DEFAULT_PREFS: Prefs = {
   lineVisible: true,
   autoMode: false,
   autoDelaySec: 5,
-  pvDepth: 4,
+  pvGrowDelaySec: 3,
+  pvWhiteColor: '#60a5fa',
+  pvBlackColor: '#f9a8d4',
+  pvDepth: 10,
   lossThreshold: 0,
   maxDepth: 28,
   evalBarVisible: true,

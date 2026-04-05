@@ -12,6 +12,9 @@ export interface OverlayState {
   arrowsVisible: boolean;
   lineVisible: boolean;
   pvDepth: number;
+  pvDisplayDepth: number;
+  pvWhiteColor: string;
+  pvBlackColor: string;
   evalBarVisible: boolean;
   sourceVisible: boolean;
   selectedLineIndex: number;
@@ -35,7 +38,7 @@ export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
     const turn = state.currentResult.turn
       ?? state.currentResult.evaluation.fen?.split(' ')[1] as 'w' | 'b'
       ?? 'w';
-    return computePvArrows(pv, turn, state.pvDepth);
+    return computePvArrows(pv, turn, state.pvDisplayDepth, state.pvWhiteColor, state.pvBlackColor);
   }
   // Filter arrows by centipawn loss threshold
   return state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold);
@@ -128,7 +131,7 @@ export function drawArrow(
 
   // Draw label at midpoint of arrow
   if (arrow.label) {
-    const fontSize = Math.max(6, lineWidth * 2);
+    const fontSize = Math.max(8, lineWidth * 2);
     ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

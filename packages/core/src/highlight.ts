@@ -290,12 +290,14 @@ export function turnFromHighlight(
     }
   }
 
-  for (const idx of highlightedIndices) {
-    const piece = board[idx];
-    if (piece) {
-      return piece === piece.toUpperCase() ? 'b' : 'w';
-    }
-  }
+  // A valid last-move highlight has one empty square (source) and one occupied (destination).
+  // If both squares have pieces, it's likely a false positive — return null.
+  const pieces = highlightedIndices.filter(idx => board[idx] !== null);
+  const empties = highlightedIndices.filter(idx => board[idx] === null);
+  if (pieces.length === 0 || empties.length === 0) return null;
 
-  return null;
+  // The piece on the destination is the one that just moved.
+  // Uppercase (White) piece → White just moved → Black's turn.
+  const piece = board[pieces[0]]!;
+  return piece === piece.toUpperCase() ? 'b' : 'w';
 }

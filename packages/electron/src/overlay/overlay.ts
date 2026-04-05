@@ -14,6 +14,7 @@ declare global {
       onFrameResult: (cb: (result: unknown) => void) => void;
       onStopTracking: (cb: () => void) => void;
       setMousePassthrough: (passthrough: boolean) => void;
+      setAlwaysOnTop: (enabled: boolean) => void;
       onDisplayInfo: (cb: (info: any) => void) => void;
       onSourceVisibility: (cb: (visible: boolean) => void) => void;
       reopenPicker: () => void;
@@ -43,7 +44,10 @@ const state: OverlayState = {
   borderVisible: false,
   arrowsVisible: true,
   lineVisible: false,
-  pvDepth: 4,
+  pvDepth: 10,
+  pvDisplayDepth: 2,
+  pvWhiteColor: '#60a5fa',
+  pvBlackColor: '#f9a8d4',
   evalBarVisible: true,
   sourceVisible: true,
   selectedLineIndex: 0,
@@ -287,6 +291,8 @@ function initOverlay(): void {
       if (state.lineVisible && state.arrowsVisible) {
         state.arrowsVisible = false;
       }
+      // Reset grow on mode change
+      if (state.lineVisible) { pvGrowStart(); } else { pvGrowStop(); }
       syncModeButtons();
       savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
       renderArrows(state);
@@ -301,6 +307,76 @@ function initOverlay(): void {
       pvDepthVal.textContent = String(state.pvDepth);
       savePrefs({ pvDepth: state.pvDepth });
       renderArrows(state);
+    });
+  }
+
+  // ── PV grow timer ──
+  const pvGrowSlider = document.getElementById('cv-pv-grow-delay') as HTMLInputElement | null;
+  const pvGrowVal = document.getElementById('cv-pv-grow-delay-val');
+  let pvGrowDelaySec = prefs.pvGrowDelaySec;
+  let pvGrowTimer: ReturnType<typeof setInterval> | null = null;
+
+  function pvGrowStart(): void {
+    pvGrowStop();
+    state.pvDisplayDepth = Math.min(1, state.pvDepth);
+    // Only start growing if line is currently visible
+    if (!state.lineVisible) return;
+    if (state.pvDisplayDepth >= state.pvDepth) return;
+    pvGrowTimer = setInterval(() => {
+      if (state.pvDisplayDepth >= state.pvDepth) { pvGrowStop(); return; }
+      state.pvDisplayDepth++;
+      renderArrows(state);
+      renderVideoOverlay(state);
+    }, pvGrowDelaySec * 1000);
+  }
+
+  function pvGrowStop(): void {
+    if (pvGrowTimer !== null) { clearInterval(pvGrowTimer); pvGrowTimer = null; }
+  }
+
+  (window as any).__chessrayPvGrowStart = pvGrowStart;
+  (window as any).__chessrayPvGrowStop = pvGrowStop;
+
+  if (pvGrowSlider && pvGrowVal) {
+    pvGrowSlider.value = String(pvGrowDelaySec);
+    pvGrowVal.textContent = String(pvGrowDelaySec);
+    pvGrowSlider.addEventListener('input', () => {
+      pvGrowDelaySec = parseInt(pvGrowSlider.value, 10);
+      pvGrowVal.textContent = String(pvGrowDelaySec);
+      savePrefs({ pvGrowDelaySec });
+      pvGrowStart();
+    });
+  }
+
+  // ── PV line colors ──
+  const pvWhiteColorInput = document.getElementById('cv-pv-white-color') as HTMLInputElement | null;
+  const pvBlackColorInput = document.getElementById('cv-pv-black-color') as HTMLInputElement | null;
+  state.pvWhiteColor = prefs.pvWhiteColor;
+  state.pvBlackColor = prefs.pvBlackColor;
+
+  function colorPickerFocus() { window.chessRay.setAlwaysOnTop(false); }
+  function colorPickerBlur() { window.chessRay.setAlwaysOnTop(true); }
+
+  if (pvWhiteColorInput) {
+    pvWhiteColorInput.value = state.pvWhiteColor;
+    pvWhiteColorInput.addEventListener('click', colorPickerFocus);
+    pvWhiteColorInput.addEventListener('blur', colorPickerBlur);
+    pvWhiteColorInput.addEventListener('input', () => {
+      state.pvWhiteColor = pvWhiteColorInput.value;
+      savePrefs({ pvWhiteColor: state.pvWhiteColor });
+      renderArrows(state);
+      renderVideoOverlay(state);
+    });
+  }
+  if (pvBlackColorInput) {
+    pvBlackColorInput.value = state.pvBlackColor;
+    pvBlackColorInput.addEventListener('click', colorPickerFocus);
+    pvBlackColorInput.addEventListener('blur', colorPickerBlur);
+    pvBlackColorInput.addEventListener('input', () => {
+      state.pvBlackColor = pvBlackColorInput.value;
+      savePrefs({ pvBlackColor: state.pvBlackColor });
+      renderArrows(state);
+      renderVideoOverlay(state);
     });
   }
 
@@ -368,10 +444,12 @@ function initOverlay(): void {
     renderVideoOverlay(state);
 
     // Switch to best line after delay
+    pvGrowStop(); // stop any existing grow while showing moves
     autoTimer = setTimeout(() => {
       autoTimer = null;
       state.arrowsVisible = false;
       state.lineVisible = true;
+      pvGrowStart(); // start growing from 2 when line becomes visible
       syncModeButtons();
       renderArrows(state);
       renderVideoOverlay(state);
@@ -462,10 +540,13 @@ initOverlay();
 let pendingResult: PipelineResult | null = null;
 let rafScheduled = false;
 let lastEvalFen: string | null = null;
+let lastEvalDepth: number = 0;
 
 function selectLine(index: number): void {
   state.selectedLineIndex = index;
   if (state.currentResult) {
+    // Restart grow from 2 when a different line is selected
+    if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
     updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine);
     renderArrows(state);
     renderVideoOverlay(state);
@@ -494,10 +575,18 @@ function processPendingResult(): void {
 
   // Reset to best line when position changes
   const evalFen = result.evaluation?.fen ?? null;
+  const evalDepth = result.eval_depth ?? 0;
   if (evalFen && evalFen !== lastEvalFen) {
     state.selectedLineIndex = 0;
     lastEvalFen = evalFen;
+    lastEvalDepth = evalDepth;
     (window as any).__chessrayResetAutoTimer?.();
+    // If line is already visible (non-auto mode), restart grow from 2
+    if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
+  } else if (evalDepth > lastEvalDepth) {
+    // Same position, deeper eval — PV may have changed, restart grow
+    lastEvalDepth = evalDepth;
+    if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
   }
 
   // Update arrows tooltip with actual multiPV count from engine
@@ -538,6 +627,7 @@ window.chessRay.onStopTracking(() => {
   state.currentArrows = [];
   state.currentResult = null;
   (window as any).__chessrayClearAutoTimer?.();
+  (window as any).__chessrayPvGrowStop?.();
   renderArrows(state);
   clearVideoOverlay(state);
 });

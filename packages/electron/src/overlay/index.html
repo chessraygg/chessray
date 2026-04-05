@@ -73,10 +73,22 @@
           <span id="cv-loss-threshold-val">0</span>
         </div>
 
-        <div class="pv-depth-row" id="cv-pv-depth-row">
+        <div class="pv-depth-row hidden" id="cv-pv-depth-row">
           <label data-tip="Number of moves shown in best line">PV depth</label>
-          <input type="range" id="cv-pv-depth" min="1" max="10" value="4">
-          <span id="cv-pv-depth-val">4</span>
+          <input type="range" id="cv-pv-depth" min="1" max="10" value="10">
+          <span id="cv-pv-depth-val">10</span>
+        </div>
+
+        <div class="pv-depth-row">
+          <label data-tip="Seconds between adding each new line arrow (starts at 2, grows to max)">Grow</label>
+          <input type="range" id="cv-pv-grow-delay" min="1" max="10" value="3" step="1">
+          <span id="cv-pv-grow-delay-val">3</span><span style="font-size:8px;color:var(--text-faint)">s</span>
+        </div>
+
+        <div class="pv-depth-row">
+          <label data-tip="Line arrow colors for white and black moves">Colors</label>
+          <input type="color" id="cv-pv-white-color" value="#60a5fa" class="color-pick">
+          <input type="color" id="cv-pv-black-color" value="#f9a8d4" class="color-pick">
         </div>
 
         <div class="pv-depth-row" id="cv-auto-delay-row" style="display:none">

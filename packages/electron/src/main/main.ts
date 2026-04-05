@@ -402,6 +402,17 @@ ipcMain.on('set-mouse-passthrough', (_e, passthrough: boolean) => {
   }
 });
 
+// Temporarily lower/restore overlay z-level (for system dialogs like color picker)
+ipcMain.on('set-always-on-top', (_e, enabled: boolean) => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    if (enabled) {
+      platform.configureOverlayWindow(overlayWindow);
+    } else {
+      overlayWindow.setAlwaysOnTop(false);
+    }
+  }
+});
+
 // Window controls
 ipcMain.on('minimize-app', () => {
   app.hide();
