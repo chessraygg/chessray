@@ -12,6 +12,8 @@ export interface Prefs {
   evalBarVisible: boolean;
   panelScale: number;
   collapsed: boolean;
+  autoMode: boolean;
+  autoDelaySec: number;
   panelLeft: number | null;
   panelTop: number | null;
 }
@@ -21,6 +23,8 @@ export const DEFAULT_PREFS: Prefs = {
   borderVisible: false,
   arrowsVisible: false,
   lineVisible: true,
+  autoMode: false,
+  autoDelaySec: 5,
   pvDepth: 4,
   lossThreshold: 0,
   maxDepth: 28,

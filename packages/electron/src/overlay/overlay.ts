@@ -48,6 +48,7 @@ const state: OverlayState = {
   sourceVisible: true,
   selectedLineIndex: 0,
   lossThreshold: 50,
+  autoMode: false,
   panelScale: 1,
   displayInfo: null,
 };
@@ -257,16 +258,21 @@ function initOverlay(): void {
   const pvDepthSlider = document.getElementById('cv-pv-depth') as HTMLInputElement | null;
   const pvDepthVal = document.getElementById('cv-pv-depth-val');
 
+  function syncModeButtons(): void {
+    arrowsBtn?.classList.toggle('active', state.arrowsVisible);
+    lineBtn?.classList.toggle('active', state.lineVisible);
+    if (pvDepthRow) pvDepthRow.style.display = state.lineVisible ? 'flex' : 'none';
+  }
+
   if (arrowsBtn) {
     arrowsBtn.classList.toggle('active', state.arrowsVisible);
     arrowsBtn.addEventListener('click', () => {
+      if (state.autoMode) return;
       state.arrowsVisible = !state.arrowsVisible;
-      arrowsBtn.classList.toggle('active', state.arrowsVisible);
       if (state.arrowsVisible && state.lineVisible) {
         state.lineVisible = false;
-        lineBtn?.classList.toggle('active', false);
-        if (pvDepthRow) pvDepthRow.style.display = 'none';
       }
+      syncModeButtons();
       savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
       renderArrows(state);
     });
@@ -276,13 +282,12 @@ function initOverlay(): void {
     lineBtn.classList.toggle('active', state.lineVisible);
     if (pvDepthRow) pvDepthRow.style.display = state.lineVisible ? 'flex' : 'none';
     lineBtn.addEventListener('click', () => {
+      if (state.autoMode) return;
       state.lineVisible = !state.lineVisible;
-      lineBtn.classList.toggle('active', state.lineVisible);
-      if (pvDepthRow) pvDepthRow.style.display = state.lineVisible ? 'flex' : 'none';
       if (state.lineVisible && state.arrowsVisible) {
         state.arrowsVisible = false;
-        arrowsBtn?.classList.toggle('active', false);
       }
+      syncModeButtons();
       savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
       renderArrows(state);
     });
@@ -340,6 +345,74 @@ function initOverlay(): void {
       window.chessRay.setMaxDepth(depth);
     });
   }
+
+  // ── Auto mode ──
+  const autoBtn = document.getElementById('cv-auto-btn');
+  const autoDelayRow = document.getElementById('cv-auto-delay-row');
+  const autoDelaySlider = document.getElementById('cv-auto-delay') as HTMLInputElement | null;
+  const autoDelayVal = document.getElementById('cv-auto-delay-val');
+
+  state.autoMode = prefs.autoMode;
+  let autoDelaySec = prefs.autoDelaySec;
+  let autoTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function resetAutoTimer(): void {
+    if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
+    if (!state.autoMode) return;
+
+    // Show top moves immediately
+    state.arrowsVisible = true;
+    state.lineVisible = false;
+    syncModeButtons();
+    renderArrows(state);
+    renderVideoOverlay(state);
+
+    // Switch to best line after delay
+    autoTimer = setTimeout(() => {
+      autoTimer = null;
+      state.arrowsVisible = false;
+      state.lineVisible = true;
+      syncModeButtons();
+      renderArrows(state);
+      renderVideoOverlay(state);
+    }, autoDelaySec * 1000);
+  }
+
+  // Expose resetAutoTimer for processPendingResult
+  (window as any).__chessrayResetAutoTimer = resetAutoTimer;
+  (window as any).__chessrayClearAutoTimer = () => {
+    if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
+  };
+
+  function applyAutoMode(): void {
+    autoBtn?.classList.toggle('active', state.autoMode);
+    arrowsBtn?.classList.toggle('auto-disabled', state.autoMode);
+    lineBtn?.classList.toggle('auto-disabled', state.autoMode);
+    if (autoDelayRow) autoDelayRow.style.display = state.autoMode ? 'flex' : 'none';
+  }
+
+  applyAutoMode();
+  if (autoDelaySlider && autoDelayVal) {
+    autoDelaySlider.value = String(autoDelaySec);
+    autoDelayVal.textContent = String(autoDelaySec);
+    autoDelaySlider.addEventListener('input', () => {
+      autoDelaySec = parseInt(autoDelaySlider.value, 10);
+      autoDelayVal.textContent = String(autoDelaySec);
+      savePrefs({ autoDelaySec });
+      resetAutoTimer();
+    });
+  }
+
+  autoBtn?.addEventListener('click', () => {
+    state.autoMode = !state.autoMode;
+    applyAutoMode();
+    if (state.autoMode) {
+      resetAutoTimer();
+    } else {
+      if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
+    }
+    savePrefs({ autoMode: state.autoMode });
+  });
 
   // ── Collapse panel ──
   const collapseBtn = document.getElementById('cv-collapse-btn');
@@ -424,6 +497,7 @@ function processPendingResult(): void {
   if (evalFen && evalFen !== lastEvalFen) {
     state.selectedLineIndex = 0;
     lastEvalFen = evalFen;
+    (window as any).__chessrayResetAutoTimer?.();
   }
 
   // Update arrows tooltip with actual multiPV count from engine
@@ -463,6 +537,7 @@ window.chessRay.onSourceVisibility((visible) => {
 window.chessRay.onStopTracking(() => {
   state.currentArrows = [];
   state.currentResult = null;
+  (window as any).__chessrayClearAutoTimer?.();
   renderArrows(state);
   clearVideoOverlay(state);
 });

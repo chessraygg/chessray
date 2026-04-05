@@ -16,6 +16,7 @@ export interface OverlayState {
   sourceVisible: boolean;
   selectedLineIndex: number;
   lossThreshold: number;
+  autoMode: boolean;
   panelScale: number;
   displayInfo: {
     size: { width: number; height: number };

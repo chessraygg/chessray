@@ -77,6 +77,11 @@ canvas#video-overlay {
   100% { box-shadow: none; border-color: var(--border); }
 }
 
+.toggle.auto-disabled {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
 .resize-grip {
   position: absolute;
   width: 14px;
