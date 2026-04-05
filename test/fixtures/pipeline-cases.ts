@@ -258,4 +258,14 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'rnbbknqr/pppppppp/8/8/8/8/PPPPPPPP/RNBBKNQR',
     orientation_source: 'piece_count',
   },
+  {
+    file: 'test-grenke-carlsen-keymer.png',
+    white_pawns: 'up',
+    highlighted: ['b8', 'f8'],
+    turn: 'b',
+    bbox: { x: 51, y: 68, width: 587, height: 587 },
+    squareSize: 73,
+    expectedFen: '5Q2/1pq5/2pkrp2/3p4/8/6R1/PP4P1/6K1',
+    orientation_source: 'piece_count',
+  },
 ];

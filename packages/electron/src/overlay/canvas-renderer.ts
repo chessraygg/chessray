@@ -20,6 +20,7 @@ export interface OverlayState {
   selectedLineIndex: number;
   lossThreshold: number;
   autoMode: boolean;
+  vboardOverlayVisible: boolean;
   panelScale: number;
   displayInfo: {
     size: { width: number; height: number };
@@ -144,7 +145,10 @@ export function drawArrow(
     ctx.arc(ox, oy, r, 0, Math.PI * 2);
     ctx.fillStyle = arrow.color;
     ctx.fill();
-    ctx.fillStyle = '#fff';
+    // Contrast text: dark on light circles, white on dark circles
+    const hex = arrow.color.replace('#', '');
+    const lum = (parseInt(hex.substring(0, 2), 16) * 299 + parseInt(hex.substring(2, 4), 16) * 587 + parseInt(hex.substring(4, 6), 16) * 114) / 1000;
+    ctx.fillStyle = lum > 140 ? '#000' : '#fff';
     ctx.fillText(arrow.label, ox, oy);
   }
 
@@ -152,8 +156,8 @@ export function drawArrow(
 }
 
 export function renderArrows(state: OverlayState): void {
-  // Skip virtual board arrow rendering while PV playback is animating
-  if ((window as any).__chessrayPvPlaying) return;
+  // Skip virtual board arrow rendering while PV playback is animating or vboard overlay hidden
+  if ((window as any).__chessrayPvPlaying || !state.vboardOverlayVisible) return;
   if (!state.canvas) return;
 
   const size = 200;

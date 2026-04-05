@@ -11,8 +11,11 @@
   <div class="panel user-panel" id="user-panel">
     <!-- Top bar: always visible — icon toggles + collapse/close -->
     <div class="top-bar" id="cv-main-toggles">
-      <button class="toggle icon-toggle active" id="cv-overlay-btn" data-tip="Show/hide all screen overlays (arrows, eval bar)">
+      <button class="toggle icon-toggle active" id="cv-overlay-btn" data-tip="Show/hide actual board overlay (arrows, eval bar)">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8s3-5.5 7-5.5S15 8 15 8s-3 5.5-7 5.5S1 8 1 8z"/><circle cx="8" cy="8" r="2.5"/></svg>
+      </button>
+      <button class="toggle icon-toggle active" id="cv-vboard-btn" data-tip="Show/hide virtual board overlay (arrows, animation)">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M2 8h12M8 2v12"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/></svg>
       </button>
       <button class="toggle icon-toggle active" id="cv-eval-btn" data-tip="Show eval bar next to detected board">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="1" width="6" height="14" rx="1"/><rect x="5" y="7" width="6" height="8" rx="0" fill="currentColor" stroke="none"/></svg>
@@ -26,6 +29,9 @@
       <button class="toggle icon-toggle" id="cv-auto-btn" data-tip="Auto: show top moves then switch to best line">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><polyline points="8,4 8,8 11,10"/></svg>
       </button>
+      <button class="toggle icon-toggle" id="cv-compact-btn" data-tip="Compact mode: board + top moves only">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="9" rx="1"/><line x1="4" y1="13.5" x2="12" y2="13.5"/></svg>
+      </button>
       <span data-tip="Debug info"><button class="ctrl-btn" id="cv-debug-toggle"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="1.5"/><line x1="8" y1="2" x2="8" y2="4"/><line x1="8" y1="12" x2="8" y2="14"/><line x1="2" y1="8" x2="4" y2="8"/><line x1="12" y1="8" x2="14" y2="8"/></svg></button></span>
       <span data-tip="Expand/Collapse"><button class="ctrl-btn chevron" id="cv-collapse-btn">&#x25BC;</button></span>
       <span data-tip="Close"><button class="ctrl-btn close" id="cv-close-btn">&#xD7;</button></span>
@@ -35,7 +41,7 @@
       <!-- Zoom controls: only in expanded view -->
       <div class="zoom-bar">
         <button class="zoom-btn" id="cv-zoom-out" data-tip="Zoom out">&#x2212;</button>
-        <input type="range" id="cv-zoom-slider" min="50" max="200" value="100" class="zoom-slider">
+        <input type="range" id="cv-zoom-slider" min="50" max="400" value="100" class="zoom-slider">
         <button class="zoom-btn" id="cv-zoom-in" data-tip="Zoom in">&#x2B;</button>
         <span class="zoom-label" id="cv-zoom-label">100%</span>
       </div>
@@ -46,8 +52,8 @@
             <div class="piece-grid" id="cv-debug-grid"></div>
             <canvas id="cv-arrow-canvas" width="200" height="200"></canvas>
           </div>
+          <div class="compact-moves hidden" id="cv-compact-moves"></div>
           <div class="board-status">
-            <span class="turn-indicator" id="cv-turn-indicator">
               <span class="turn-dot white" id="cv-turn-dot"></span>
               <span id="cv-turn-text">White</span>
             </span>

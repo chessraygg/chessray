@@ -4,7 +4,7 @@
  */
 
 import type { PipelineResult } from '@chessray/core';
-import { applyUciMoves } from '@chessray/core';
+import { applyUciMoves, uciToSan, lossToColor } from '@chessray/core';
 import { loadPrefs, savePrefs } from './preferences.js';
 import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, drawArrow } from './canvas-renderer.js';
 import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid } from './debug-panel.js';
@@ -55,6 +55,7 @@ const state: OverlayState = {
   selectedLineIndex: 0,
   lossThreshold: 50,
   autoMode: false,
+  vboardOverlayVisible: true,
   panelScale: 1,
   displayInfo: null,
 };
@@ -125,7 +126,7 @@ function initOverlay(): void {
       if (!e.metaKey && !e.ctrlKey) return;
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.05 : 0.05;
-      panelScale = Math.min(2, Math.max(0.5, panelScale + delta));
+      panelScale = Math.min(4, Math.max(0.5, panelScale + delta));
       applyScale();
       savePrefs({ panelScale });
     }, { passive: false });
@@ -165,7 +166,7 @@ function initOverlay(): void {
       const dy = e.clientY - startY;
       // Top grips: drag up = enlarge (invert), bottom grips: drag down = enlarge
       const scaleDelta = anchorBottom ? -dy / 200 : dy / 200;
-      const newScale = Math.min(2, Math.max(0.5, startScale + scaleDelta));
+      const newScale = Math.min(4, Math.max(0.5, startScale + scaleDelta));
 
       if (anchorRight) {
         const scaledWidthDiff = panelWidth * (newScale - startScale);
@@ -206,7 +207,7 @@ function initOverlay(): void {
   updateZoomUI();
 
   function setZoom(scale: number): void {
-    panelScale = Math.min(2, Math.max(0.5, scale));
+    panelScale = Math.min(4, Math.max(0.5, scale));
     applyScale(); updateZoomUI(); savePrefs({ panelScale });
   }
 
@@ -236,27 +237,53 @@ function initOverlay(): void {
     childToggles.forEach(btn => btn.classList.toggle('parent-hidden', !state.overlayVisible));
   }
 
+  // Actual board overlay toggle
   if (overlayBtn) {
     overlayBtn.classList.toggle('active', state.overlayVisible);
     updateChildToggles();
     overlayBtn.addEventListener('click', () => {
       state.overlayVisible = !state.overlayVisible;
       if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
-      if (state.canvas) state.canvas.style.display = state.overlayVisible ? '' : 'none';
-      // Remove any in-flight piece animations
-      document.querySelectorAll('.piece-anim').forEach(el => el.remove());
       overlayBtn.classList.toggle('active', state.overlayVisible);
       updateChildToggles();
       savePrefs({ overlayVisible: state.overlayVisible });
       if (state.overlayVisible) {
-        // Restart auto mode + grow when overlay becomes visible again
         (window as any).__chessrayResetAutoTimer?.();
-        if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
+        if (state.lineVisible) pvCycleStart();
       } else {
-        // Stop everything when overlay is hidden
         (window as any).__chessrayClearAutoTimer?.();
-        (window as any).__chessrayPvGrowStop?.();
-        (window as any).__chessrayPvPlayStop?.();
+        // Stop cycle if both overlays are hidden
+        if (!state.vboardOverlayVisible) pvCycleStop();
+      }
+    });
+  }
+
+  // Virtual board overlay toggle
+  const vboardBtn = document.getElementById('cv-vboard-btn');
+  state.vboardOverlayVisible = prefs.vboardOverlayVisible;
+  if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
+
+  if (vboardBtn) {
+    vboardBtn.classList.toggle('active', state.vboardOverlayVisible);
+    vboardBtn.addEventListener('click', () => {
+      state.vboardOverlayVisible = !state.vboardOverlayVisible;
+      if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
+      document.querySelectorAll('.piece-anim').forEach(el => el.remove());
+      vboardBtn.classList.toggle('active', state.vboardOverlayVisible);
+      savePrefs({ vboardOverlayVisible: state.vboardOverlayVisible });
+      if (state.vboardOverlayVisible) {
+        // Redraw virtual board arrows if cycle is running
+        renderArrows(state);
+        if (state.lineVisible && !pvCycleTimer) pvCycleStart();
+      } else {
+        // Clean up virtual board visuals
+        document.querySelectorAll('.piece-anim').forEach(el => el.remove());
+        if (state.canvas) {
+          const ctx = state.canvas.getContext('2d');
+          if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+        }
+        // Stop cycle if actual board overlay is also hidden
+        if (!state.overlayVisible) pvCycleStop();
       }
     });
   }
@@ -341,19 +368,42 @@ function initOverlay(): void {
   let pvCycleFlipped = false;
   let pvCyclePv: string[] = [];
 
+  let pvCycleMovesTimer: ReturnType<typeof setTimeout> | null = null;
+
   function pvCycleStep(): void {
     if (state.pvDisplayDepth >= state.pvDepth || state.pvDisplayDepth >= pvCyclePv.length) {
-      // Sequence complete — pause one step then reset and loop
+      // Sequence complete
+      if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
       state.pvDisplayDepth = 0;
-      // Show base position on virtual board (no highlights, no arrows)
-      const grid = document.getElementById('cv-debug-grid');
-      if (grid) renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, []);
-      if (state.canvas) {
-        const ctx = state.canvas.getContext('2d');
-        if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+
+      // Reset virtual board if visible
+      if (state.vboardOverlayVisible) {
+        const grid = document.getElementById('cv-debug-grid');
+        if (grid) renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, []);
+        if (state.canvas) {
+          const ctx = state.canvas.getContext('2d');
+          if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+        }
       }
-      // Clear actual board overlay arrows too (reset to 0)
-      renderVideoOverlay(state);
+
+      if (state.autoMode) {
+        // Switch to moves mode for autoDelaySec, then restart line cycle
+        state.arrowsVisible = true;
+        state.lineVisible = false;
+        syncModeButtons();
+        renderVideoOverlay(state);
+        pvCycleMovesTimer = setTimeout(() => {
+          pvCycleMovesTimer = null;
+          state.arrowsVisible = false;
+          state.lineVisible = true;
+          syncModeButtons();
+          pvCycleStart();
+        }, autoDelaySec * 1000);
+      } else {
+        // Non-auto: just loop the line cycle
+        renderVideoOverlay(state);
+        pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
+      }
       return;
     }
 
@@ -361,8 +411,10 @@ function initOverlay(): void {
     const step = state.pvDisplayDepth;
 
     // Update actual board overlay (shows arrows 1..step)
-    renderArrows(state);
     renderVideoOverlay(state);
+
+    // Skip virtual board animation if vboard overlay is hidden
+    if (!state.vboardOverlayVisible) return;
 
     // Animate piece movement on virtual board
     const uci = pvCyclePv[step - 1];
@@ -497,7 +549,7 @@ function initOverlay(): void {
   /** Start the unified cycle from step 1 */
   function pvCycleStart(): void {
     pvCycleStop();
-    if (!state.lineVisible || !state.overlayVisible) return;
+    if (!state.lineVisible) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) return;
     const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
@@ -521,7 +573,7 @@ function initOverlay(): void {
 
   /** Continue if displayed moves match, otherwise restart */
   function pvCycleContinue(): void {
-    if (!state.lineVisible || !state.overlayVisible) return;
+    if (!state.lineVisible) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) return;
     const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
@@ -539,6 +591,7 @@ function initOverlay(): void {
 
   function pvCycleStop(): void {
     if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
+    if (pvCycleMovesTimer !== null) { clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null; }
     const wasPlaying = (window as any).__chessrayPvPlaying;
     (window as any).__chessrayPvPlaying = false;
     document.getElementById('cv-debug-grid')?.classList.remove('analysis');
@@ -733,6 +786,65 @@ function initOverlay(): void {
 
   collapseBtn?.addEventListener('click', () => { collapsed = !collapsed; setCollapsed(collapsed); });
 
+  // ── Compact mode ──
+  const compactBtn = document.getElementById('cv-compact-btn');
+  const compactMovesEl = document.getElementById('cv-compact-moves');
+  let compactMode = prefs.compactMode;
+
+  function setCompactMode(on: boolean): void {
+    compactMode = on;
+    userPanel?.classList.toggle('compact', on);
+    compactBtn?.classList.toggle('active', on);
+    if (compactMovesEl) compactMovesEl.classList.toggle('hidden', !on);
+    savePrefs({ compactMode: on });
+    if (on) updateCompactMoves();
+  }
+
+  function updateCompactMoves(): void {
+    if (!compactMode || !compactMovesEl) return;
+    const result = state.currentResult;
+    if (!result?.evaluation?.top_moves?.length) {
+      compactMovesEl.innerHTML = '';
+      return;
+    }
+    const fen = result.evaluation.fen;
+    let html = '';
+    for (let i = 0; i < result.evaluation.top_moves.length; i++) {
+      const move = result.evaluation.top_moves[i];
+      if (move.loss_cp > state.lossThreshold) continue;
+      const uci = move.pv[0];
+      // Convert to SAN via core
+      const sanArr = fen ? uciToSan(fen, [uci]) : [uci];
+      const label = sanArr[0] || uci;
+      const scoreStr = move.score_cp >= 0 ? `+${(move.score_cp / 100).toFixed(1)}` : (move.score_cp / 100).toFixed(1);
+      const selected = i === state.selectedLineIndex ? ' selected' : '';
+      const hex = lossToColor(move.loss_cp);
+      const cr = parseInt(hex.slice(1, 3), 16);
+      const cg = parseInt(hex.slice(3, 5), 16);
+      const cb = parseInt(hex.slice(5, 7), 16);
+      const bg = `rgba(${cr},${cg},${cb},0.25)`;
+      html += `<div class="compact-move${selected}" data-line="${i}" style="background:${bg}">${label}</div>`;
+    }
+    compactMovesEl.innerHTML = html;
+    compactMovesEl.querySelectorAll('.compact-move').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt((el as HTMLElement).dataset.line!, 10);
+        selectLine(idx);
+        updateCompactMoves();
+      });
+    });
+  }
+
+  // Expose for processPendingResult
+  (window as any).__chessrayUpdateCompactMoves = updateCompactMoves;
+
+  if (compactMode) setCompactMode(true);
+  compactBtn?.addEventListener('click', () => setCompactMode(!compactMode));
+  // Double-click board to toggle compact mode
+  document.getElementById('cv-debug-grid')?.addEventListener('dblclick', () => {
+    setCompactMode(!compactMode);
+  });
+
   // ── Reset panel position (triggered from dock menu) ──
   window.chessRay.onResetPanelPosition(() => {
     if (userPanel) {
@@ -831,6 +943,7 @@ function processPendingResult(): void {
   }
 
   updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine);
+  (window as any).__chessrayUpdateCompactMoves?.();
   state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
   renderVideoOverlay(state);

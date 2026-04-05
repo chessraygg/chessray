@@ -316,6 +316,40 @@ canvas#video-overlay {
 .piece-grid.analysis .light.highlight { background: #a8c4f0; }
 .piece-grid.analysis .dark.highlight { background: #6a8fc4; }
 
+/* ── Compact mode ── */
+
+.panel.compact .top-bar { display: none; }
+.panel.compact .panel-body > *:not(.tracking-content) { display: none !important; }
+.panel.compact .tracking-content > *:not(.board-frame) { display: none !important; }
+.panel.compact .board-status { display: none; }
+.panel.compact .compact-moves { display: flex !important; }
+.panel.compact { padding: 4px; cursor: grab; }
+
+.compact-moves {
+  display: flex;
+  gap: 2px;
+  padding: 3px 0 0;
+}
+
+.compact-move {
+  flex: 1 1 0;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 3px;
+  border-radius: 3px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  border: 1px solid transparent;
+}
+.compact-move:hover { filter: brightness(1.2); }
+.compact-move.selected { border-color: var(--accent); }
+.compact-move .compact-score { color: var(--text-dim); margin-left: 2px; font-size: 9px; }
+
 .piece-anim {
   position: absolute;
   display: flex;

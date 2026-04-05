@@ -82,10 +82,10 @@ export function computePvArrows(
     // Alternate colors: green/blue for white moves, orange/red for black moves
     const color = isWhite ? whiteColor : blackColor;
 
-    // First move thick, subsequent thinner
-    const width = Math.max(3.5, 5 - i);
-    // Fade out progressively
-    const opacity = Math.max(0.4, 0.675 - i * 0.06);
+    // Most recent move (last) is thickest/most opaque, earlier moves shrink
+    const distFromEnd = moves.length - 1 - i;
+    const width = Math.max(3.5, 5 - distFromEnd * 0.5);
+    const opacity = Math.max(0.35, 0.8 - distFromEnd * 0.08);
 
     const arrow: ArrowDescriptor = {
       from, to, color, width, opacity,
