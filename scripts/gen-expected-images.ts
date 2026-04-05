@@ -31,14 +31,86 @@ const WHITE_PIECE = [255, 255, 255] as const;
 const BLACK_PIECE = [0, 0, 0] as const;
 const PIECE_OUTLINE = [80, 80, 80] as const;
 
-// Simple 5x7 pixel font for chess piece letters
-const FONT: Record<string, string[]> = {
-  K: ['10001','10010','10100','11000','10100','10010','10001'],
-  Q: ['01110','10001','10001','10101','10010','01101','00000'],
-  R: ['11110','10001','10001','11110','10100','10010','10001'],
-  B: ['11110','10001','10001','11110','10001','10001','11110'],
-  N: ['10001','11001','10101','10011','10001','10001','10001'],
-  P: ['11110','10001','10001','11110','10000','10000','10000'],
+// 11x11 piece shape bitmaps for recognizable chess figures
+const PIECE_SHAPES: Record<string, string[]> = {
+  K: [
+    '00000100000',
+    '00001110000',
+    '00000100000',
+    '00011111000',
+    '00011111000',
+    '00001110000',
+    '00011111000',
+    '00111111100',
+    '01111111110',
+    '01111111110',
+    '11111111111',
+  ],
+  Q: [
+    '10000100001',
+    '11001110011',
+    '01101110110',
+    '01111111110',
+    '00111111100',
+    '00011111000',
+    '00011111000',
+    '00111111100',
+    '01111111110',
+    '01111111110',
+    '11111111111',
+  ],
+  R: [
+    '11011011011',
+    '11111111111',
+    '01111111110',
+    '00111111100',
+    '00011111000',
+    '00011111000',
+    '00011111000',
+    '00011111000',
+    '00111111100',
+    '01111111110',
+    '11111111111',
+  ],
+  B: [
+    '00000100000',
+    '00001110000',
+    '00011111000',
+    '00011111000',
+    '00001110000',
+    '00001110000',
+    '00011111000',
+    '00011111000',
+    '00111111100',
+    '01111111110',
+    '11111111111',
+  ],
+  N: [
+    '00011100000',
+    '00111110000',
+    '01111111000',
+    '11111111100',
+    '00011111110',
+    '00001111100',
+    '00001111000',
+    '00011111000',
+    '00111111100',
+    '01111111110',
+    '11111111111',
+  ],
+  P: [
+    '00000000000',
+    '00000000000',
+    '00001110000',
+    '00011111000',
+    '00011111000',
+    '00001110000',
+    '00001110000',
+    '00011111000',
+    '00111111100',
+    '01111111110',
+    '11111111111',
+  ],
 };
 
 // 5x7 bitmap font for labels (uppercase, digits, common symbols)
@@ -189,63 +261,42 @@ function drawVirtualBoard(
         }
       }
 
-      // Draw piece
+      // Draw piece shape
       const piece = board[rank]?.[file];
       if (piece && piece !== '.') {
         const isWhitePiece = piece === piece.toUpperCase();
         const pieceColor = isWhitePiece ? WHITE_PIECE : BLACK_PIECE;
         const outlineColor = isWhitePiece ? PIECE_OUTLINE : [180, 180, 180] as const;
-        const letter = piece.toUpperCase();
-        const glyph = FONT[letter];
+        const shape = PIECE_SHAPES[piece.toUpperCase()];
 
-        // Draw filled circle for the piece
-        const cx = (x0 + x1) / 2;
-        const cy = (y0 + y1) / 2;
-        const radius = sq * 0.35;
+        if (shape) {
+          const shapeH = shape.length;     // 11
+          const shapeW = shape[0].length;  // 11
+          const scale = Math.max(1, Math.floor(sq * 0.8 / shapeH));
+          const pw = shapeW * scale;
+          const ph = shapeH * scale;
+          const px0 = Math.floor((x0 + x1) / 2 - pw / 2);
+          const py0 = Math.floor((y0 + y1) / 2 - ph / 2 + scale); // slightly lower
 
-        for (let y = y0; y < y1; y++) {
-          for (let x = x0; x < x1; x++) {
-            const dx = x - cx;
-            const dy = y - cy;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < radius && x >= 0 && x < out.width && y >= 0 && y < out.height) {
-              const i = (y * out.width + x) * 4;
-              if (dist > radius - 1.5) {
-                // Outline
-                out.data[i] = outlineColor[0];
-                out.data[i + 1] = outlineColor[1];
-                out.data[i + 2] = outlineColor[2];
-              } else {
-                out.data[i] = pieceColor[0];
-                out.data[i + 1] = pieceColor[1];
-                out.data[i + 2] = pieceColor[2];
-              }
-              out.data[i + 3] = 255;
-            }
-          }
-        }
-
-        // Draw letter on the piece
-        if (glyph) {
-          const letterColor = isWhitePiece ? [40, 40, 40] : [220, 220, 220];
-          const scale = Math.max(1, Math.floor(sq / 14));
-          const lw = 5 * scale;
-          const lh = 7 * scale;
-          const lx = Math.floor(cx - lw / 2);
-          const ly = Math.floor(cy - lh / 2);
-
-          for (let gr = 0; gr < 7; gr++) {
-            for (let gc = 0; gc < 5; gc++) {
-              if (glyph[gr][gc] === '1') {
+          // Draw outline (1px border around shape)
+          for (let gr = 0; gr < shapeH; gr++) {
+            for (let gc = 0; gc < shapeW; gc++) {
+              if (shape[gr][gc] === '1') {
+                // Check if this pixel borders a '0' → outline pixel
+                const isEdge = (gr === 0 || shape[gr-1][gc] === '0') ||
+                               (gr === shapeH-1 || shape[gr+1][gc] === '0') ||
+                               (gc === 0 || shape[gr][gc-1] === '0') ||
+                               (gc === shapeW-1 || shape[gr][gc+1] === '0');
+                const color = isEdge ? outlineColor : pieceColor;
                 for (let sy = 0; sy < scale; sy++) {
                   for (let sx = 0; sx < scale; sx++) {
-                    const px = lx + gc * scale + sx;
-                    const py = ly + gr * scale + sy;
+                    const px = px0 + gc * scale + sx;
+                    const py = py0 + gr * scale + sy;
                     if (px >= 0 && px < out.width && py >= 0 && py < out.height) {
                       const i = (py * out.width + px) * 4;
-                      out.data[i] = letterColor[0];
-                      out.data[i + 1] = letterColor[1];
-                      out.data[i + 2] = letterColor[2];
+                      out.data[i] = color[0];
+                      out.data[i + 1] = color[1];
+                      out.data[i + 2] = color[2];
                       out.data[i + 3] = 255;
                     }
                   }
@@ -404,6 +455,18 @@ for (const tc of PIPELINE_CASES) {
   const wRights = describeSide(castling.includes('K'), castling.includes('Q'));
   const bRights = describeSide(castling.includes('k'), castling.includes('q'));
   drawText(out, `CASTLING RIGHTS: W ${wRights}. B ${bRights}`, labelX, labelY, 200, 200, 200, textScale);
+  labelY += lineH;
+
+  // Orientation source
+  drawText(out, `SOURCE: ${tc.orientation_source.toUpperCase()}`, labelX, labelY, 200, 200, 200, textScale);
+  labelY += lineH;
+
+  // Bbox
+  drawText(out, `BBOX: ${tc.bbox.x},${tc.bbox.y} ${tc.bbox.width}X${tc.bbox.height}`, labelX, labelY, 200, 200, 200, textScale);
+  labelY += lineH;
+
+  // Square size
+  drawText(out, `SQUARE: ${tc.squareSize}PX`, labelX, labelY, 200, 200, 200, textScale);
   labelY += lineH;
 
   // Full FEN

@@ -315,11 +315,10 @@ function initOverlay(): void {
   const pvGrowVal = document.getElementById('cv-pv-grow-delay-val');
   let pvGrowDelaySec = prefs.pvGrowDelaySec;
   let pvGrowTimer: ReturnType<typeof setInterval> | null = null;
+  let pvGrowLastPv: string[] = [];
 
-  function pvGrowStart(): void {
-    pvGrowStop();
-    state.pvDisplayDepth = Math.min(1, state.pvDepth);
-    // Only start growing if line is currently visible
+  function pvGrowStartInterval(): void {
+    if (pvGrowTimer !== null) { clearInterval(pvGrowTimer); pvGrowTimer = null; }
     if (!state.lineVisible) return;
     if (state.pvDisplayDepth >= state.pvDepth) return;
     pvGrowTimer = setInterval(() => {
@@ -330,11 +329,47 @@ function initOverlay(): void {
     }, pvGrowDelaySec * 1000);
   }
 
+  /** Full restart: reset to 1 and start growing */
+  function pvGrowStart(): void {
+    pvGrowStop();
+    state.pvDisplayDepth = Math.min(1, state.pvDepth);
+    pvGrowLastPv = getCurrentPv();
+    pvGrowStartInterval();
+  }
+
+  /** Continue if displayed moves match, otherwise restart */
+  function pvGrowContinue(): void {
+    if (!state.lineVisible) return;
+    const newPv = getCurrentPv();
+    // Check if the first pvDisplayDepth moves are the same
+    const displayedMatch = state.pvDisplayDepth <= newPv.length &&
+      pvGrowLastPv.slice(0, state.pvDisplayDepth).every((m, i) => m === newPv[i]);
+    if (displayedMatch) {
+      // PV changed later but displayed portion is the same — keep going
+      pvGrowLastPv = newPv;
+      // Restart the interval (new PV may be longer/shorter) but keep current depth
+      if (pvGrowTimer !== null) { clearInterval(pvGrowTimer); pvGrowTimer = null; }
+      pvGrowStartInterval();
+    } else {
+      // Displayed moves changed — restart from 1
+      pvGrowStart();
+    }
+  }
+
   function pvGrowStop(): void {
     if (pvGrowTimer !== null) { clearInterval(pvGrowTimer); pvGrowTimer = null; }
+    pvGrowLastPv = [];
+  }
+
+  function getCurrentPv(): string[] {
+    const result = state.currentResult;
+    if (!result?.evaluation?.top_moves?.length) return [];
+    const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
+    return result.evaluation.top_moves[idx].pv;
   }
 
   (window as any).__chessrayPvGrowStart = pvGrowStart;
+  (window as any).__chessrayPvGrowContinue = pvGrowContinue;
   (window as any).__chessrayPvGrowStop = pvGrowStop;
 
   if (pvGrowSlider && pvGrowVal) {
@@ -584,9 +619,9 @@ function processPendingResult(): void {
     // If line is already visible (non-auto mode), restart grow from 2
     if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
   } else if (evalDepth > lastEvalDepth) {
-    // Same position, deeper eval — PV may have changed, restart grow
+    // Same position, deeper eval — continue grow if displayed moves match
     lastEvalDepth = evalDepth;
-    if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
+    if (state.lineVisible) (window as any).__chessrayPvGrowContinue?.();
   }
 
   // Update arrows tooltip with actual multiPV count from engine
