@@ -14,7 +14,6 @@ declare global {
       onFrameResult: (cb: (result: unknown) => void) => void;
       onStopTracking: (cb: () => void) => void;
       setMousePassthrough: (passthrough: boolean) => void;
-      setAlwaysOnTop: (enabled: boolean) => void;
       onDisplayInfo: (cb: (info: any) => void) => void;
       onSourceVisibility: (cb: (visible: boolean) => void) => void;
       reopenPicker: () => void;
@@ -50,9 +49,6 @@ const state: OverlayState = {
   selectedLineIndex: 0,
   lossThreshold: 50,
   autoMode: false,
-  pvWhiteColor: '#facc15',
-  pvBlackColor: '#a855f7',
-  pvDisplayDepth: 4,
   panelScale: 1,
   displayInfo: null,
 };
@@ -273,10 +269,12 @@ function initOverlay(): void {
     arrowsBtn.addEventListener('click', () => {
       if (state.autoMode) return;
       state.arrowsVisible = !state.arrowsVisible;
+      if (state.arrowsVisible && state.lineVisible) {
+        state.lineVisible = false;
+      }
       syncModeButtons();
-      savePrefs({ arrowsVisible: state.arrowsVisible });
+      savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
       renderArrows(state);
-      renderVideoOverlay(state);
     });
   }
 
@@ -286,10 +284,12 @@ function initOverlay(): void {
     lineBtn.addEventListener('click', () => {
       if (state.autoMode) return;
       state.lineVisible = !state.lineVisible;
+      if (state.lineVisible && state.arrowsVisible) {
+        state.arrowsVisible = false;
+      }
       syncModeButtons();
-      savePrefs({ lineVisible: state.lineVisible });
+      savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
       renderArrows(state);
-      renderVideoOverlay(state);
     });
   }
 
@@ -298,82 +298,9 @@ function initOverlay(): void {
     pvDepthVal.textContent = String(state.pvDepth);
     pvDepthSlider.addEventListener('input', () => {
       state.pvDepth = parseInt(pvDepthSlider.value, 10);
-      state.pvDisplayDepth = state.pvDepth; // show full depth immediately on manual change
       pvDepthVal.textContent = String(state.pvDepth);
       savePrefs({ pvDepth: state.pvDepth });
       renderArrows(state);
-      renderVideoOverlay(state);
-    });
-  }
-
-  // ── PV line colors ──
-  const pvWhiteColorInput = document.getElementById('cv-pv-white-color') as HTMLInputElement | null;
-  const pvBlackColorInput = document.getElementById('cv-pv-black-color') as HTMLInputElement | null;
-  state.pvWhiteColor = prefs.pvWhiteColor;
-  state.pvBlackColor = prefs.pvBlackColor;
-  // Lower overlay z-level while color picker is open so the system dialog is visible
-  function colorPickerFocus() { window.chessRay.setAlwaysOnTop(false); }
-  function colorPickerBlur() { window.chessRay.setAlwaysOnTop(true); }
-
-  if (pvWhiteColorInput) {
-    pvWhiteColorInput.value = state.pvWhiteColor;
-    pvWhiteColorInput.addEventListener('click', colorPickerFocus);
-    pvWhiteColorInput.addEventListener('blur', colorPickerBlur);
-    pvWhiteColorInput.addEventListener('input', () => {
-      state.pvWhiteColor = pvWhiteColorInput.value;
-      savePrefs({ pvWhiteColor: state.pvWhiteColor });
-      renderArrows(state);
-      renderVideoOverlay(state);
-    });
-  }
-  if (pvBlackColorInput) {
-    pvBlackColorInput.value = state.pvBlackColor;
-    pvBlackColorInput.addEventListener('click', colorPickerFocus);
-    pvBlackColorInput.addEventListener('blur', colorPickerBlur);
-    pvBlackColorInput.addEventListener('input', () => {
-      state.pvBlackColor = pvBlackColorInput.value;
-      savePrefs({ pvBlackColor: state.pvBlackColor });
-      renderArrows(state);
-      renderVideoOverlay(state);
-    });
-  }
-
-  // ── PV grow timer ──
-  // Line starts at min(4, pvDepth) and grows by 1 every pvGrowDelaySec until pvDepth
-  const pvGrowSlider = document.getElementById('cv-pv-grow-delay') as HTMLInputElement | null;
-  const pvGrowVal = document.getElementById('cv-pv-grow-delay-val');
-  let pvGrowDelaySec = prefs.pvGrowDelaySec;
-  let pvGrowTimer: ReturnType<typeof setInterval> | null = null;
-
-  function pvGrowStart(): void {
-    pvGrowStop();
-    const startDepth = Math.min(2, state.pvDepth);
-    state.pvDisplayDepth = startDepth;
-    if (startDepth >= state.pvDepth) return;
-    pvGrowTimer = setInterval(() => {
-      if (state.pvDisplayDepth >= state.pvDepth) { pvGrowStop(); return; }
-      state.pvDisplayDepth++;
-      renderArrows(state);
-      renderVideoOverlay(state);
-    }, pvGrowDelaySec * 1000);
-  }
-
-  function pvGrowStop(): void {
-    if (pvGrowTimer !== null) { clearInterval(pvGrowTimer); pvGrowTimer = null; }
-  }
-
-  // Expose for processPendingResult position changes
-  (window as any).__chessrayPvGrowStart = pvGrowStart;
-  (window as any).__chessrayPvGrowStop = pvGrowStop;
-
-  if (pvGrowSlider && pvGrowVal) {
-    pvGrowSlider.value = String(pvGrowDelaySec);
-    pvGrowVal.textContent = String(pvGrowDelaySec);
-    pvGrowSlider.addEventListener('input', () => {
-      pvGrowDelaySec = parseInt(pvGrowSlider.value, 10);
-      pvGrowVal.textContent = String(pvGrowDelaySec);
-      savePrefs({ pvGrowDelaySec });
-      pvGrowStart();
     });
   }
 
@@ -571,7 +498,6 @@ function processPendingResult(): void {
     state.selectedLineIndex = 0;
     lastEvalFen = evalFen;
     (window as any).__chessrayResetAutoTimer?.();
-    (window as any).__chessrayPvGrowStart?.();
   }
 
   // Update arrows tooltip with actual multiPV count from engine
@@ -612,7 +538,6 @@ window.chessRay.onStopTracking(() => {
   state.currentArrows = [];
   state.currentResult = null;
   (window as any).__chessrayClearAutoTimer?.();
-  (window as any).__chessrayPvGrowStop?.();
   renderArrows(state);
   clearVideoOverlay(state);
 });

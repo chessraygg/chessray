@@ -29,8 +29,6 @@ const api = {
   // Overlay renderer: mouse passthrough control
   setMousePassthrough: (passthrough: boolean) =>
     ipcRenderer.send('set-mouse-passthrough', passthrough),
-  setAlwaysOnTop: (enabled: boolean) =>
-    ipcRenderer.send('set-always-on-top', enabled),
 
   // Display info for coordinate mapping
   onDisplayInfo: (cb: (info: any) => void) =>

@@ -17,9 +17,6 @@ export interface OverlayState {
   selectedLineIndex: number;
   lossThreshold: number;
   autoMode: boolean;
-  pvWhiteColor: string;
-  pvBlackColor: string;
-  pvDisplayDepth: number;
   panelScale: number;
   displayInfo: {
     size: { width: number; height: number };
@@ -29,26 +26,19 @@ export interface OverlayState {
   } | null;
 }
 
-/** Get the arrows to display based on current mode (top moves, PV line, or both) */
+/** Get the arrows to display based on current mode (top moves vs PV line) */
 export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
-  const arrows: ArrowDescriptor[] = [];
-
-  // Top moves (loss-colored arrows)
-  if (state.arrowsVisible) {
-    arrows.push(...state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold));
-  }
-
-  // PV line (numbered sequence arrows)
   if (state.lineVisible && state.currentResult?.evaluation?.top_moves?.length) {
     const idx = Math.min(state.selectedLineIndex, state.currentResult.evaluation.top_moves.length - 1);
     const pv = state.currentResult.evaluation.top_moves[idx].pv;
+    // Prefer highlight-based turn (always current) over eval FEN turn (may be stale)
     const turn = state.currentResult.turn
       ?? state.currentResult.evaluation.fen?.split(' ')[1] as 'w' | 'b'
       ?? 'w';
-    arrows.push(...computePvArrows(pv, turn, state.pvDisplayDepth, state.pvWhiteColor, state.pvBlackColor));
+    return computePvArrows(pv, turn, state.pvDepth);
   }
-
-  return arrows;
+  // Filter arrows by centipawn loss threshold
+  return state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold);
 }
 
 export function drawArrow(
@@ -138,7 +128,7 @@ export function drawArrow(
 
   // Draw label at midpoint of arrow
   if (arrow.label) {
-    const fontSize = Math.max(8, lineWidth * 2);
+    const fontSize = Math.max(6, lineWidth * 2);
     ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

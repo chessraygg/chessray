@@ -67,10 +67,7 @@ export function computeArrows(topMoves: EvalMove[]): ArrowDescriptor[] {
  * @param turn - Whose turn it is for the first move ('w' or 'b')
  * @param maxMoves - Maximum number of PV moves to show
  */
-export function computePvArrows(
-  pv: string[], turn: 'w' | 'b', maxMoves: number,
-  whiteColor = '#facc15', blackColor = '#a855f7',
-): ArrowDescriptor[] {
+export function computePvArrows(pv: string[], turn: 'w' | 'b', maxMoves: number): ArrowDescriptor[] {
   const moves = pv.slice(0, maxMoves);
   let side = turn;
 
@@ -79,10 +76,11 @@ export function computePvArrows(
     const to = uci.slice(2, 4);
     const isWhite = side === 'w';
 
-    const color = isWhite ? whiteColor : blackColor;
+    // Alternate colors: green/blue for white moves, orange/red for black moves
+    const color = isWhite ? '#22c55e' : '#ef4444';
 
     // First move thick, subsequent thinner
-    const width = Math.max(3, 5 - i);
+    const width = Math.max(2, 5 - i);
     // Fade out progressively
     const opacity = Math.max(0.4, 0.675 - i * 0.06);
 
