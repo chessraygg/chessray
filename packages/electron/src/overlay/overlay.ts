@@ -6,8 +6,9 @@
 import type { PipelineResult } from '@chessray/core';
 import { applyUciMoves } from '@chessray/core';
 import { loadPrefs, savePrefs } from './preferences.js';
-import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay } from './canvas-renderer.js';
+import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, drawArrow } from './canvas-renderer.js';
 import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid } from './debug-panel.js';
+import { pieceSvg } from './piece-svg.js';
 
 declare global {
   interface Window {
@@ -215,6 +216,7 @@ function initOverlay(): void {
 
   // Restore visual state from prefs
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
+  if (state.canvas) state.canvas.style.display = state.overlayVisible ? '' : 'none';
 
   // ── Inline debug section toggle (gear icon in top bar) ──
   const debugToggle = document.getElementById('cv-debug-toggle');
@@ -240,6 +242,9 @@ function initOverlay(): void {
     overlayBtn.addEventListener('click', () => {
       state.overlayVisible = !state.overlayVisible;
       if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
+      if (state.canvas) state.canvas.style.display = state.overlayVisible ? '' : 'none';
+      // Remove any in-flight piece animations
+      document.querySelectorAll('.piece-anim').forEach(el => el.remove());
       overlayBtn.classList.toggle('active', state.overlayVisible);
       updateChildToggles();
       savePrefs({ overlayVisible: state.overlayVisible });
@@ -286,8 +291,7 @@ function initOverlay(): void {
       state.arrowsVisible = !state.arrowsVisible;
       if (state.arrowsVisible && state.lineVisible) {
         state.lineVisible = false;
-        pvGrowStop();
-        pvPlayStop();
+        pvCycleStop();
       }
       syncModeButtons();
       savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
@@ -305,7 +309,7 @@ function initOverlay(): void {
         state.arrowsVisible = false;
       }
       // Reset grow on mode change
-      if (state.lineVisible) { pvPlayStop(); pvGrowStart(); } else { pvGrowStop(); pvPlayStop(); }
+      if (state.lineVisible) { pvCycleStart(); } else { pvCycleStop(); }
       syncModeButtons();
       savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
       renderArrows(state);
@@ -323,135 +327,230 @@ function initOverlay(): void {
     });
   }
 
-  // ── PV grow timer ──
+  // ── Unified PV line cycle ──
+  // In line mode, the actual board and virtual board animate in sync:
+  // - Actual board: arrows grow one by one (1, 2, 3... up to pvDepth)
+  // - Virtual board: shows position after N moves with arrow+highlight for move N
+  // When the sequence completes, both reset and loop.
   const pvGrowSlider = document.getElementById('cv-pv-grow-delay') as HTMLInputElement | null;
   const pvGrowVal = document.getElementById('cv-pv-grow-delay-val');
   let pvGrowDelaySec = prefs.pvGrowDelaySec;
-  let pvGrowTimer: ReturnType<typeof setInterval> | null = null;
-  let pvGrowLastPv: string[] = [];
+  let pvCycleTimer: ReturnType<typeof setInterval> | null = null;
+  let pvCycleLastPv: string[] = [];
+  let pvCycleBaseFen = '';
+  let pvCycleFlipped = false;
+  let pvCyclePv: string[] = [];
 
-  function pvGrowStartInterval(): void {
-    if (pvGrowTimer !== null) { clearInterval(pvGrowTimer); pvGrowTimer = null; }
-    if (!state.lineVisible) return;
-    if (state.pvDisplayDepth >= state.pvDepth) return;
-    pvGrowTimer = setInterval(() => {
-      if (state.pvDisplayDepth >= state.pvDepth) { pvGrowStop(); return; }
-      state.pvDisplayDepth++;
-      renderArrows(state);
+  function pvCycleStep(): void {
+    if (state.pvDisplayDepth >= state.pvDepth || state.pvDisplayDepth >= pvCyclePv.length) {
+      // Sequence complete — pause one step then reset and loop
+      state.pvDisplayDepth = 0;
+      // Show base position on virtual board (no highlights, no arrows)
+      const grid = document.getElementById('cv-debug-grid');
+      if (grid) renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, []);
+      if (state.canvas) {
+        const ctx = state.canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+      }
+      // Clear actual board overlay arrows too (reset to 0)
       renderVideoOverlay(state);
-    }, pvGrowDelaySec * 1000);
-  }
+      return;
+    }
 
-  /** Full restart: reset to 1 and start growing */
-  function pvGrowStart(): void {
-    pvGrowStop();
-    state.pvDisplayDepth = Math.min(1, state.pvDepth);
-    pvGrowLastPv = getCurrentPv();
-    pvGrowStartInterval();
-  }
+    state.pvDisplayDepth++;
+    const step = state.pvDisplayDepth;
 
-  /** Continue if displayed moves match, otherwise restart */
-  function pvGrowContinue(): void {
-    if (!state.lineVisible) return;
-    const newPv = getCurrentPv();
-    // Check if the first pvDisplayDepth moves are the same
-    const displayedMatch = state.pvDisplayDepth <= newPv.length &&
-      pvGrowLastPv.slice(0, state.pvDisplayDepth).every((m, i) => m === newPv[i]);
-    if (displayedMatch) {
-      // PV changed later but displayed portion is the same — keep going
-      pvGrowLastPv = newPv;
-      // Restart the interval (new PV may be longer/shorter) but keep current depth
-      if (pvGrowTimer !== null) { clearInterval(pvGrowTimer); pvGrowTimer = null; }
-      pvGrowStartInterval();
-    } else {
-      // Displayed moves changed — restart from 1
-      pvGrowStart();
+    // Update actual board overlay (shows arrows 1..step)
+    renderArrows(state);
+    renderVideoOverlay(state);
+
+    // Animate piece movement on virtual board
+    const uci = pvCyclePv[step - 1];
+    const fromSq = uci.slice(0, 2);
+    const toSq = uci.slice(2, 4);
+
+    // Get the board position BEFORE this move (step-1 moves applied)
+    const beforePos = step === 1
+      ? { fen: pvCycleBaseFen.split(' ')[0], highlight: [] as number[] }
+      : applyUciMoves(pvCycleBaseFen, pvCyclePv, step - 1);
+    if (!beforePos) { pvCycleStop(); return; }
+
+    // Get the board position AFTER this move
+    const afterPos = applyUciMoves(pvCycleBaseFen, pvCyclePv, step);
+    if (!afterPos) { pvCycleStop(); return; }
+
+    const grid = document.getElementById('cv-debug-grid');
+    const container = grid?.parentElement;
+    if (!grid || !container) { pvCycleStop(); return; }
+
+    // Figure out which piece is moving (from the before position)
+    const beforeRows = beforePos.fen.split('/');
+    const fromFile = fromSq.charCodeAt(0) - 97;
+    const fromRank = 8 - parseInt(fromSq[1]);
+    let movingPiece = '';
+    {
+      let file = 0;
+      for (const ch of beforeRows[fromRank]) {
+        if (ch >= '1' && ch <= '8') { file += parseInt(ch); }
+        else { if (file === fromFile) { movingPiece = ch; break; } file++; }
+      }
+    }
+
+    // Render board BEFORE the move with source square emptied (piece "picked up")
+    // and highlight on source square
+    const fromIdx = fromRank * 8 + fromFile;
+    const toFileN = toSq.charCodeAt(0) - 97;
+    const toRankN = 8 - parseInt(toSq[1]);
+    const toIdx = toRankN * 8 + toFileN;
+    // Build a FEN with the moving piece removed from source
+    const pickedUpFen = beforePos.fen.split('/').map((row, rank) => {
+      if (rank !== fromRank) return row;
+      let result = '';
+      let file = 0;
+      for (const ch of row) {
+        if (ch >= '1' && ch <= '8') {
+          const n = parseInt(ch);
+          for (let i = 0; i < n; i++) {
+            result += file === fromFile ? '1' : '1';
+            file++;
+          }
+        } else {
+          result += file === fromFile ? '1' : ch;
+          file++;
+        }
+      }
+      // Compress consecutive 1s
+      return result.replace(/1+/g, m => String(m.length));
+    }).join('/');
+    renderBoardGrid(grid, pickedUpFen, pvCycleFlipped, [fromIdx, toIdx]);
+
+    // Compute pixel positions for source and destination squares
+    const sq = 25; // grid square size in CSS px
+    let srcFile = fromFile, srcRank = fromRank, dstFile = toFileN, dstRank = toRankN;
+    if (pvCycleFlipped) {
+      srcFile = 7 - srcFile; srcRank = 7 - srcRank;
+      dstFile = 7 - dstFile; dstRank = 7 - dstRank;
+    }
+
+    // Create floating piece at source
+    const floater = document.createElement('div');
+    floater.className = 'piece-anim';
+    floater.style.width = `${sq}px`;
+    floater.style.height = `${sq}px`;
+    floater.style.left = `${srcFile * sq}px`;
+    floater.style.top = `${srcRank * sq}px`;
+    floater.innerHTML = movingPiece ? pieceSvg(movingPiece, 22) : '';
+    container.appendChild(floater);
+
+    // Trigger animation to destination
+    requestAnimationFrame(() => {
+      floater.style.left = `${dstFile * sq}px`;
+      floater.style.top = `${dstRank * sq}px`;
+    });
+
+    // On transition end, render final board and remove floater
+    floater.addEventListener('transitionend', () => {
+      floater.remove();
+      if ((window as any).__chessrayPvPlaying) {
+        renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight);
+      }
+    }, { once: true });
+    // Fallback if transitionend doesn't fire
+    setTimeout(() => {
+      if (floater.parentElement) {
+        floater.remove();
+        if ((window as any).__chessrayPvPlaying) {
+          renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight);
+        }
+      }
+    }, 500);
+
+    // Draw single arrow for the current move on virtual board canvas
+    if (state.canvas) {
+      const size = 200;
+      const dpr = window.devicePixelRatio || 1;
+      const effectiveDpr = dpr * (state.panelScale || 1);
+      const bufferSize = Math.ceil(size * effectiveDpr);
+      if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
+        state.canvas.width = bufferSize;
+        state.canvas.height = bufferSize;
+        state.canvas.style.width = `${size}px`;
+        state.canvas.style.height = `${size}px`;
+      }
+      const ctx = state.canvas.getContext('2d')!;
+      ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
+      ctx.clearRect(0, 0, size, size);
+
+      // Build a single arrow for the current move
+      const turn = pvCycleBaseFen.split(' ')[1] || 'w';
+      const isWhite = (step % 2 === 1) === (turn === 'w');
+      const arrow = {
+        from: fromSq, to: toSq,
+        color: isWhite ? state.pvWhiteColor : state.pvBlackColor,
+        width: 5, opacity: 0.8, loss_cp: 0,
+        label: String(step),
+      };
+      drawArrow(ctx, arrow, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped);
     }
   }
 
-  function pvGrowStop(): void {
-    if (pvGrowTimer !== null) { clearInterval(pvGrowTimer); pvGrowTimer = null; }
-    pvGrowLastPv = [];
-    // When grow completes at max depth, start virtual board playback after a pause
-    if (state.lineVisible && state.pvDisplayDepth >= state.pvDepth) {
-      pvPlaySchedule();
-    }
-  }
-
-  // ── PV virtual board playback ──
-  let pvPlayTimer: ReturnType<typeof setInterval> | null = null;
-  let pvPlayPauseTimer: ReturnType<typeof setTimeout> | null = null;
-  let pvPlayStep = 0;
-  let pvPlayPv: string[] = [];
-  let pvPlayBaseFen = '';
-  let pvPlayFlipped = false;
-
-  function pvPlaySchedule(): void {
-    pvPlayStop();
-    // Snapshot the current PV
+  /** Start the unified cycle from step 1 */
+  function pvCycleStart(): void {
+    pvCycleStop();
+    if (!state.lineVisible || !state.overlayVisible) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) return;
     const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
     const pv = result.evaluation.top_moves[idx].pv;
     const baseFen = result.evaluation.fen;
     if (!baseFen || pv.length === 0) return;
-    pvPlayPv = [...pv];
-    pvPlayBaseFen = baseFen;
-    pvPlayFlipped = !!result.flipped;
-    pvPlayStep = 0;
 
-    // Start after a pause equal to grow delay
-    pvPlayPauseTimer = setTimeout(() => {
-      pvPlayPauseTimer = null;
-      (window as any).__chessrayPvPlaying = true;
-      // Clear virtual board arrows when playback starts
-      if (state.canvas) {
-        const ctx = state.canvas.getContext('2d');
-        if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-      }
-      pvPlayTimer = setInterval(() => {
-        pvPlayStep++;
-        if (pvPlayStep > pvPlayPv.length) {
-          // Reset to start position and replay
-          pvPlayStep = 0;
-          const grid = document.getElementById('cv-debug-grid');
-          if (grid) renderBoardGrid(grid, pvPlayBaseFen.split(' ')[0], pvPlayFlipped, []);
-          return;
-        }
-        // Clear virtual board arrows as moves are executed
-        if (state.canvas) {
-          const ctx = state.canvas.getContext('2d');
-          if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-        }
-        const applied = applyUciMoves(pvPlayBaseFen, pvPlayPv, pvPlayStep);
-        if (!applied) { pvPlayStop(); return; }
-        const grid = document.getElementById('cv-debug-grid');
-        if (grid) renderBoardGrid(grid, applied.fen, pvPlayFlipped, applied.highlight);
-      }, pvGrowDelaySec * 1000);
-    }, pvGrowDelaySec * 1000);
+    pvCyclePv = [...pv];
+    pvCycleBaseFen = baseFen;
+    pvCycleFlipped = !!result.flipped;
+    pvCycleLastPv = [...pv];
+    state.pvDisplayDepth = 0;
+    (window as any).__chessrayPvPlaying = true;
+
+    // First step immediately
+    pvCycleStep();
+    // Then continue on interval
+    pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
   }
 
-  function pvPlayStop(): void {
-    if (pvPlayPauseTimer !== null) { clearTimeout(pvPlayPauseTimer); pvPlayPauseTimer = null; }
-    if (pvPlayTimer !== null) { clearInterval(pvPlayTimer); pvPlayTimer = null; }
+  /** Continue if displayed moves match, otherwise restart */
+  function pvCycleContinue(): void {
+    if (!state.lineVisible || !state.overlayVisible) return;
+    const result = state.currentResult;
+    if (!result?.evaluation?.top_moves?.length) return;
+    const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
+    const newPv = result.evaluation.top_moves[idx].pv;
+    const displayedMatch = state.pvDisplayDepth <= newPv.length &&
+      pvCycleLastPv.slice(0, state.pvDisplayDepth).every((m, i) => m === newPv[i]);
+    if (displayedMatch) {
+      pvCycleLastPv = [...newPv];
+      pvCyclePv = [...newPv];
+      pvCycleBaseFen = result.evaluation.fen || pvCycleBaseFen;
+    } else {
+      pvCycleStart();
+    }
+  }
+
+  function pvCycleStop(): void {
+    if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
     const wasPlaying = (window as any).__chessrayPvPlaying;
     (window as any).__chessrayPvPlaying = false;
-    pvPlayStep = 0;
-    // Restore virtual board to current position when stopping
-    if (wasPlaying) renderArrows(state);
+    document.querySelectorAll('.piece-anim').forEach(el => el.remove());
+    if (wasPlaying) {
+      state.pvDisplayDepth = state.pvDepth; // restore full depth
+      renderArrows(state);
+    }
   }
 
-  function getCurrentPv(): string[] {
-    const result = state.currentResult;
-    if (!result?.evaluation?.top_moves?.length) return [];
-    const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
-    return result.evaluation.top_moves[idx].pv;
-  }
-
-  (window as any).__chessrayPvGrowStart = () => { pvPlayStop(); pvGrowStart(); };
-  (window as any).__chessrayPvGrowContinue = pvGrowContinue;
-  (window as any).__chessrayPvGrowStop = () => { pvGrowStop(); };
-  (window as any).__chessrayPvPlayStop = pvPlayStop;
+  (window as any).__chessrayPvGrowStart = pvCycleStart;
+  (window as any).__chessrayPvGrowContinue = pvCycleContinue;
+  (window as any).__chessrayPvGrowStop = pvCycleStop;
+  (window as any).__chessrayPvPlayStop = pvCycleStop;
 
   if (pvGrowSlider && pvGrowVal) {
     pvGrowSlider.value = String(pvGrowDelaySec);
@@ -460,7 +559,7 @@ function initOverlay(): void {
       pvGrowDelaySec = parseInt(pvGrowSlider.value, 10);
       pvGrowVal.textContent = String(pvGrowDelaySec);
       savePrefs({ pvGrowDelaySec });
-      pvGrowStart();
+      pvCycleStart();
     });
   }
 
@@ -550,7 +649,7 @@ function initOverlay(): void {
 
   function resetAutoTimer(): void {
     if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
-    if (!state.autoMode) return;
+    if (!state.autoMode || !state.overlayVisible) return;
 
     // Show top moves immediately
     state.arrowsVisible = true;
@@ -560,12 +659,12 @@ function initOverlay(): void {
     renderVideoOverlay(state);
 
     // Switch to best line after delay
-    pvGrowStop(); // stop any existing grow while showing moves
+    pvCycleStop();
     autoTimer = setTimeout(() => {
       autoTimer = null;
       state.arrowsVisible = false;
       state.lineVisible = true;
-      pvGrowStart(); // start growing from 2 when line becomes visible
+      pvCycleStart();
       syncModeButtons();
       renderArrows(state);
       renderVideoOverlay(state);
@@ -586,6 +685,12 @@ function initOverlay(): void {
   }
 
   applyAutoMode();
+  // Set correct initial visual state for auto mode (arrows first)
+  if (state.autoMode) {
+    state.arrowsVisible = true;
+    state.lineVisible = false;
+    syncModeButtons();
+  }
   if (autoDelaySlider && autoDelayVal) {
     autoDelaySlider.value = String(autoDelaySec);
     autoDelayVal.textContent = String(autoDelaySec);
@@ -604,11 +709,11 @@ function initOverlay(): void {
       resetAutoTimer();
     } else {
       if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
-      pvGrowStop();
-      pvPlayStop();
+      pvCycleStop();
     }
     savePrefs({ autoMode: state.autoMode });
   });
+
 
   // ── Collapse panel ──
   const collapseBtn = document.getElementById('cv-collapse-btn');

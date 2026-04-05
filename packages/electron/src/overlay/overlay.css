@@ -310,6 +310,17 @@ canvas#video-overlay {
 .piece-grid .light.highlight { background: #f5f682; }
 .piece-grid .dark.highlight { background: #bbca2b; }
 
+.piece-anim {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10;
+  transition: left 0.35s ease-in-out, top 0.35s ease-in-out;
+}
+.piece-anim svg { width: 22px; height: 22px; }
+
 /* ── Board status bar ── */
 
 .board-status {
