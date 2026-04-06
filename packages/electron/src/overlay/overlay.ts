@@ -1012,7 +1012,9 @@ window.chessRay.onFrameResult((result) => {
   pendingResult = result as PipelineResult;
   if (!rafScheduled) {
     rafScheduled = true;
-    requestAnimationFrame(processPendingResult);
+    // setTimeout instead of rAF: transparent overlays can have rAF stalled
+    // by the OS when the window isn't considered active on launch
+    setTimeout(processPendingResult, 0);
   }
 });
 
