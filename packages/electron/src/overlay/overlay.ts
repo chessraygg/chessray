@@ -607,7 +607,7 @@ function initOverlay(): void {
         width: 3, opacity: 0.8, loss_cp: 0,
         label: String(step),
       };
-      drawArrow(ctx, arrow, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped);
+      drawArrow(ctx, arrow, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, 1, true);
     }
   }
 

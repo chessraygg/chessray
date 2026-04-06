@@ -177,6 +177,7 @@ export function drawArrow(
   displayFlipped: boolean,
   curveOffset: number = 0,
   progress: number = 1,
+  noArrowhead: boolean = false,
 ): void {
   const squareW = board.width / 8;
   const squareH = board.height / 8;
@@ -223,16 +224,16 @@ export function drawArrow(
   // For a quadratic bezier, the tangent at t=1 is the direction from control point to end.
   const tipAngle = Math.atan2(y2 - my, x2 - mx);
 
-  // Shorten the curve so it ends before the arrowhead
-  const tipBackX = x2 - headLength * Math.cos(tipAngle);
-  const tipBackY = y2 - headLength * Math.sin(tipAngle);
+  // Shorten the curve so it ends before the arrowhead (unless no arrowhead)
+  const endX = noArrowhead ? x2 : x2 - headLength * Math.cos(tipAngle);
+  const endY = noArrowhead ? y2 : y2 - headLength * Math.sin(tipAngle);
 
   ctx.save();
   ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
 
-  // Gradient stroke: transparent at source, full opacity at arrowhead
-  const grad = ctx.createLinearGradient(x1, y1, tipBackX, tipBackY);
+  // Gradient stroke: transparent at source, full opacity at tip
+  const grad = ctx.createLinearGradient(x1, y1, endX, endY);
   const r = parseInt(arrow.color.slice(1, 3), 16);
   const g = parseInt(arrow.color.slice(3, 5), 16);
   const b = parseInt(arrow.color.slice(5, 7), 16);
@@ -244,21 +245,23 @@ export function drawArrow(
   ctx.beginPath();
   ctx.moveTo(x1, y1);
   if (curveOffset === 0) {
-    ctx.lineTo(tipBackX, tipBackY);
+    ctx.lineTo(endX, endY);
   } else {
-    ctx.quadraticCurveTo(mx, my, tipBackX, tipBackY);
+    ctx.quadraticCurveTo(mx, my, endX, endY);
   }
   ctx.stroke();
 
-  // Draw the arrowhead at full opacity
-  ctx.globalAlpha = arrow.opacity;
-  ctx.fillStyle = arrow.color;
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - headLength * Math.cos(tipAngle - Math.PI / 6), y2 - headLength * Math.sin(tipAngle - Math.PI / 6));
-  ctx.lineTo(x2 - headLength * Math.cos(tipAngle + Math.PI / 6), y2 - headLength * Math.sin(tipAngle + Math.PI / 6));
-  ctx.closePath();
-  ctx.fill();
+  // Draw the arrowhead at full opacity (unless disabled)
+  if (!noArrowhead) {
+    ctx.globalAlpha = arrow.opacity;
+    ctx.fillStyle = arrow.color;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - headLength * Math.cos(tipAngle - Math.PI / 6), y2 - headLength * Math.sin(tipAngle - Math.PI / 6));
+    ctx.lineTo(x2 - headLength * Math.cos(tipAngle + Math.PI / 6), y2 - headLength * Math.sin(tipAngle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+  }
 
   // Draw label at midpoint of arrow (only when fully extended)
   if (arrow.label && t >= 1) {
@@ -342,7 +345,7 @@ export function renderArrows(state: OverlayState): void {
 
   const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
   for (let i = drawList.length - 1; i >= 0; i--) {
-    drawArrow(ctx, drawList[i].arrow, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress);
+    drawArrow(ctx, drawList[i].arrow, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress, true);
   }
 
   // Draw cp loss label for the active PV line
