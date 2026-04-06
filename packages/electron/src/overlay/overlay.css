@@ -130,14 +130,44 @@ canvas#video-overlay {
 }
 
 
+/* ── Panel sections ── */
+
+.panel-section { margin-top: 2px; }
+
+.section-header {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 0 2px;
+  cursor: pointer;
+  user-select: none;
+  border-top: 1px solid var(--border);
+}
+.section-header::before {
+  content: '▾ ';
+  font-size: 8px;
+}
+.section-header.collapsed::before {
+  content: '▸ ';
+}
+.section-header.collapsed + .section-body,
+.section-body.collapsed { display: none !important; }
+
+.section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0;
+}
+
 /* ── Inline debug section ── */
 
 .debug-section {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-top: 4px;
-  border-top: 1px solid var(--border);
 }
 
 .debug-section.hidden { display: none; }
@@ -176,8 +206,6 @@ canvas#video-overlay {
 
 .ctrl-btn.chevron.collapsed { transform: rotate(-90deg); }
 
-/* Hide debug gear when panel is collapsed */
-.panel.collapsed #cv-debug-toggle { display: none; }
 
 /* ── Top bar: icons + collapse/close, always visible ── */
 
@@ -319,11 +347,9 @@ canvas#video-overlay {
 /* ── Compact mode ── */
 
 .panel.compact .top-bar { display: none; }
-.panel.compact .panel-body > *:not(.tracking-content) { display: none !important; }
-.panel.compact .tracking-content > *:not(.board-frame) { display: none !important; }
-.panel.compact .board-status { display: none; }
+.panel.compact .section-header { display: none; }
 .panel.compact .compact-moves { display: flex !important; }
-.panel.compact { padding: 4px; cursor: grab; }
+.panel.compact { padding: 4px; }
 
 .compact-moves {
   display: flex;
@@ -503,41 +529,6 @@ canvas#video-overlay {
 
 /* ── Zoom controls ── */
 
-.zoom-bar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.zoom-slider {
-  flex: 1;
-  height: 4px;
-  accent-color: var(--text-muted);
-}
-
-.zoom-btn {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  font: 11px/1 var(--mono);
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.12s, border-color 0.12s;
-}
-
-.zoom-btn:hover { color: var(--text); border-color: #3a3a3a; }
-
-.zoom-label {
-  font: 9px/1 var(--mono);
-  color: var(--text-faint);
-  min-width: 28px;
-  text-align: center;
-}
 
 /* ── Custom tooltips (native title doesn't work in transparent Electron windows) ── */
 

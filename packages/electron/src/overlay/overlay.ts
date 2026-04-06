@@ -197,38 +197,33 @@ function initOverlay(): void {
   setupResizeGrip('cv-resize-grip-tl', true, true);      // anchor bottom-right
 
   // ── Zoom controls ──
-  const zoomLabel = document.getElementById('cv-zoom-label');
-  const zoomSlider = document.getElementById('cv-zoom-slider') as HTMLInputElement | null;
-
-  function updateZoomUI(): void {
-    const pct = Math.round(panelScale * 100);
-    if (zoomLabel) zoomLabel.textContent = `${pct}%`;
-    if (zoomSlider) zoomSlider.value = String(pct);
-  }
-  updateZoomUI();
-
   function setZoom(scale: number): void {
     panelScale = Math.min(4, Math.max(0.5, scale));
-    applyScale(); updateZoomUI(); savePrefs({ panelScale });
+    applyScale(); savePrefs({ panelScale });
   }
 
   document.getElementById('cv-zoom-in')?.addEventListener('click', () => setZoom(panelScale + 0.1));
   document.getElementById('cv-zoom-out')?.addEventListener('click', () => setZoom(panelScale - 0.1));
-  zoomSlider?.addEventListener('input', () => setZoom(parseInt(zoomSlider.value, 10) / 100));
 
   // Restore visual state from prefs
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
   if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
 
-  // ── Inline debug section toggle (gear icon in top bar) ──
-  const debugToggle = document.getElementById('cv-debug-toggle');
-  const debugSection = document.getElementById('debug-section');
-  if (debugToggle && debugSection) {
-    debugToggle.addEventListener('click', () => {
-      const isHidden = debugSection.classList.toggle('hidden');
-      debugToggle.classList.toggle('active', !isHidden);
+  // ── Section header toggles ──
+  document.querySelectorAll('.section-header').forEach(header => {
+    const section = (header as HTMLElement).dataset.section;
+    if (!section) return;
+    // Debug section starts collapsed
+    if (section === 'debug') {
+      header.classList.add('collapsed');
+      header.nextElementSibling?.classList.add('collapsed');
+    }
+    header.addEventListener('click', () => {
+      header.classList.toggle('collapsed');
+      const body = header.nextElementSibling;
+      body?.classList.toggle('collapsed');
     });
-  }
+  });
 
   // ── Overlay/Box toggles (debug panel) ──
   const overlayBtn = document.getElementById('cv-overlay-btn');
@@ -306,14 +301,12 @@ function initOverlay(): void {
   // ── User panel toggles ──
   const arrowsBtn = document.getElementById('cv-arrows-btn');
   const lineBtn = document.getElementById('cv-line-btn');
-  const pvDepthRow = document.getElementById('cv-pv-depth-row');
   const pvDepthSlider = document.getElementById('cv-pv-depth') as HTMLInputElement | null;
   const pvDepthVal = document.getElementById('cv-pv-depth-val');
 
   function syncModeButtons(): void {
     arrowsBtn?.classList.toggle('active', state.arrowsVisible);
     lineBtn?.classList.toggle('active', state.lineVisible);
-    if (pvDepthRow) pvDepthRow.style.display = state.lineVisible ? 'flex' : 'none';
   }
 
   if (arrowsBtn) {
@@ -329,7 +322,6 @@ function initOverlay(): void {
 
   if (lineBtn) {
     lineBtn.classList.toggle('active', state.lineVisible);
-    if (pvDepthRow) pvDepthRow.style.display = state.lineVisible ? 'flex' : 'none';
     lineBtn.addEventListener('click', () => {
       if (state.autoMode) return;
       state.lineVisible = !state.lineVisible;
@@ -760,7 +752,6 @@ function initOverlay(): void {
 
   // ── Auto mode ──
   const autoBtn = document.getElementById('cv-auto-btn');
-  const autoDelayRow = document.getElementById('cv-auto-delay-row');
   const autoDelaySlider = document.getElementById('cv-auto-delay') as HTMLInputElement | null;
   const autoDelayVal = document.getElementById('cv-auto-delay-val');
 
@@ -802,7 +793,6 @@ function initOverlay(): void {
     autoBtn?.classList.toggle('active', state.autoMode);
     arrowsBtn?.classList.toggle('auto-disabled', state.autoMode);
     lineBtn?.classList.toggle('auto-disabled', state.autoMode);
-    if (autoDelayRow) autoDelayRow.style.display = state.autoMode ? 'flex' : 'none';
   }
 
   applyAutoMode();
@@ -926,8 +916,11 @@ function initOverlay(): void {
 
   if (compactMode) setCompactMode(true);
   compactBtn?.addEventListener('click', () => setCompactMode(!compactMode));
-  // Double-click board to toggle compact mode
-  document.getElementById('cv-debug-grid')?.addEventListener('dblclick', () => {
+  // Double-click panel to toggle compact mode
+  userPanel?.addEventListener('dblclick', (e) => {
+    // Don't toggle on double-click of interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('input, button, .compact-move')) return;
     setCompactMode(!compactMode);
   });
 

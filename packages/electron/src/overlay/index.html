@@ -32,97 +32,109 @@
       <button class="toggle icon-toggle" id="cv-compact-btn" data-tip="Compact mode: board + top moves only">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="9" rx="1"/><line x1="4" y1="13.5" x2="12" y2="13.5"/></svg>
       </button>
-      <span data-tip="Debug info"><button class="ctrl-btn" id="cv-debug-toggle"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="1.5"/><line x1="8" y1="2" x2="8" y2="4"/><line x1="8" y1="12" x2="8" y2="14"/><line x1="2" y1="8" x2="4" y2="8"/><line x1="12" y1="8" x2="14" y2="8"/></svg></button></span>
+      <button class="ctrl-btn" id="cv-zoom-out" data-tip="Zoom out">&#x2212;</button>
+      <button class="ctrl-btn" id="cv-zoom-in" data-tip="Zoom in">&#x2B;</button>
       <span data-tip="Expand/Collapse"><button class="ctrl-btn chevron" id="cv-collapse-btn">&#x25BC;</button></span>
       <span data-tip="Close"><button class="ctrl-btn close" id="cv-close-btn">&#xD7;</button></span>
     </div>
 
     <div class="panel-body" id="cv-panel-body">
-      <!-- Zoom controls: only in expanded view -->
-      <div class="zoom-bar">
-        <button class="zoom-btn" id="cv-zoom-out" data-tip="Zoom out">&#x2212;</button>
-        <input type="range" id="cv-zoom-slider" min="50" max="400" value="100" class="zoom-slider">
-        <button class="zoom-btn" id="cv-zoom-in" data-tip="Zoom in">&#x2B;</button>
-        <span class="zoom-label" id="cv-zoom-label">100%</span>
-      </div>
       <div class="tracking-content" id="cv-tracking-content">
-        <!-- Virtual board with SVG pieces -->
-        <div class="board-frame">
-          <div class="board-container">
-            <div class="piece-grid" id="cv-debug-grid"></div>
-            <canvas id="cv-arrow-canvas" width="200" height="200"></canvas>
+        <!-- Board -->
+        <div class="panel-section" id="sec-board">
+          <div class="section-header" data-section="board">Board</div>
+          <div class="section-body">
+            <div class="board-frame">
+              <div class="board-container">
+                <div class="piece-grid" id="cv-debug-grid"></div>
+                <canvas id="cv-arrow-canvas" width="200" height="200"></canvas>
+              </div>
+              <div class="compact-moves hidden" id="cv-compact-moves"></div>
+              <div class="board-status">
+                  <span class="turn-dot white" id="cv-turn-dot"></span>
+                  <span id="cv-turn-text">White</span>
+                </span>
+                <span class="orientation-badge" id="cv-orientation-badge">
+                  <span class="orient-arrow" id="cv-pawn-dir"></span>
+                </span>
+              </div>
+            </div>
           </div>
-          <div class="compact-moves hidden" id="cv-compact-moves"></div>
-          <div class="board-status">
-              <span class="turn-dot white" id="cv-turn-dot"></span>
-              <span id="cv-turn-text">White</span>
-            </span>
-            <span class="orientation-badge" id="cv-orientation-badge">
-              <span class="orient-arrow" id="cv-pawn-dir"></span>
-            </span>
+        </div>
+
+        <!-- Eval -->
+        <div class="panel-section" id="sec-eval">
+          <div class="section-header" data-section="eval">Eval</div>
+          <div class="section-body">
+            <div class="eval-bar">
+              <div class="eval-bar-fill" id="cv-eval-fill" style="width:50%"></div>
+              <div class="eval-bar-label" id="cv-eval-label">0.0</div>
+              <div class="eval-bar-depth" id="cv-eval-depth"></div>
+            </div>
           </div>
         </div>
 
-        <!-- Eval bar -->
-        <div class="eval-bar">
-          <div class="eval-bar-fill" id="cv-eval-fill" style="width:50%"></div>
-          <div class="eval-bar-label" id="cv-eval-label">0.0</div>
-          <div class="eval-bar-depth" id="cv-eval-depth"></div>
-        </div>
-
-        <!-- Best moves -->
-        <div class="best-moves" id="cv-best-moves"></div>
-
-        <div class="pv-depth-row">
-          <label data-tip="Max centipawn loss for showing alternative moves">CP loss</label>
-          <input type="range" id="cv-loss-threshold" min="0" max="200" value="0" step="10">
-          <span id="cv-loss-threshold-val">0</span>
-        </div>
-
-        <div class="pv-depth-row hidden" id="cv-pv-depth-row">
-          <label data-tip="Number of moves shown in best line">PV depth</label>
-          <input type="range" id="cv-pv-depth" min="1" max="10" value="10">
-          <span id="cv-pv-depth-val">10</span>
-        </div>
-
-        <div class="pv-depth-row">
-          <label data-tip="Seconds between adding each new line arrow (starts at 2, grows to max)">Grow</label>
-          <input type="range" id="cv-pv-grow-delay" min="1" max="10" value="3" step="1">
-          <span id="cv-pv-grow-delay-val">3</span><span style="font-size:8px;color:var(--text-faint)">s</span>
-        </div>
-
-        <div class="pv-depth-row">
-          <label data-tip="Line arrow colors for white and black moves">Colors</label>
-          <input type="color" id="cv-pv-white-color" value="#60a5fa" class="color-pick">
-          <input type="color" id="cv-pv-black-color" value="#f9a8d4" class="color-pick">
-        </div>
-
-        <div class="pv-depth-row" id="cv-auto-delay-row" style="display:none">
-          <label data-tip="Seconds to show top moves before switching to best line">Delay</label>
-          <input type="range" id="cv-auto-delay" min="1" max="15" value="5" step="1">
-          <span id="cv-auto-delay-val">5</span><span style="font-size:8px;color:var(--text-faint)">s</span>
-        </div>
-
-        <div class="pv-depth-row">
-          <label data-tip="Maximum engine search depth (higher = stronger but slower)">Engine</label>
-          <input type="range" id="cv-max-depth" min="8" max="40" value="28" step="4">
-          <span id="cv-max-depth-val">28</span>
-        </div>
-
-        <div class="pv-depth-row">
-          <label data-tip="Skip recognition when board pixels haven't changed (faster but may miss subtle changes)">Change detect</label>
-          <input type="checkbox" id="cv-change-detect" checked>
-        </div>
-
-        <!-- Debug section (inline, collapsible) -->
-        <div class="debug-section hidden" id="debug-section">
-          <div class="toggle-row">
-            <button class="toggle" id="cv-border-btn">Box</button>
+        <!-- Lines -->
+        <div class="panel-section" id="sec-lines">
+          <div class="section-header" data-section="lines">Lines</div>
+          <div class="section-body">
+            <div class="best-moves" id="cv-best-moves"></div>
           </div>
-          <img id="cv-debug-img" src="" alt="Board capture">
-          <div class="fen" id="cv-debug-fen">Waiting...</div>
-          <div class="debug-orient" id="cv-orientation-info"></div>
-          <div class="meta" id="cv-debug-info"></div>
+        </div>
+
+        <!-- Settings -->
+        <div class="panel-section" id="sec-settings">
+          <div class="section-header" data-section="settings">Settings</div>
+          <div class="section-body">
+            <div class="pv-depth-row">
+              <label data-tip="Max centipawn loss for showing alternative moves">CP loss</label>
+              <input type="range" id="cv-loss-threshold" min="0" max="200" value="0" step="10">
+              <span id="cv-loss-threshold-val">0</span>
+            </div>
+            <div class="pv-depth-row" id="cv-pv-depth-row">
+              <label data-tip="Number of moves shown in best line">PV depth</label>
+              <input type="range" id="cv-pv-depth" min="1" max="10" value="10">
+              <span id="cv-pv-depth-val">10</span>
+            </div>
+            <div class="pv-depth-row">
+              <label data-tip="Seconds between adding each new line arrow (starts at 2, grows to max)">Grow</label>
+              <input type="range" id="cv-pv-grow-delay" min="1" max="10" value="3" step="1">
+              <span id="cv-pv-grow-delay-val">3</span><span style="font-size:8px;color:var(--text-faint)">s</span>
+            </div>
+            <div class="pv-depth-row">
+              <label data-tip="Line arrow colors for white and black moves">Colors</label>
+              <input type="color" id="cv-pv-white-color" value="#60a5fa" class="color-pick">
+              <input type="color" id="cv-pv-black-color" value="#f9a8d4" class="color-pick">
+            </div>
+            <div class="pv-depth-row" id="cv-auto-delay-row">
+              <label data-tip="Seconds to show top moves before switching to best line">Delay</label>
+              <input type="range" id="cv-auto-delay" min="1" max="15" value="5" step="1">
+              <span id="cv-auto-delay-val">5</span><span style="font-size:8px;color:var(--text-faint)">s</span>
+            </div>
+            <div class="pv-depth-row">
+              <label data-tip="Maximum engine search depth (higher = stronger but slower)">Engine</label>
+              <input type="range" id="cv-max-depth" min="8" max="40" value="28" step="4">
+              <span id="cv-max-depth-val">28</span>
+            </div>
+            <div class="pv-depth-row">
+              <label data-tip="Skip recognition when board pixels haven't changed (faster but may miss subtle changes)">Change detect</label>
+              <input type="checkbox" id="cv-change-detect" checked>
+            </div>
+          </div>
+        </div>
+
+        <!-- Debug -->
+        <div class="panel-section" id="sec-debug">
+          <div class="section-header" data-section="debug">Debug</div>
+          <div class="section-body debug-section" id="debug-section">
+            <div class="toggle-row">
+              <button class="toggle" id="cv-border-btn">Box</button>
+            </div>
+            <img id="cv-debug-img" src="" alt="Board capture">
+            <div class="fen" id="cv-debug-fen">Waiting...</div>
+            <div class="debug-orient" id="cv-orientation-info"></div>
+            <div class="meta" id="cv-debug-info"></div>
+          </div>
         </div>
 
       </div>
