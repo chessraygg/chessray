@@ -384,10 +384,15 @@ function initOverlay(): void {
     const indices = getCycleLineIndices();
     if (indices.length === 0) return;
 
-    // Advance to next line in the cycle
-    const curPos = indices.indexOf(pvCycleLineIndex);
-    const nextPos = (curPos + 1) % indices.length;
-    pvCycleLineIndex = indices[nextPos];
+    if (userLockedLine >= 0) {
+      // Locked: repeat same line
+      pvCycleLineIndex = userLockedLine;
+    } else {
+      // Advance to next line in the cycle
+      const curPos = indices.indexOf(pvCycleLineIndex);
+      const nextPos = (curPos + 1) % indices.length;
+      pvCycleLineIndex = indices[nextPos];
+    }
     state.selectedLineIndex = pvCycleLineIndex;
 
     // Show moves briefly between lines
@@ -856,19 +861,21 @@ function initOverlay(): void {
       const sanArr = fen ? uciToSan(fen, [uci]) : [uci];
       const label = sanArr[0] || uci;
       const scoreStr = move.score_cp >= 0 ? `+${(move.score_cp / 100).toFixed(1)}` : (move.score_cp / 100).toFixed(1);
-      const selected = i === state.selectedLineIndex ? ' selected' : '';
+      const cls = (i === state.selectedLineIndex ? ' selected' : '') + (i === userLockedLine ? ' locked' : '');
       const hex = lossToColor(move.loss_cp);
       const cr = parseInt(hex.slice(1, 3), 16);
       const cg = parseInt(hex.slice(3, 5), 16);
       const cb = parseInt(hex.slice(5, 7), 16);
       const bg = `rgba(${cr},${cg},${cb},0.25)`;
       const lossStr = move.loss_cp === 0 ? '' : ` −${(move.loss_cp / 100).toFixed(1)}`;
-      html += `<div class="compact-move${selected}" data-line="${i}" style="background:${bg}"><span class="compact-label">${label}${lossStr}</span></div>`;
+      html += `<div class="compact-move${cls}" data-line="${i}" style="background:${bg}"><span class="compact-label">${label}${lossStr}</span></div>`;
     }
     compactMovesEl.innerHTML = html;
     compactMovesEl.querySelectorAll('.compact-move').forEach(el => {
       el.addEventListener('click', () => {
         const idx = parseInt((el as HTMLElement).dataset.line!, 10);
+        // Toggle lock: click same = unlock, click different = lock
+        userLockedLine = userLockedLine === idx ? -1 : idx;
         selectLine(idx);
         updateCompactMoves();
       });
@@ -926,6 +933,7 @@ initOverlay();
 
 let pendingResult: PipelineResult | null = null;
 let rafScheduled = false;
+let userLockedLine = -1; // -1 = cycle all, >= 0 = locked to that line
 let lastEvalFen: string | null = null;
 let lastRecogFen: string | null = null;
 let lastEvalDepth: number = 0;
@@ -974,6 +982,7 @@ function processPendingResult(): void {
   const evalDepth = result.eval_depth ?? 0;
   if (evalFen && evalFen !== lastEvalFen) {
     state.selectedLineIndex = 0;
+    userLockedLine = -1;
     lastEvalFen = evalFen;
     lastEvalDepth = evalDepth;
     (window as any).__chessrayResetAutoTimer?.();
@@ -1003,7 +1012,9 @@ window.chessRay.onFrameResult((result) => {
   pendingResult = result as PipelineResult;
   if (!rafScheduled) {
     rafScheduled = true;
-    requestAnimationFrame(processPendingResult);
+    // setTimeout instead of rAF: transparent overlays can have rAF stalled
+    // by the OS when the window isn't considered active on launch
+    setTimeout(processPendingResult, 0);
   }
 });
 
