@@ -346,10 +346,40 @@ canvas#video-overlay {
 
 /* ── Compact mode ── */
 
+.display-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 8px;
+}
+.display-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 9px/1 var(--sans);
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.display-toggle input { margin: 0; }
+.display-toggle input:checked + span { color: var(--text); }
+
 .panel.compact .top-bar { display: none; }
 .panel.compact .section-header { display: none; }
+.panel.compact .panel-section { margin-top: 0; }
+.panel.compact .section-body { padding: 0; }
+.panel.compact .tracking-content { gap: 2px; }
 .panel.compact .compact-moves { display: flex !important; }
 .panel.compact { padding: 4px; }
+.compact-hint { display: none; }
+.panel.compact .compact-hint {
+  display: block;
+  text-align: center;
+  font: 8px/1 var(--sans);
+  color: var(--text-faint);
+  opacity: 0.4;
+  padding: 3px 0 1px;
+  user-select: none;
+}
 
 .compact-moves {
   display: flex;

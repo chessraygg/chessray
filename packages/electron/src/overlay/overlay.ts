@@ -210,11 +210,11 @@ function initOverlay(): void {
   if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
 
   // ── Section header toggles ──
+  const collapsedSections = new Set(prefs.collapsedSections);
   document.querySelectorAll('.section-header').forEach(header => {
     const section = (header as HTMLElement).dataset.section;
     if (!section) return;
-    // Debug section starts collapsed
-    if (section === 'debug') {
+    if (collapsedSections.has(section)) {
       header.classList.add('collapsed');
       header.nextElementSibling?.classList.add('collapsed');
     }
@@ -222,6 +222,12 @@ function initOverlay(): void {
       header.classList.toggle('collapsed');
       const body = header.nextElementSibling;
       body?.classList.toggle('collapsed');
+      if (header.classList.contains('collapsed')) {
+        collapsedSections.add(section);
+      } else {
+        collapsedSections.delete(section);
+      }
+      savePrefs({ collapsedSections: [...collapsedSections] });
     });
   });
 
@@ -242,6 +248,7 @@ function initOverlay(): void {
       if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
       overlayBtn.classList.toggle('active', state.overlayVisible);
       updateChildToggles();
+      syncDisplayToggles();
       savePrefs({ overlayVisible: state.overlayVisible });
       if (state.overlayVisible) {
         (window as any).__chessrayResetAutoTimer?.();
@@ -268,6 +275,7 @@ function initOverlay(): void {
       if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
       document.querySelectorAll('.piece-anim').forEach(el => el.remove());
       vboardBtn.classList.toggle('active', state.vboardOverlayVisible);
+      syncDisplayToggles();
       savePrefs({ vboardOverlayVisible: state.vboardOverlayVisible });
       if (state.vboardOverlayVisible) {
         // Redraw virtual board arrows if cycle is running
@@ -304,9 +312,36 @@ function initOverlay(): void {
   const pvDepthSlider = document.getElementById('cv-pv-depth') as HTMLInputElement | null;
   const pvDepthVal = document.getElementById('cv-pv-depth-val');
 
+  // ── Display section checkboxes ──
+  const dispOverlay = document.getElementById('cv-disp-overlay') as HTMLInputElement | null;
+  const dispVboard = document.getElementById('cv-disp-vboard') as HTMLInputElement | null;
+  const dispEval = document.getElementById('cv-disp-eval') as HTMLInputElement | null;
+  const dispLines = document.getElementById('cv-disp-lines') as HTMLInputElement | null;
+  const dispArrows = document.getElementById('cv-disp-arrows') as HTMLInputElement | null;
+  const dispAuto = document.getElementById('cv-disp-auto') as HTMLInputElement | null;
+
+  function syncDisplayToggles(): void {
+    if (dispOverlay) dispOverlay.checked = state.overlayVisible;
+    if (dispVboard) dispVboard.checked = state.vboardOverlayVisible;
+    if (dispEval) dispEval.checked = state.evalBarVisible;
+    if (dispLines) dispLines.checked = state.lineVisible;
+    if (dispArrows) dispArrows.checked = state.arrowsVisible;
+    if (dispAuto) dispAuto.checked = state.autoMode;
+  }
+
+  // Wire checkboxes to click the corresponding top bar button (use getElementById
+  // to avoid TDZ issues with const declarations further down)
+  dispOverlay?.addEventListener('change', () => document.getElementById('cv-overlay-btn')?.click());
+  dispVboard?.addEventListener('change', () => document.getElementById('cv-vboard-btn')?.click());
+  dispEval?.addEventListener('change', () => document.getElementById('cv-eval-btn')?.click());
+  dispLines?.addEventListener('change', () => document.getElementById('cv-line-btn')?.click());
+  dispArrows?.addEventListener('change', () => document.getElementById('cv-arrows-btn')?.click());
+  dispAuto?.addEventListener('change', () => document.getElementById('cv-auto-btn')?.click());
+
   function syncModeButtons(): void {
     arrowsBtn?.classList.toggle('active', state.arrowsVisible);
     lineBtn?.classList.toggle('active', state.lineVisible);
+    syncDisplayToggles();
   }
 
   if (arrowsBtn) {
@@ -719,6 +754,7 @@ function initOverlay(): void {
     evalBtn.addEventListener('click', () => {
       state.evalBarVisible = !state.evalBarVisible;
       evalBtn.classList.toggle('active', state.evalBarVisible);
+      syncDisplayToggles();
       savePrefs({ evalBarVisible: state.evalBarVisible });
     });
   }
@@ -793,6 +829,7 @@ function initOverlay(): void {
     autoBtn?.classList.toggle('active', state.autoMode);
     arrowsBtn?.classList.toggle('auto-disabled', state.autoMode);
     lineBtn?.classList.toggle('auto-disabled', state.autoMode);
+    syncDisplayToggles();
   }
 
   applyAutoMode();
