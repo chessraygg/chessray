@@ -252,9 +252,11 @@ function initOverlay(): void {
         (window as any).__chessrayResetAutoTimer?.();
         if (state.lineVisible) pvCycleStart();
       } else {
-        (window as any).__chessrayClearAutoTimer?.();
-        // Stop cycle if both overlays are hidden
-        if (!state.vboardOverlayVisible) pvCycleStop();
+        // Stop everything only if both overlays are hidden
+        if (!state.vboardOverlayVisible) {
+          (window as any).__chessrayClearAutoTimer?.();
+          pvCycleStop();
+        }
       }
     });
   }
