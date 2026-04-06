@@ -366,6 +366,8 @@ canvas#video-overlay {
 .panel.compact .top-bar { display: none; }
 .panel.compact .section-header { display: none; }
 .panel.compact .panel-section { margin-top: 0; }
+.panel.compact .section-body { padding: 0; }
+.panel.compact .tracking-content { gap: 2px; }
 .panel.compact .compact-moves { display: flex !important; }
 .panel.compact { padding: 4px; }
 .compact-hint { display: none; }
