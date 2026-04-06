@@ -867,8 +867,8 @@ function initOverlay(): void {
       const cg = parseInt(hex.slice(3, 5), 16);
       const cb = parseInt(hex.slice(5, 7), 16);
       const bg = `rgba(${cr},${cg},${cb},0.25)`;
-      const lossStr = move.loss_cp === 0 ? '' : ` −${(move.loss_cp / 100).toFixed(1)}`;
-      html += `<div class="compact-move${cls}" data-line="${i}" style="background:${bg}"><span class="compact-label">${label}${lossStr}</span></div>`;
+      const lossHtml = move.loss_cp === 0 ? '' : `<span class="compact-loss">−${(move.loss_cp / 100).toFixed(1)}</span>`;
+      html += `<div class="compact-move${cls}" data-line="${i}" style="background:${bg}"><span class="compact-label">${label}</span>${lossHtml}</div>`;
     }
     compactMovesEl.innerHTML = html;
     compactMovesEl.querySelectorAll('.compact-move').forEach(el => {
