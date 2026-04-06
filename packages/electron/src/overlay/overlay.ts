@@ -282,6 +282,11 @@ function initOverlay(): void {
           const ctx = state.canvas.getContext('2d');
           if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
         }
+        // Restore board grid to base position if animation was mid-flight
+        if ((window as any).__chessrayPvPlaying && pvCycleBaseFen) {
+          const grid = document.getElementById('cv-debug-grid');
+          if (grid) renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, []);
+        }
         // Stop cycle if actual board overlay is also hidden
         if (!state.overlayVisible) pvCycleStop();
       }
@@ -594,8 +599,13 @@ function initOverlay(): void {
     if (pvCycleMovesTimer !== null) { clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null; }
     const wasPlaying = (window as any).__chessrayPvPlaying;
     (window as any).__chessrayPvPlaying = false;
-    document.getElementById('cv-debug-grid')?.classList.remove('analysis');
+    const grid = document.getElementById('cv-debug-grid');
+    grid?.classList.remove('analysis');
     document.querySelectorAll('.piece-anim').forEach(el => el.remove());
+    // Restore board grid to base position (before animation moved pieces)
+    if (wasPlaying && pvCycleBaseFen && grid) {
+      renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, []);
+    }
     if (wasPlaying) {
       state.pvDisplayDepth = state.pvDepth; // restore full depth
       renderArrows(state);
