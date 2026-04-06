@@ -82,13 +82,20 @@
               <div class="eval-bar-label" id="cv-eval-label">0.0</div>
               <div class="eval-bar-depth" id="cv-eval-depth"></div>
             </div>
-            <div class="best-moves" id="cv-best-moves"></div>
           </div>
         </div>
 
         <!-- Lines -->
         <div class="panel-section" id="sec-lines">
           <div class="section-header" data-section="lines">Lines</div>
+          <div class="section-body">
+            <div class="best-moves" id="cv-best-moves"></div>
+          </div>
+        </div>
+
+        <!-- Settings -->
+        <div class="panel-section" id="sec-settings">
+          <div class="section-header" data-section="settings">Settings</div>
           <div class="section-body">
             <div class="pv-depth-row">
               <label data-tip="Max centipawn loss for showing alternative moves">CP loss</label>
@@ -115,13 +122,6 @@
               <input type="range" id="cv-auto-delay" min="1" max="15" value="5" step="1">
               <span id="cv-auto-delay-val">5</span><span style="font-size:8px;color:var(--text-faint)">s</span>
             </div>
-          </div>
-        </div>
-
-        <!-- Settings -->
-        <div class="panel-section" id="sec-settings">
-          <div class="section-header" data-section="settings">Settings</div>
-          <div class="section-body">
             <div class="pv-depth-row">
               <label data-tip="Maximum engine search depth (higher = stronger but slower)">Engine</label>
               <input type="range" id="cv-max-depth" min="8" max="40" value="28" step="4">
