@@ -220,15 +220,16 @@ function initOverlay(): void {
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
   if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
 
-  // ── Inline debug section toggle (gear icon in top bar) ──
-  const debugToggle = document.getElementById('cv-debug-toggle');
-  const debugSection = document.getElementById('debug-section');
-  if (debugToggle && debugSection) {
-    debugToggle.addEventListener('click', () => {
-      const isHidden = debugSection.classList.toggle('hidden');
-      debugToggle.classList.toggle('active', !isHidden);
+  // ── Section header toggles ──
+  document.querySelectorAll('.section-header').forEach(header => {
+    const section = (header as HTMLElement).dataset.section;
+    if (!section) return;
+    // Debug section starts collapsed
+    if (section === 'debug') header.classList.add('collapsed');
+    header.addEventListener('click', () => {
+      header.classList.toggle('collapsed');
     });
-  }
+  });
 
   // ── Overlay/Box toggles (debug panel) ──
   const overlayBtn = document.getElementById('cv-overlay-btn');
@@ -306,14 +307,12 @@ function initOverlay(): void {
   // ── User panel toggles ──
   const arrowsBtn = document.getElementById('cv-arrows-btn');
   const lineBtn = document.getElementById('cv-line-btn');
-  const pvDepthRow = document.getElementById('cv-pv-depth-row');
   const pvDepthSlider = document.getElementById('cv-pv-depth') as HTMLInputElement | null;
   const pvDepthVal = document.getElementById('cv-pv-depth-val');
 
   function syncModeButtons(): void {
     arrowsBtn?.classList.toggle('active', state.arrowsVisible);
     lineBtn?.classList.toggle('active', state.lineVisible);
-    if (pvDepthRow) pvDepthRow.style.display = state.lineVisible ? 'flex' : 'none';
   }
 
   if (arrowsBtn) {
@@ -329,7 +328,6 @@ function initOverlay(): void {
 
   if (lineBtn) {
     lineBtn.classList.toggle('active', state.lineVisible);
-    if (pvDepthRow) pvDepthRow.style.display = state.lineVisible ? 'flex' : 'none';
     lineBtn.addEventListener('click', () => {
       if (state.autoMode) return;
       state.lineVisible = !state.lineVisible;
@@ -760,7 +758,6 @@ function initOverlay(): void {
 
   // ── Auto mode ──
   const autoBtn = document.getElementById('cv-auto-btn');
-  const autoDelayRow = document.getElementById('cv-auto-delay-row');
   const autoDelaySlider = document.getElementById('cv-auto-delay') as HTMLInputElement | null;
   const autoDelayVal = document.getElementById('cv-auto-delay-val');
 
@@ -802,7 +799,6 @@ function initOverlay(): void {
     autoBtn?.classList.toggle('active', state.autoMode);
     arrowsBtn?.classList.toggle('auto-disabled', state.autoMode);
     lineBtn?.classList.toggle('auto-disabled', state.autoMode);
-    if (autoDelayRow) autoDelayRow.style.display = state.autoMode ? 'flex' : 'none';
   }
 
   applyAutoMode();
