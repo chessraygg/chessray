@@ -20,6 +20,7 @@ export interface Prefs {
   changeDetect: boolean;
   pvWhiteColor: string;
   pvBlackColor: string;
+  collapsedSections: string[];
   panelLeft: number | null;
   panelTop: number | null;
 }
@@ -43,6 +44,7 @@ export const DEFAULT_PREFS: Prefs = {
   evalBarVisible: true,
   panelScale: 1,
   collapsed: false,
+  collapsedSections: ['debug'],
   panelLeft: null,
   panelTop: null,
 };

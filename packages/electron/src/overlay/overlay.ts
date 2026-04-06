@@ -210,11 +210,11 @@ function initOverlay(): void {
   if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
 
   // ── Section header toggles ──
+  const collapsedSections = new Set(prefs.collapsedSections);
   document.querySelectorAll('.section-header').forEach(header => {
     const section = (header as HTMLElement).dataset.section;
     if (!section) return;
-    // Debug section starts collapsed
-    if (section === 'debug') {
+    if (collapsedSections.has(section)) {
       header.classList.add('collapsed');
       header.nextElementSibling?.classList.add('collapsed');
     }
@@ -222,6 +222,12 @@ function initOverlay(): void {
       header.classList.toggle('collapsed');
       const body = header.nextElementSibling;
       body?.classList.toggle('collapsed');
+      if (header.classList.contains('collapsed')) {
+        collapsedSections.add(section);
+      } else {
+        collapsedSections.delete(section);
+      }
+      savePrefs({ collapsedSections: [...collapsedSections] });
     });
   });
 
