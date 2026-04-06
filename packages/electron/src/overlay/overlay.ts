@@ -396,6 +396,11 @@ function initOverlay(): void {
     }
     state.selectedLineIndex = pvCycleLineIndex;
 
+    // Exit analysis view for the interlude
+    (window as any).__chessrayPvPlaying = false;
+    document.getElementById('cv-debug-grid')?.classList.remove('analysis');
+    document.querySelectorAll('.piece-anim').forEach(el => el.remove());
+
     // Show moves briefly between lines
     pvCycleArrowsWas = state.arrowsVisible;
     state.arrowsVisible = true;
