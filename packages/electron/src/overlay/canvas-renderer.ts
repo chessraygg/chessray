@@ -64,7 +64,7 @@ function drawLossLabel(
 
   const text = (lossCp / 100).toFixed(1);
   const fontSize = Math.max(7, Math.round(squareW * 0.28));
-  const r = fontSize * 0.65;
+  const r = fontSize * 0.85;
 
   // Position: top-right corner of square, inset by radius
   const cx = board.x + (file + 1) * squareW - r - 1;
