@@ -559,25 +559,31 @@ function initOverlay(): void {
     floater.innerHTML = movingPiece ? pieceSvg(movingPiece, 22) : '';
     container.appendChild(floater);
 
-    // Build arrow for this move
-    const turn = pvCycleBaseFen.split(' ')[1] || 'w';
-    const isWhite = (step % 2 === 1) === (turn === 'w');
-    const moveArrow = {
-      from: fromSq, to: toSq,
-      color: isWhite ? '#e5e5e5' : '#1a1a1a',
-      width: 3, opacity: 0.8, loss_cp: 0,
-      label: String(step),
-    };
+    // Trigger animation to destination
+    requestAnimationFrame(() => {
+      floater.style.left = `${dstFile * sq}px`;
+      floater.style.top = `${dstRank * sq}px`;
+    });
 
-    // Draw arrow following piece position during transition
-    const srcLeft = srcFile * sq;
-    const srcTop = srcRank * sq;
-    const dstLeft = dstFile * sq;
-    const dstTop = dstRank * sq;
-    let arrowRafId = 0;
+    // On transition end, render final board and remove floater
+    floater.addEventListener('transitionend', () => {
+      floater.remove();
+      if ((window as any).__chessrayPvPlaying) {
+        renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight);
+      }
+    }, { once: true });
+    // Fallback if transitionend doesn't fire
+    setTimeout(() => {
+      if (floater.parentElement) {
+        floater.remove();
+        if ((window as any).__chessrayPvPlaying) {
+          renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight);
+        }
+      }
+    }, 500);
 
-    function drawArrowAtProgress(): void {
-      if (!state.canvas || !(window as any).__chessrayPvPlaying) return;
+    // Draw single arrow for the current move on virtual board canvas
+    if (state.canvas) {
       const size = 200;
       const dpr = window.devicePixelRatio || 1;
       const effectiveDpr = dpr * (state.panelScale || 1);
@@ -592,51 +598,17 @@ function initOverlay(): void {
       ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
       ctx.clearRect(0, 0, size, size);
 
-      // Compute progress from floater's current animated position
-      const computed = getComputedStyle(floater);
-      const curLeft = parseFloat(computed.left) || srcLeft;
-      const curTop = parseFloat(computed.top) || srcTop;
-      const totalDist = Math.hypot(dstLeft - srcLeft, dstTop - srcTop);
-      const curDist = Math.hypot(curLeft - srcLeft, curTop - srcTop);
-      const progress = totalDist > 0 ? Math.min(1, curDist / totalDist) : 1;
-
-      drawArrow(ctx, moveArrow, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, progress, true);
-
-      if (floater.parentElement && progress < 1) {
-        arrowRafId = requestAnimationFrame(drawArrowAtProgress);
-      }
+      // Build a single arrow for the current move
+      const turn = pvCycleBaseFen.split(' ')[1] || 'w';
+      const isWhite = (step % 2 === 1) === (turn === 'w');
+      const arrow = {
+        from: fromSq, to: toSq,
+        color: isWhite ? '#e5e5e5' : '#1a1a1a',
+        width: 3, opacity: 0.8, loss_cp: 0,
+        label: String(step),
+      };
+      drawArrow(ctx, arrow, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, 1, true);
     }
-
-    // Trigger animation to destination
-    requestAnimationFrame(() => {
-      floater.style.left = `${dstLeft}px`;
-      floater.style.top = `${dstTop}px`;
-      arrowRafId = requestAnimationFrame(drawArrowAtProgress);
-    });
-
-    // On transition end, render final board, full arrow, and remove floater
-    function onTransitionDone(): void {
-      if (arrowRafId) cancelAnimationFrame(arrowRafId);
-      floater.remove();
-      if ((window as any).__chessrayPvPlaying) {
-        renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight);
-        // Draw final full arrow
-        if (state.canvas) {
-          const size = 200;
-          const dpr = window.devicePixelRatio || 1;
-          const effectiveDpr = dpr * (state.panelScale || 1);
-          const ctx = state.canvas.getContext('2d')!;
-          ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
-          ctx.clearRect(0, 0, size, size);
-          drawArrow(ctx, moveArrow, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, 1, true);
-        }
-      }
-    }
-    floater.addEventListener('transitionend', onTransitionDone, { once: true });
-    // Fallback if transitionend doesn't fire
-    setTimeout(() => {
-      if (floater.parentElement) onTransitionDone();
-    }, 500);
   }
 
   /** Start animating the current pvCycleLineIndex */
