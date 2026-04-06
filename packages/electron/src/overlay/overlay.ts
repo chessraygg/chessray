@@ -780,27 +780,24 @@ function initOverlay(): void {
   // ── Collapse panel ──
   const collapseBtn = document.getElementById('cv-collapse-btn');
   const panelBody = document.getElementById('cv-panel-body');
-
-  function setCollapsed(c: boolean): void {
-    if (c && compactMode) setCompactMode(false);
-    panelBody?.classList.toggle('hidden', c);
-    userPanel?.classList.toggle('collapsed', c);
-    collapseBtn?.classList.toggle('collapsed', c);
-    savePrefs({ collapsed: c });
-  }
-
   let collapsed = prefs.collapsed;
-  if (collapsed) setCollapsed(true);
-
-  collapseBtn?.addEventListener('click', () => { collapsed = !collapsed; setCollapsed(collapsed); });
 
   // ── Compact mode ──
   const compactBtn = document.getElementById('cv-compact-btn');
   const compactMovesEl = document.getElementById('cv-compact-moves');
   let compactMode = prefs.compactMode;
 
+  function setCollapsed(c: boolean): void {
+    if (c && compactMode) setCompactMode(false);
+    collapsed = c;
+    panelBody?.classList.toggle('hidden', c);
+    userPanel?.classList.toggle('collapsed', c);
+    collapseBtn?.classList.toggle('collapsed', c);
+    savePrefs({ collapsed: c });
+  }
+
   function setCompactMode(on: boolean): void {
-    if (on && collapsed) { collapsed = false; setCollapsed(false); }
+    if (on && collapsed) setCollapsed(false);
     compactMode = on;
     userPanel?.classList.toggle('compact', on);
     compactBtn?.classList.toggle('active', on);
@@ -808,6 +805,10 @@ function initOverlay(): void {
     savePrefs({ compactMode: on });
     if (on) updateCompactMoves();
   }
+
+  if (collapsed) setCollapsed(true);
+
+  collapseBtn?.addEventListener('click', () => { collapsed = !collapsed; setCollapsed(collapsed); });
 
   function updateCompactMoves(): void {
     if (!compactMode || !compactMovesEl) return;
