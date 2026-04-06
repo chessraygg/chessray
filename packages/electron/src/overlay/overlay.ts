@@ -400,6 +400,7 @@ function initOverlay(): void {
     state.arrowsVisible = true;
     state.lineVisible = false;
     syncModeButtons();
+    renderArrows(state);
     renderVideoOverlay(state);
     updateCompactMoves();
 
