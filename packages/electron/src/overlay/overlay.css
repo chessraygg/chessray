@@ -343,6 +343,7 @@ canvas#video-overlay {
   text-align: center;
   position: relative;
   overflow: hidden;
+  border: 1px solid transparent;
 }
 .compact-move .compact-label {
   display: block;
@@ -361,6 +362,7 @@ canvas#video-overlay {
   background: var(--text);
   opacity: 0.7;
 }
+.compact-move.locked { border: 1px solid rgba(255, 255, 255, 0.3); }
 
 .piece-anim {
   position: absolute;
