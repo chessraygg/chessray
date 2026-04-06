@@ -62,7 +62,7 @@ function drawLossLabel(
   let rank = parseInt(square[1], 10) - 1;
   if (displayFlipped) { file = 7 - file; rank = 7 - rank; }
 
-  const text = (lossCp / 100).toFixed(1);
+  const text = `−${(lossCp / 100).toFixed(1)}`;
   const fontSize = Math.max(7, Math.round(squareW * 0.28));
   const r = fontSize * 0.85;
 
