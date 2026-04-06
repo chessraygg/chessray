@@ -369,11 +369,14 @@ function initOverlay(): void {
   }
 
   if (pvDepthSlider && pvDepthVal) {
-    pvDepthSlider.value = String(state.pvDepth);
-    pvDepthVal.textContent = String(state.pvDepth);
+    const PV_ALL = 999;
+    const sliderVal = state.pvDepth >= PV_ALL ? 11 : state.pvDepth;
+    pvDepthSlider.value = String(sliderVal);
+    pvDepthVal.textContent = state.pvDepth >= PV_ALL ? 'All' : String(state.pvDepth);
     pvDepthSlider.addEventListener('input', () => {
-      state.pvDepth = parseInt(pvDepthSlider.value, 10);
-      pvDepthVal.textContent = String(state.pvDepth);
+      const raw = parseInt(pvDepthSlider.value, 10);
+      state.pvDepth = raw >= 11 ? PV_ALL : raw;
+      pvDepthVal.textContent = state.pvDepth >= PV_ALL ? 'All' : String(state.pvDepth);
       savePrefs({ pvDepth: state.pvDepth });
       renderArrows(state);
     });
