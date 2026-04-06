@@ -4,6 +4,7 @@ dist/
 .env
 .DS_Store
 .claude/
+CLAUDE.local.md
 .vite/
 vendor/stockfish/
 vendor/onnxruntime-web/
