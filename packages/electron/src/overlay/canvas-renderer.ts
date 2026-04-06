@@ -345,7 +345,8 @@ export function renderArrows(state: OverlayState): void {
 
   const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
   for (let i = drawList.length - 1; i >= 0; i--) {
-    drawArrow(ctx, drawList[i].arrow, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress, true);
+    const isLineArrow = !!drawList[i].arrow.label;
+    drawArrow(ctx, drawList[i].arrow, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow);
   }
 
   // Draw cp loss label for the active PV line
