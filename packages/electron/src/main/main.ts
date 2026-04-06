@@ -428,6 +428,12 @@ ipcMain.on('set-max-depth', (_e, depth: number) => {
   }
 });
 
+ipcMain.on('set-change-detect', (_e, enabled: boolean) => {
+  if (analysisWindow && !analysisWindow.isDestroyed()) {
+    analysisWindow.webContents.send('set-change-detect', enabled);
+  }
+});
+
 // ── App lifecycle ──
 
 // Enforce single instance — quit if another copy is already running

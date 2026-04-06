@@ -21,6 +21,7 @@ declare global {
       onSourceVisibility: (cb: (visible: boolean) => void) => void;
       reopenPicker: () => void;
       setMaxDepth: (depth: number) => void;
+      setChangeDetect: (enabled: boolean) => void;
       onResetPanelPosition: (cb: () => void) => void;
       minimizeApp: () => void;
       closeApp: () => void;
@@ -217,7 +218,7 @@ function initOverlay(): void {
 
   // Restore visual state from prefs
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
-  if (state.canvas) state.canvas.style.display = state.overlayVisible ? '' : 'none';
+  if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
 
   // ── Inline debug section toggle (gear icon in top bar) ──
   const debugToggle = document.getElementById('cv-debug-toggle');
@@ -251,9 +252,11 @@ function initOverlay(): void {
         (window as any).__chessrayResetAutoTimer?.();
         if (state.lineVisible) pvCycleStart();
       } else {
-        (window as any).__chessrayClearAutoTimer?.();
-        // Stop cycle if both overlays are hidden
-        if (!state.vboardOverlayVisible) pvCycleStop();
+        // Stop everything only if both overlays are hidden
+        if (!state.vboardOverlayVisible) {
+          (window as any).__chessrayClearAutoTimer?.();
+          pvCycleStop();
+        }
       }
     });
   }
@@ -364,6 +367,59 @@ function initOverlay(): void {
   let pvCyclePv: string[] = [];
 
   let pvCycleMovesTimer: ReturnType<typeof setTimeout> | null = null;
+  let pvCycleLineIndex = 0;
+
+  /** Get line indices eligible for cycling (filtered by loss threshold) */
+  function getCycleLineIndices(): number[] {
+    const moves = state.currentResult?.evaluation?.top_moves;
+    if (!moves?.length) return [];
+    const indices: number[] = [];
+    for (let i = 0; i < moves.length; i++) {
+      if (moves[i].loss_cp <= state.lossThreshold) indices.push(i);
+    }
+    return indices;
+  }
+
+  let pvCycleArrowsWas = false; // remember arrows state before interlude
+
+  /** Advance to next line, show moves in between, then start animating */
+  function pvCycleNextLine(): void {
+    const indices = getCycleLineIndices();
+    if (indices.length === 0) return;
+
+    if (userLockedLine >= 0) {
+      // Locked: repeat same line
+      pvCycleLineIndex = userLockedLine;
+    } else {
+      // Advance to next line in the cycle
+      const curPos = indices.indexOf(pvCycleLineIndex);
+      const nextPos = (curPos + 1) % indices.length;
+      pvCycleLineIndex = indices[nextPos];
+    }
+    state.selectedLineIndex = pvCycleLineIndex;
+
+    // Exit analysis view for the interlude
+    (window as any).__chessrayPvPlaying = false;
+    document.getElementById('cv-debug-grid')?.classList.remove('analysis');
+    document.querySelectorAll('.piece-anim').forEach(el => el.remove());
+
+    // Show moves briefly between lines
+    pvCycleArrowsWas = state.arrowsVisible;
+    state.arrowsVisible = true;
+    state.lineVisible = false;
+    syncModeButtons();
+    renderArrows(state);
+    renderVideoOverlay(state);
+    updateCompactMoves();
+
+    pvCycleMovesTimer = setTimeout(() => {
+      pvCycleMovesTimer = null;
+      state.arrowsVisible = pvCycleArrowsWas;
+      state.lineVisible = true;
+      syncModeButtons();
+      pvCycleStartCurrentLine();
+    }, autoDelaySec * 1000);
+  }
 
   function pvCycleStep(): void {
     if (state.pvDisplayDepth >= state.pvDepth || state.pvDisplayDepth >= pvCyclePv.length) {
@@ -381,23 +437,8 @@ function initOverlay(): void {
         }
       }
 
-      if (state.autoMode) {
-        // Show arrows, pause line, then restart line cycle
-        state.arrowsVisible = true;
-        state.lineVisible = false;
-        syncModeButtons();
-        renderVideoOverlay(state);
-        pvCycleMovesTimer = setTimeout(() => {
-          pvCycleMovesTimer = null;
-          state.lineVisible = true;
-          syncModeButtons();
-          pvCycleStart();
-        }, autoDelaySec * 1000);
-      } else {
-        // Non-auto: just loop the line cycle
-        renderVideoOverlay(state);
-        pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
-      }
+      // Advance to next line (with moves interlude)
+      pvCycleNextLine();
       return;
     }
 
@@ -540,13 +581,13 @@ function initOverlay(): void {
     }
   }
 
-  /** Start the unified cycle from step 1 */
-  function pvCycleStart(): void {
-    pvCycleStop();
+  /** Start animating the current pvCycleLineIndex */
+  function pvCycleStartCurrentLine(): void {
+    if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
     if (!state.lineVisible) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) return;
-    const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
+    const idx = Math.min(pvCycleLineIndex, result.evaluation.top_moves.length - 1);
     const pv = result.evaluation.top_moves[idx].pv;
     const baseFen = result.evaluation.fen;
     if (!baseFen || pv.length === 0) return;
@@ -565,12 +606,19 @@ function initOverlay(): void {
     pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
   }
 
+  /** Start the unified cycle from the selected line */
+  function pvCycleStart(): void {
+    pvCycleStop();
+    pvCycleLineIndex = state.selectedLineIndex;
+    pvCycleStartCurrentLine();
+  }
+
   /** Continue if displayed moves match, otherwise restart */
   function pvCycleContinue(): void {
     if (!state.lineVisible) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) return;
-    const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
+    const idx = Math.min(pvCycleLineIndex, result.evaluation.top_moves.length - 1);
     const newPv = result.evaluation.top_moves[idx].pv;
     const displayedMatch = state.pvDisplayDepth <= newPv.length &&
       pvCycleLastPv.slice(0, state.pvDisplayDepth).every((m, i) => m === newPv[i]);
@@ -585,7 +633,15 @@ function initOverlay(): void {
 
   function pvCycleStop(): void {
     if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
-    if (pvCycleMovesTimer !== null) { clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null; }
+    if (pvCycleMovesTimer !== null) {
+      clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null;
+      // Restore mode state if stopped during interlude
+      state.arrowsVisible = pvCycleArrowsWas;
+      if (!state.autoMode) {
+        state.lineVisible = true;
+      }
+      syncModeButtons();
+    }
     const wasPlaying = (window as any).__chessrayPvPlaying;
     (window as any).__chessrayPvPlaying = false;
     const grid = document.getElementById('cv-debug-grid');
@@ -691,6 +747,17 @@ function initOverlay(): void {
     });
   }
 
+  // ── Change detection toggle ──
+  const changeDetectCheckbox = document.getElementById('cv-change-detect') as HTMLInputElement | null;
+  if (changeDetectCheckbox) {
+    changeDetectCheckbox.checked = prefs.changeDetect;
+    window.chessRay.setChangeDetect(prefs.changeDetect);
+    changeDetectCheckbox.addEventListener('change', () => {
+      savePrefs({ changeDetect: changeDetectCheckbox.checked });
+      window.chessRay.setChangeDetect(changeDetectCheckbox.checked);
+    });
+  }
+
   // ── Auto mode ──
   const autoBtn = document.getElementById('cv-auto-btn');
   const autoDelayRow = document.getElementById('cv-auto-delay-row');
@@ -703,7 +770,7 @@ function initOverlay(): void {
 
   function resetAutoTimer(): void {
     if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
-    if (!state.autoMode || !state.overlayVisible) return;
+    if (!state.autoMode || (!state.overlayVisible && !state.vboardOverlayVisible)) return;
 
     // Show top moves immediately
     state.arrowsVisible = true;
@@ -713,9 +780,10 @@ function initOverlay(): void {
     renderArrows(state);
     renderVideoOverlay(state);
 
-    // Add best line after delay (keep arrows visible)
+    // Switch to line after delay (hide moves)
     autoTimer = setTimeout(() => {
       autoTimer = null;
+      state.arrowsVisible = false;
       state.lineVisible = true;
       pvCycleStart();
       syncModeButtons();
@@ -817,21 +885,28 @@ function initOverlay(): void {
       const sanArr = fen ? uciToSan(fen, [uci]) : [uci];
       const label = sanArr[0] || uci;
       const scoreStr = move.score_cp >= 0 ? `+${(move.score_cp / 100).toFixed(1)}` : (move.score_cp / 100).toFixed(1);
-      const selected = i === state.selectedLineIndex ? ' selected' : '';
+      const cls = (i === state.selectedLineIndex ? ' selected' : '') + (i === userLockedLine ? ' locked' : '');
       const hex = lossToColor(move.loss_cp);
       const cr = parseInt(hex.slice(1, 3), 16);
       const cg = parseInt(hex.slice(3, 5), 16);
       const cb = parseInt(hex.slice(5, 7), 16);
       const bg = `rgba(${cr},${cg},${cb},0.25)`;
-      const lossStr = move.loss_cp === 0 ? '' : ` −${(move.loss_cp / 100).toFixed(1)}`;
-      html += `<div class="compact-move${selected}" data-line="${i}" style="background:${bg}"><span class="compact-label">${label}${lossStr}</span></div>`;
+      const lossHtml = move.loss_cp < 5 ? '' : `<span class="compact-loss">−${(move.loss_cp / 100).toFixed(1)}</span>`;
+      html += `<div class="compact-move${cls}" data-line="${i}" style="background:${bg}"><span class="compact-label">${label}</span>${lossHtml}</div>`;
     }
     compactMovesEl.innerHTML = html;
     compactMovesEl.querySelectorAll('.compact-move').forEach(el => {
       el.addEventListener('click', () => {
         const idx = parseInt((el as HTMLElement).dataset.line!, 10);
-        selectLine(idx);
-        updateCompactMoves();
+        // Toggle lock: click same = unlock, click different = lock
+        if (userLockedLine === idx) {
+          userLockedLine = -1;
+          updateCompactMoves();
+        } else {
+          userLockedLine = idx;
+          selectLine(idx);
+          updateCompactMoves();
+        }
       });
       // Fit text to container width
       const label = el.querySelector('.compact-label') as HTMLElement;
@@ -887,6 +962,7 @@ initOverlay();
 
 let pendingResult: PipelineResult | null = null;
 let rafScheduled = false;
+let userLockedLine = -1; // -1 = cycle all, >= 0 = locked to that line
 let lastEvalFen: string | null = null;
 let lastRecogFen: string | null = null;
 let lastEvalDepth: number = 0;
@@ -935,6 +1011,7 @@ function processPendingResult(): void {
   const evalDepth = result.eval_depth ?? 0;
   if (evalFen && evalFen !== lastEvalFen) {
     state.selectedLineIndex = 0;
+    userLockedLine = -1;
     lastEvalFen = evalFen;
     lastEvalDepth = evalDepth;
     (window as any).__chessrayResetAutoTimer?.();
@@ -964,7 +1041,9 @@ window.chessRay.onFrameResult((result) => {
   pendingResult = result as PipelineResult;
   if (!rafScheduled) {
     rafScheduled = true;
-    requestAnimationFrame(processPendingResult);
+    // setTimeout instead of rAF: transparent overlays can have rAF stalled
+    // by the OS when the window isn't considered active on launch
+    setTimeout(processPendingResult, 0);
   }
 });
 

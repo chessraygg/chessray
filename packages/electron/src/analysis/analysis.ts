@@ -32,6 +32,7 @@ declare global {
       getSources: () => Promise<Array<{ id: string; name: string; thumbnailDataUrl: string; display_id: string }>>;
       selectSource: (id: string) => void;
       onSetMaxDepth: (cb: (depth: number) => void) => void;
+      onSetChangeDetect: (cb: (enabled: boolean) => void) => void;
     };
   }
 }
@@ -147,7 +148,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     const tPreview = Date.now() - t;
 
     const boardSample = sampleBoardPixels(cropped.data, cropped.width, cropped.height);
-    const visuallyUnchanged = lastBoardSample && boardUnchanged(lastBoardSample, boardSample);
+    const visuallyUnchanged = changeDetectEnabled && lastBoardSample && boardUnchanged(lastBoardSample, boardSample);
     lastBoardSample = boardSample;
 
     let recognition: RecognitionResult | null = null;
@@ -411,6 +412,12 @@ window.chessRay.onStopCapture(() => {
 window.chessRay.onSetMaxDepth((depth: number) => {
   debugLog(`Max depth changed to ${depth}`);
   EVAL_MAX_DEPTH = depth;
+});
+
+let changeDetectEnabled = true;
+window.chessRay.onSetChangeDetect((enabled: boolean) => {
+  debugLog(`Change detection ${enabled ? 'enabled' : 'disabled'}`);
+  changeDetectEnabled = enabled;
 });
 
 // Signal to main that all IPC listeners are registered
