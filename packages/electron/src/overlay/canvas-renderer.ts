@@ -72,7 +72,7 @@ function drawLossLabel(
 
   ctx.save();
   const color = lossToColor(lossCp);
-  ctx.globalAlpha = 0.8;
+  ctx.globalAlpha = 0.5;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fillStyle = color;
