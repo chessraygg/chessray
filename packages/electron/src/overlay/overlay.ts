@@ -318,10 +318,6 @@ function initOverlay(): void {
     arrowsBtn.addEventListener('click', () => {
       if (state.autoMode) return;
       state.arrowsVisible = !state.arrowsVisible;
-      if (state.arrowsVisible && state.lineVisible) {
-        state.lineVisible = false;
-        pvCycleStop();
-      }
       syncModeButtons();
       savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
       renderArrows(state);
@@ -334,9 +330,6 @@ function initOverlay(): void {
     lineBtn.addEventListener('click', () => {
       if (state.autoMode) return;
       state.lineVisible = !state.lineVisible;
-      if (state.lineVisible && state.arrowsVisible) {
-        state.arrowsVisible = false;
-      }
       // Reset grow on mode change
       if (state.lineVisible) { pvCycleStart(); } else { pvCycleStop(); }
       syncModeButtons();
@@ -389,14 +382,13 @@ function initOverlay(): void {
       }
 
       if (state.autoMode) {
-        // Switch to moves mode for autoDelaySec, then restart line cycle
+        // Show arrows, pause line, then restart line cycle
         state.arrowsVisible = true;
         state.lineVisible = false;
         syncModeButtons();
         renderVideoOverlay(state);
         pvCycleMovesTimer = setTimeout(() => {
           pvCycleMovesTimer = null;
-          state.arrowsVisible = false;
           state.lineVisible = true;
           syncModeButtons();
           pvCycleStart();
@@ -716,15 +708,14 @@ function initOverlay(): void {
     // Show top moves immediately
     state.arrowsVisible = true;
     state.lineVisible = false;
+    pvCycleStop();
     syncModeButtons();
     renderArrows(state);
     renderVideoOverlay(state);
 
-    // Switch to best line after delay
-    pvCycleStop();
+    // Add best line after delay (keep arrows visible)
     autoTimer = setTimeout(() => {
       autoTimer = null;
-      state.arrowsVisible = false;
       state.lineVisible = true;
       pvCycleStart();
       syncModeButtons();
@@ -750,7 +741,6 @@ function initOverlay(): void {
   // Set correct initial visual state for auto mode (arrows first)
   if (state.autoMode) {
     state.arrowsVisible = true;
-    state.lineVisible = false;
     syncModeButtons();
   }
   if (autoDelaySlider && autoDelayVal) {
