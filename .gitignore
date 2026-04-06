@@ -4,10 +4,12 @@ dist/
 .env
 .DS_Store
 .claude/
+CLAUDE.local.md
 .vite/
 vendor/stockfish/
 vendor/onnxruntime-web/
 vendor/yolo-chess/
+vendor/paddle-ocr/
 test/output/
 test/e2e/output/
 test-results/
