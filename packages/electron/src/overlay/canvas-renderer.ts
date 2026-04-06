@@ -1,5 +1,5 @@
 import type { ArrowDescriptor, PipelineResult } from '@chessray/core';
-import { computeCurveOffsets, computePvArrows } from '@chessray/core';
+import { computeCurveOffsets, computePvArrows, lossToColor } from '@chessray/core';
 
 export interface OverlayState {
   videoCanvas: HTMLCanvasElement | null;
@@ -47,6 +47,53 @@ export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
     : [];
   if (moveArrows.length && pvArrows.length) return [...pvArrows, ...moveArrows];
   return pvArrows.length ? pvArrows : moveArrows;
+}
+
+function drawLossLabel(
+  ctx: CanvasRenderingContext2D,
+  square: string,
+  lossCp: number,
+  board: { x: number; y: number; width: number; height: number },
+  displayFlipped: boolean,
+): void {
+  const squareW = board.width / 8;
+  const squareH = board.height / 8;
+  let file = square.charCodeAt(0) - 97;
+  let rank = parseInt(square[1], 10) - 1;
+  if (displayFlipped) { file = 7 - file; rank = 7 - rank; }
+
+  // Position at top-right corner of the square
+  const x = board.x + file * squareW + squareW - 2;
+  const y = board.y + (7 - rank) * squareH + 2;
+
+  const text = `−${(lossCp / 100).toFixed(1)}`;
+  const fontSize = Math.max(8, Math.round(squareW * 0.22));
+  ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
+  const metrics = ctx.measureText(text);
+  const pw = 3; // padding
+  const ph = 2;
+  const tw = metrics.width;
+  const th = fontSize;
+  const rx = x - tw - pw * 2;
+  const ry = y;
+
+  // Background pill
+  const color = lossToColor(lossCp);
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.85;
+  const r = 3;
+  const w = tw + pw * 2;
+  const h = th + ph * 2;
+  ctx.beginPath();
+  ctx.roundRect(rx, ry, w, h, r);
+  ctx.fill();
+
+  // Text
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(text, rx + pw, ry + ph);
 }
 
 export function drawArrow(
@@ -211,6 +258,15 @@ export function renderArrows(state: OverlayState): void {
   for (let i = arrows.length - 1; i >= 0; i--) {
     drawArrow(ctx, arrows[i], virtualBoard, 1, state.displayFlipped, offsets[i]);
   }
+
+  // Draw cp loss label for the active PV line
+  if (state.lineVisible && state.pvDisplayDepth > 0 && state.currentResult?.evaluation?.top_moves?.length) {
+    const idx = Math.min(state.selectedLineIndex, state.currentResult.evaluation.top_moves.length - 1);
+    const move = state.currentResult.evaluation.top_moves[idx];
+    if (move.loss_cp > 0 && arrows[0]) {
+      drawLossLabel(ctx, arrows[0].from, move.loss_cp, virtualBoard, state.displayFlipped);
+    }
+  }
 }
 
 /** Draw arrows and eval bar on the full-screen overlay canvas */
@@ -275,6 +331,18 @@ export function renderVideoOverlay(state: OverlayState): void {
     const offsets = computeCurveOffsets(arrows);
     for (let i = arrows.length - 1; i >= 0; i--) {
       drawArrow(ctx, arrows[i], boardRect, arrowScale, state.displayFlipped, offsets[i]);
+    }
+
+    // Draw cp loss label for the active PV line
+    if (state.lineVisible && state.pvDisplayDepth > 0 && result.evaluation?.top_moves?.length) {
+      const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
+      const move = result.evaluation.top_moves[idx];
+      if (move.loss_cp > 0) {
+        const firstArrow = arrows[0];
+        if (firstArrow) {
+          drawLossLabel(ctx, firstArrow.from, move.loss_cp, boardRect, state.displayFlipped);
+        }
+      }
     }
   }
 
