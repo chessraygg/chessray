@@ -33,6 +33,14 @@ const ASSETS = [
       { name: 'chess-pieces.onnx', url: 'https://github.com/chessraygg/chessray/releases/download/v0.2.5/chess-pieces.onnx' },
     ],
   },
+  // PP-OCRv5 recognition model for label detection
+  {
+    dir: 'paddle-ocr',
+    files: [
+      { name: 'en_PP-OCRv5_mobile_rec_infer.onnx', url: 'https://github.com/nicegoodgoodnice/ppu-paddle-ocr-models/releases/download/v1.0.0-1/en_PP-OCRv5_mobile_rec_infer.onnx' },
+      { name: 'ppocrv5_en_dict.txt', url: 'https://github.com/nicegoodgoodnice/ppu-paddle-ocr-models/releases/download/v1.0.0-1/ppocrv5_en_dict.txt' },
+    ],
+  },
 ];
 
 function download(url, dest) {

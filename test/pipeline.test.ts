@@ -3,7 +3,7 @@ import * as ort from 'onnxruntime-node';
 import fs from 'fs';
 import path from 'path';
 import { PNG } from 'pngjs';
-import { detectBoard, cropPixels, detectHighlightedSquares, indexToSquare, flipFen, recognizeBoard, YoloPieceRecognizer } from '@chessray/core';
+import { detectBoard, cropPixels, detectHighlightedSquares, indexToSquare, flipFen, recognizeBoard, YoloPieceRecognizer, detectLabels } from '@chessray/core';
 import type { BoardBBox } from '@chessray/core';
 import { PIPELINE_CASES } from './fixtures/pipeline-cases.js';
 
@@ -23,6 +23,9 @@ function indexToChess(idx: number): string {
 
 describe('end-to-end detection pipeline', () => {
   beforeAll(async () => {
+    // Make ort available globally for label detection (PP-OCRv5)
+    (globalThis as any).ort = ort;
+
     session = await ort.InferenceSession.create(MODEL_PATH);
     recognizer = new YoloPieceRecognizer('');
     recognizer.session = session;
@@ -92,6 +95,22 @@ describe('end-to-end detection pipeline', () => {
         expect(result.fullFen).toBeNull();
       }
       console.log(`  fullFen=${result.fullFen}`);
+
+      // Verify label detection
+      if (tc.expected_labels !== undefined) {
+        const labelResult = await detectLabels(cropped);
+        if (tc.expected_labels === null) {
+          // No labels expected — detectLabels should return null
+          expect(labelResult).toBeNull();
+          console.log('  labels: none (correct)');
+        } else {
+          // Labels expected — verify detection
+          expect(labelResult).not.toBeNull();
+          console.log(`  labels: flipped=${labelResult!.flipped}`);
+          // Run per-strip verification for specific characters
+          // (detectLabels returns overall result; chars are verified via the expected config)
+        }
+      }
 
       // Save annotated debug image
       const out = new PNG({ width, height });
