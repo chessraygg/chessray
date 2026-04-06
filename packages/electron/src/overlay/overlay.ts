@@ -876,9 +876,14 @@ function initOverlay(): void {
       el.addEventListener('click', () => {
         const idx = parseInt((el as HTMLElement).dataset.line!, 10);
         // Toggle lock: click same = unlock, click different = lock
-        userLockedLine = userLockedLine === idx ? -1 : idx;
-        selectLine(idx);
-        updateCompactMoves();
+        if (userLockedLine === idx) {
+          userLockedLine = -1;
+          updateCompactMoves();
+        } else {
+          userLockedLine = idx;
+          selectLine(idx);
+          updateCompactMoves();
+        }
       });
       // Fit text to container width
       const label = el.querySelector('.compact-label') as HTMLElement;
