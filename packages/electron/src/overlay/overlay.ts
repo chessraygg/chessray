@@ -282,13 +282,10 @@ function initOverlay(): void {
           const ctx = state.canvas.getContext('2d');
           if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
         }
-        // Restore board grid to base position if animation was mid-flight
-        if ((window as any).__chessrayPvPlaying && pvCycleBaseFen) {
-          const grid = document.getElementById('cv-debug-grid');
-          if (grid) renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, []);
+        // Stop animation and restore board to original state
+        if ((window as any).__chessrayPvPlaying) {
+          pvCycleStop();
         }
-        // Stop cycle if actual board overlay is also hidden
-        if (!state.overlayVisible) pvCycleStop();
       }
     });
   }
@@ -321,10 +318,6 @@ function initOverlay(): void {
     arrowsBtn.addEventListener('click', () => {
       if (state.autoMode) return;
       state.arrowsVisible = !state.arrowsVisible;
-      if (state.arrowsVisible && state.lineVisible) {
-        state.lineVisible = false;
-        pvCycleStop();
-      }
       syncModeButtons();
       savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
       renderArrows(state);
@@ -337,9 +330,6 @@ function initOverlay(): void {
     lineBtn.addEventListener('click', () => {
       if (state.autoMode) return;
       state.lineVisible = !state.lineVisible;
-      if (state.lineVisible && state.arrowsVisible) {
-        state.arrowsVisible = false;
-      }
       // Reset grow on mode change
       if (state.lineVisible) { pvCycleStart(); } else { pvCycleStop(); }
       syncModeButtons();
@@ -392,14 +382,13 @@ function initOverlay(): void {
       }
 
       if (state.autoMode) {
-        // Switch to moves mode for autoDelaySec, then restart line cycle
+        // Show arrows, pause line, then restart line cycle
         state.arrowsVisible = true;
         state.lineVisible = false;
         syncModeButtons();
         renderVideoOverlay(state);
         pvCycleMovesTimer = setTimeout(() => {
           pvCycleMovesTimer = null;
-          state.arrowsVisible = false;
           state.lineVisible = true;
           syncModeButtons();
           pvCycleStart();
@@ -719,15 +708,14 @@ function initOverlay(): void {
     // Show top moves immediately
     state.arrowsVisible = true;
     state.lineVisible = false;
+    pvCycleStop();
     syncModeButtons();
     renderArrows(state);
     renderVideoOverlay(state);
 
-    // Switch to best line after delay
-    pvCycleStop();
+    // Add best line after delay (keep arrows visible)
     autoTimer = setTimeout(() => {
       autoTimer = null;
-      state.arrowsVisible = false;
       state.lineVisible = true;
       pvCycleStart();
       syncModeButtons();
@@ -753,7 +741,6 @@ function initOverlay(): void {
   // Set correct initial visual state for auto mode (arrows first)
   if (state.autoMode) {
     state.arrowsVisible = true;
-    state.lineVisible = false;
     syncModeButtons();
   }
   if (autoDelaySlider && autoDelayVal) {
@@ -783,25 +770,24 @@ function initOverlay(): void {
   // ── Collapse panel ──
   const collapseBtn = document.getElementById('cv-collapse-btn');
   const panelBody = document.getElementById('cv-panel-body');
-
-  function setCollapsed(c: boolean): void {
-    panelBody?.classList.toggle('hidden', c);
-    userPanel?.classList.toggle('collapsed', c);
-    collapseBtn?.classList.toggle('collapsed', c);
-    savePrefs({ collapsed: c });
-  }
-
   let collapsed = prefs.collapsed;
-  if (collapsed) setCollapsed(true);
-
-  collapseBtn?.addEventListener('click', () => { collapsed = !collapsed; setCollapsed(collapsed); });
 
   // ── Compact mode ──
   const compactBtn = document.getElementById('cv-compact-btn');
   const compactMovesEl = document.getElementById('cv-compact-moves');
   let compactMode = prefs.compactMode;
 
+  function setCollapsed(c: boolean): void {
+    if (c && compactMode) setCompactMode(false);
+    collapsed = c;
+    panelBody?.classList.toggle('hidden', c);
+    userPanel?.classList.toggle('collapsed', c);
+    collapseBtn?.classList.toggle('collapsed', c);
+    savePrefs({ collapsed: c });
+  }
+
   function setCompactMode(on: boolean): void {
+    if (on && collapsed) setCollapsed(false);
     compactMode = on;
     userPanel?.classList.toggle('compact', on);
     compactBtn?.classList.toggle('active', on);
@@ -809,6 +795,10 @@ function initOverlay(): void {
     savePrefs({ compactMode: on });
     if (on) updateCompactMoves();
   }
+
+  if (collapsed) setCollapsed(true);
+
+  collapseBtn?.addEventListener('click', () => { collapsed = !collapsed; setCollapsed(collapsed); });
 
   function updateCompactMoves(): void {
     if (!compactMode || !compactMovesEl) return;
@@ -833,7 +823,8 @@ function initOverlay(): void {
       const cg = parseInt(hex.slice(3, 5), 16);
       const cb = parseInt(hex.slice(5, 7), 16);
       const bg = `rgba(${cr},${cg},${cb},0.25)`;
-      html += `<div class="compact-move${selected}" data-line="${i}" style="background:${bg}">${label}</div>`;
+      const lossStr = move.loss_cp === 0 ? '' : ` −${(move.loss_cp / 100).toFixed(1)}`;
+      html += `<div class="compact-move${selected}" data-line="${i}" style="background:${bg}"><span class="compact-label">${label}${lossStr}</span></div>`;
     }
     compactMovesEl.innerHTML = html;
     compactMovesEl.querySelectorAll('.compact-move').forEach(el => {
@@ -842,6 +833,16 @@ function initOverlay(): void {
         selectLine(idx);
         updateCompactMoves();
       });
+      // Fit text to container width
+      const label = el.querySelector('.compact-label') as HTMLElement;
+      if (label) {
+        let size = 10;
+        label.style.fontSize = size + 'px';
+        while (label.scrollWidth > el.clientWidth && size > 5) {
+          size -= 0.5;
+          label.style.fontSize = size + 'px';
+        }
+      }
     });
   }
 

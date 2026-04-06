@@ -30,19 +30,23 @@ export interface OverlayState {
   } | null;
 }
 
-/** Get the arrows to display based on current mode (top moves vs PV line) */
+/** Get the arrows to display based on current mode (top moves, PV line, or both) */
 export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
-  if (state.lineVisible && state.currentResult?.evaluation?.top_moves?.length) {
-    const idx = Math.min(state.selectedLineIndex, state.currentResult.evaluation.top_moves.length - 1);
-    const pv = state.currentResult.evaluation.top_moves[idx].pv;
-    // Prefer highlight-based turn (always current) over eval FEN turn (may be stale)
-    const turn = state.currentResult.turn
-      ?? state.currentResult.evaluation.fen?.split(' ')[1] as 'w' | 'b'
-      ?? 'w';
-    return computePvArrows(pv, turn, state.pvDisplayDepth, state.pvWhiteColor, state.pvBlackColor);
-  }
-  // Filter arrows by centipawn loss threshold
-  return state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold);
+  const moveArrows = state.arrowsVisible
+    ? state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold)
+    : [];
+  const pvArrows = (state.lineVisible && state.currentResult?.evaluation?.top_moves?.length)
+    ? (() => {
+        const idx = Math.min(state.selectedLineIndex, state.currentResult!.evaluation!.top_moves.length - 1);
+        const pv = state.currentResult!.evaluation!.top_moves[idx].pv;
+        const turn = state.currentResult!.turn
+          ?? state.currentResult!.evaluation!.fen?.split(' ')[1] as 'w' | 'b'
+          ?? 'w';
+        return computePvArrows(pv, turn, state.pvDisplayDepth, state.pvWhiteColor, state.pvBlackColor);
+      })()
+    : [];
+  if (moveArrows.length && pvArrows.length) return [...pvArrows, ...moveArrows];
+  return pvArrows.length ? pvArrows : moveArrows;
 }
 
 export function drawArrow(
