@@ -833,7 +833,8 @@ function initOverlay(): void {
       const cg = parseInt(hex.slice(3, 5), 16);
       const cb = parseInt(hex.slice(5, 7), 16);
       const bg = `rgba(${cr},${cg},${cb},0.25)`;
-      html += `<div class="compact-move${selected}" data-line="${i}" style="background:${bg}">${label}</div>`;
+      const lossStr = move.loss_cp === 0 ? '' : ` −${(move.loss_cp / 100).toFixed(1)}`;
+      html += `<div class="compact-move${selected}" data-line="${i}" style="background:${bg}"><span class="compact-label">${label}${lossStr}</span></div>`;
     }
     compactMovesEl.innerHTML = html;
     compactMovesEl.querySelectorAll('.compact-move').forEach(el => {
@@ -842,6 +843,16 @@ function initOverlay(): void {
         selectLine(idx);
         updateCompactMoves();
       });
+      // Fit text to container width
+      const label = el.querySelector('.compact-label') as HTMLElement;
+      if (label) {
+        let size = 10;
+        label.style.fontSize = size + 'px';
+        while (label.scrollWidth > el.clientWidth && size > 5) {
+          size -= 0.5;
+          label.style.fontSize = size + 'px';
+        }
+      }
     });
   }
 
