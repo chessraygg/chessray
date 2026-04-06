@@ -346,6 +346,23 @@ canvas#video-overlay {
 
 /* ── Compact mode ── */
 
+.display-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 8px;
+}
+.display-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 9px/1 var(--sans);
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.display-toggle input { margin: 0; }
+.display-toggle input:checked + span { color: var(--text); }
+
 .panel.compact .top-bar { display: none; }
 .panel.compact .section-header { display: none; }
 .panel.compact .compact-moves { display: flex !important; }
