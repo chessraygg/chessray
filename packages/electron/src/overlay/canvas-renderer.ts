@@ -62,38 +62,32 @@ function drawLossLabel(
   let rank = parseInt(square[1], 10) - 1;
   if (displayFlipped) { file = 7 - file; rank = 7 - rank; }
 
-  // Position at top-right corner of the square
-  const x = board.x + file * squareW + squareW - 2;
-  const y = board.y + (7 - rank) * squareH + 2;
+  const text = (lossCp / 100).toFixed(1);
+  const fontSize = Math.max(7, Math.round(squareW * 0.28));
+  const r = fontSize * 0.65;
 
-  const text = `−${(lossCp / 100).toFixed(1)}`;
-  const fontSize = Math.max(8, Math.round(squareW * 0.22));
-  ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
-  const metrics = ctx.measureText(text);
-  const pw = 3; // padding
-  const ph = 2;
-  const tw = metrics.width;
-  const th = fontSize;
-  const rx = x - tw - pw * 2;
-  const ry = y;
+  // Position: top-right corner of square, inset by radius
+  const cx = board.x + (file + 1) * squareW - r - 1;
+  const cy = board.y + (7 - rank) * squareH + r + 1;
 
-  // Background pill
+  ctx.save();
   const color = lossToColor(lossCp);
-  ctx.fillStyle = color;
-  ctx.globalAlpha = 0.85;
-  const r = 3;
-  const w = tw + pw * 2;
-  const h = th + ph * 2;
+  ctx.globalAlpha = 0.8;
   ctx.beginPath();
-  ctx.roundRect(rx, ry, w, h, r);
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = color;
   ctx.fill();
 
-  // Text
+  // Contrast text
+  const hex = color.replace('#', '');
+  const lum = (parseInt(hex.substring(0, 2), 16) * 299 + parseInt(hex.substring(2, 4), 16) * 587 + parseInt(hex.substring(4, 6), 16) * 114) / 1000;
   ctx.globalAlpha = 1;
-  ctx.fillStyle = '#000';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText(text, rx + pw, ry + ph);
+  ctx.fillStyle = lum > 140 ? '#000' : '#fff';
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, cx, cy);
+  ctx.restore();
 }
 
 export function drawArrow(
