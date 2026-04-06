@@ -922,8 +922,11 @@ function initOverlay(): void {
 
   if (compactMode) setCompactMode(true);
   compactBtn?.addEventListener('click', () => setCompactMode(!compactMode));
-  // Double-click board to toggle compact mode
-  document.getElementById('cv-debug-grid')?.addEventListener('dblclick', () => {
+  // Double-click panel to toggle compact mode
+  userPanel?.addEventListener('dblclick', (e) => {
+    // Don't toggle on double-click of interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('input, button, .compact-move')) return;
     setCompactMode(!compactMode);
   });
 

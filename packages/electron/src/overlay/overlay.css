@@ -339,11 +339,8 @@ canvas#video-overlay {
 /* ── Compact mode ── */
 
 .panel.compact .top-bar { display: none; }
-.panel.compact .panel-body > *:not(.tracking-content) { display: none !important; }
-.panel.compact .tracking-content > *:not(.board-frame) { display: none !important; }
-.panel.compact .board-status { display: none; }
 .panel.compact .compact-moves { display: flex !important; }
-.panel.compact { padding: 4px; cursor: grab; }
+.panel.compact { padding: 4px; }
 
 .compact-moves {
   display: flex;
