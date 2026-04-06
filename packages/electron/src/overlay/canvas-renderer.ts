@@ -257,7 +257,7 @@ export function renderArrows(state: OverlayState): void {
   if (state.lineVisible && state.pvDisplayDepth > 0 && state.currentResult?.evaluation?.top_moves?.length) {
     const idx = Math.min(state.selectedLineIndex, state.currentResult.evaluation.top_moves.length - 1);
     const move = state.currentResult.evaluation.top_moves[idx];
-    if (move.loss_cp > 0 && arrows[0]) {
+    if (move.loss_cp >= 5 && arrows[0]) {
       drawLossLabel(ctx, arrows[0].from, move.loss_cp, virtualBoard, state.displayFlipped);
     }
   }
@@ -331,7 +331,7 @@ export function renderVideoOverlay(state: OverlayState): void {
     if (state.lineVisible && state.pvDisplayDepth > 0 && result.evaluation?.top_moves?.length) {
       const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
       const move = result.evaluation.top_moves[idx];
-      if (move.loss_cp > 0) {
+      if (move.loss_cp >= 5) {
         const firstArrow = arrows[0];
         if (firstArrow) {
           drawLossLabel(ctx, firstArrow.from, move.loss_cp, boardRect, state.displayFlipped);
