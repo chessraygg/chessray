@@ -34,6 +34,7 @@ export interface OverlayState {
 
 interface AnimatedArrow extends ArrowDescriptor {
   fadeOpacity: number; // current animated opacity (0→target)
+  progress: number; // 0→1 extension from source to target
   fading: 'in' | 'out' | 'steady';
 }
 
@@ -66,11 +67,11 @@ function updateAnimatedArrows(
     const key = arrowKey(a);
     const prev = prevMap.get(key);
     if (prev) {
-      // Update arrow properties, keep fade state
-      next.push({ ...a, fadeOpacity: prev.fadeOpacity, fading: prev.fadeOpacity >= a.opacity ? 'steady' : 'in' });
+      // Update arrow properties, keep animation state
+      next.push({ ...a, fadeOpacity: prev.fadeOpacity, progress: prev.progress, fading: prev.progress >= 1 ? 'steady' : 'in' });
     } else {
-      // New arrow — fade in
-      next.push({ ...a, fadeOpacity: 0, fading: 'in' });
+      // New arrow — extend from source
+      next.push({ ...a, fadeOpacity: a.opacity, progress: 0, fading: 'in' });
     }
   }
 
@@ -90,12 +91,12 @@ function updateAnimatedArrows(
       let needsTick = false;
       animState.animated = animState.animated.filter(a => {
         if (a.fading === 'in') {
-          a.fadeOpacity = Math.min(a.opacity, a.fadeOpacity + a.opacity * step);
-          if (a.fadeOpacity >= a.opacity) { a.fadeOpacity = a.opacity; a.fading = 'steady'; }
+          a.progress = Math.min(1, a.progress + step);
+          if (a.progress >= 1) { a.progress = 1; a.fading = 'steady'; }
           else needsTick = true;
         } else if (a.fading === 'out') {
           a.fadeOpacity = Math.max(0, a.fadeOpacity - a.opacity * step);
-          if (a.fadeOpacity <= 0) return false; // remove
+          if (a.fadeOpacity <= 0) return false;
           needsTick = true;
         }
         return true;
@@ -175,6 +176,7 @@ export function drawArrow(
   widthScale: number,
   displayFlipped: boolean,
   curveOffset: number = 0,
+  progress: number = 1,
 ): void {
   const squareW = board.width / 8;
   const squareH = board.height / 8;
@@ -193,8 +195,13 @@ export function drawArrow(
 
   const x1 = board.x + fromFile * squareW + squareW / 2;
   const y1 = board.y + (7 - fromRank) * squareH + squareH / 2;
-  const x2 = board.x + toFile * squareW + squareW / 2;
-  const y2 = board.y + (7 - toRank) * squareH + squareH / 2;
+  const fullX2 = board.x + toFile * squareW + squareW / 2;
+  const fullY2 = board.y + (7 - toRank) * squareH + squareH / 2;
+
+  // Interpolate endpoint based on progress (0 = at source, 1 = at target)
+  const t = Math.min(1, Math.max(0, progress));
+  const x2 = x1 + (fullX2 - x1) * t;
+  const y2 = y1 + (fullY2 - y1) * t;
 
   const lineWidth = arrow.width * widthScale;
   const headLength = lineWidth * 3;
@@ -253,8 +260,8 @@ export function drawArrow(
   ctx.closePath();
   ctx.fill();
 
-  // Draw label at midpoint of arrow
-  if (arrow.label) {
+  // Draw label at midpoint of arrow (only when fully extended)
+  if (arrow.label && t >= 1) {
     const fontSize = Math.max(8, lineWidth * 2);
     ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textAlign = 'center';
@@ -331,11 +338,11 @@ export function renderArrows(state: OverlayState): void {
   }
 
   const animated = updateAnimatedArrows(targetArrows, vboardArrowState, () => renderArrows(state));
-  const drawArrows = animated.map(a => ({ ...a, opacity: a.fadeOpacity }));
+  const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
 
-  const offsets = computeCurveOffsets(drawArrows);
-  for (let i = drawArrows.length - 1; i >= 0; i--) {
-    drawArrow(ctx, drawArrows[i], virtualBoard, 1, state.displayFlipped, offsets[i]);
+  const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
+  for (let i = drawList.length - 1; i >= 0; i--) {
+    drawArrow(ctx, drawList[i].arrow, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress);
   }
 
   // Draw cp loss label for the active PV line
@@ -407,12 +414,12 @@ export function renderVideoOverlay(state: OverlayState): void {
     const targetArrows = getActiveArrows(state);
     const animated = updateAnimatedArrows(targetArrows, videoArrowState, () => renderVideoOverlay(state));
     // Draw with animated opacity
-    const drawArrows = animated.map(a => ({ ...a, opacity: a.fadeOpacity }));
+    const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
     const arrowScale = (bw + bh) / 2 / 192;
 
-    const offsets = computeCurveOffsets(drawArrows);
-    for (let i = drawArrows.length - 1; i >= 0; i--) {
-      drawArrow(ctx, drawArrows[i], boardRect, arrowScale, state.displayFlipped, offsets[i]);
+    const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
+    for (let i = drawList.length - 1; i >= 0; i--) {
+      drawArrow(ctx, drawList[i].arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress);
     }
 
     // Draw cp loss label for the active PV line
