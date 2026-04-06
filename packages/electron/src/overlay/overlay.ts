@@ -633,8 +633,10 @@ function initOverlay(): void {
     if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
     if (pvCycleMovesTimer !== null) {
       clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null;
-      // Restore arrows state if stopped during interlude
+      // Restore mode state if stopped during interlude
       state.arrowsVisible = pvCycleArrowsWas;
+      state.lineVisible = true;
+      syncModeButtons();
     }
     const wasPlaying = (window as any).__chessrayPvPlaying;
     (window as any).__chessrayPvPlaying = false;
