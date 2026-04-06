@@ -350,6 +350,16 @@ canvas#video-overlay {
 .panel.compact .section-header { display: none; }
 .panel.compact .compact-moves { display: flex !important; }
 .panel.compact { padding: 4px; }
+.compact-hint { display: none; }
+.panel.compact .compact-hint {
+  display: block;
+  text-align: center;
+  font: 8px/1 var(--sans);
+  color: var(--text-faint);
+  opacity: 0.4;
+  padding: 3px 0 1px;
+  user-select: none;
+}
 
 .compact-moves {
   display: flex;
