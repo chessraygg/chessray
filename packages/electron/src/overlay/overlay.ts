@@ -218,7 +218,7 @@ function initOverlay(): void {
 
   // Restore visual state from prefs
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
-  if (state.canvas) state.canvas.style.display = state.overlayVisible ? '' : 'none';
+  if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
 
   // ── Inline debug section toggle (gear icon in top bar) ──
   const debugToggle = document.getElementById('cv-debug-toggle');
