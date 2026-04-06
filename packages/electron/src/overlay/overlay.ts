@@ -782,6 +782,7 @@ function initOverlay(): void {
   const panelBody = document.getElementById('cv-panel-body');
 
   function setCollapsed(c: boolean): void {
+    if (c && compactMode) setCompactMode(false);
     panelBody?.classList.toggle('hidden', c);
     userPanel?.classList.toggle('collapsed', c);
     collapseBtn?.classList.toggle('collapsed', c);
@@ -799,6 +800,7 @@ function initOverlay(): void {
   let compactMode = prefs.compactMode;
 
   function setCompactMode(on: boolean): void {
+    if (on && collapsed) { collapsed = false; setCollapsed(false); }
     compactMode = on;
     userPanel?.classList.toggle('compact', on);
     compactBtn?.classList.toggle('active', on);
