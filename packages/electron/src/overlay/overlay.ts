@@ -214,9 +214,14 @@ function initOverlay(): void {
     const section = (header as HTMLElement).dataset.section;
     if (!section) return;
     // Debug section starts collapsed
-    if (section === 'debug') header.classList.add('collapsed');
+    if (section === 'debug') {
+      header.classList.add('collapsed');
+      header.nextElementSibling?.classList.add('collapsed');
+    }
     header.addEventListener('click', () => {
       header.classList.toggle('collapsed');
+      const body = header.nextElementSibling;
+      body?.classList.toggle('collapsed');
     });
   });
 

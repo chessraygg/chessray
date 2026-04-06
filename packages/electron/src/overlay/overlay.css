@@ -152,7 +152,15 @@ canvas#video-overlay {
 .section-header.collapsed::before {
   content: '▸ ';
 }
-.section-header.collapsed + .section-body { display: none; }
+.section-header.collapsed + .section-body,
+.section-body.collapsed { display: none !important; }
+
+.section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0;
+}
 
 /* ── Inline debug section ── */
 
@@ -339,6 +347,7 @@ canvas#video-overlay {
 /* ── Compact mode ── */
 
 .panel.compact .top-bar { display: none; }
+.panel.compact .section-header { display: none; }
 .panel.compact .compact-moves { display: flex !important; }
 .panel.compact { padding: 4px; }
 
