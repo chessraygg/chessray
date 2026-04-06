@@ -582,32 +582,45 @@ function initOverlay(): void {
       }
     }, 500);
 
-    // Draw single arrow for the current move on virtual board canvas
+    // Animate arrow following piece movement (time-based, no DOM reads)
     if (state.canvas) {
-      const size = 200;
-      const dpr = window.devicePixelRatio || 1;
-      const effectiveDpr = dpr * (state.panelScale || 1);
-      const bufferSize = Math.ceil(size * effectiveDpr);
-      if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
-        state.canvas.width = bufferSize;
-        state.canvas.height = bufferSize;
-        state.canvas.style.width = `${size}px`;
-        state.canvas.style.height = `${size}px`;
-      }
-      const ctx = state.canvas.getContext('2d')!;
-      ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
-      ctx.clearRect(0, 0, size, size);
-
-      // Build a single arrow for the current move
       const turn = pvCycleBaseFen.split(' ')[1] || 'w';
       const isWhite = (step % 2 === 1) === (turn === 'w');
-      const arrow = {
+      const moveArrow = {
         from: fromSq, to: toSq,
         color: isWhite ? '#e5e5e5' : '#1a1a1a',
         width: 3, opacity: 0.8, loss_cp: 0,
         label: String(step),
       };
-      drawArrow(ctx, arrow, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, 1, true);
+      const TRANSITION_MS = 350; // matches CSS transition duration
+      const startTime = performance.now();
+
+      // ease-in-out approximation: 3t² - 2t³
+      function easeInOut(t: number): number { return t * t * (3 - 2 * t); }
+
+      function tickArrow(): void {
+        if (!state.canvas || !(window as any).__chessrayPvPlaying) return;
+        const elapsed = performance.now() - startTime;
+        const progress = easeInOut(Math.min(1, elapsed / TRANSITION_MS));
+
+        const size = 200;
+        const dpr = window.devicePixelRatio || 1;
+        const effectiveDpr = dpr * (state.panelScale || 1);
+        const bufferSize = Math.ceil(size * effectiveDpr);
+        if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
+          state.canvas.width = bufferSize;
+          state.canvas.height = bufferSize;
+          state.canvas.style.width = `${size}px`;
+          state.canvas.style.height = `${size}px`;
+        }
+        const ctx = state.canvas.getContext('2d')!;
+        ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
+        ctx.clearRect(0, 0, size, size);
+        drawArrow(ctx, moveArrow, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, progress, true);
+
+        if (progress < 1) requestAnimationFrame(tickArrow);
+      }
+      requestAnimationFrame(tickArrow);
     }
   }
 
