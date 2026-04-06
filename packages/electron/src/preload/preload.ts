@@ -54,6 +54,12 @@ const api = {
   onSetMaxDepth: (cb: (depth: number) => void) =>
     ipcRenderer.on('set-max-depth', (_e, depth: number) => cb(depth)),
 
+  // Change detection
+  setChangeDetect: (enabled: boolean) =>
+    ipcRenderer.send('set-change-detect', enabled),
+  onSetChangeDetect: (cb: (enabled: boolean) => void) =>
+    ipcRenderer.on('set-change-detect', (_e, enabled: boolean) => cb(enabled)),
+
   // Panel reset
   onResetPanelPosition: (cb: () => void) =>
     ipcRenderer.on('reset-panel-position', () => cb()),

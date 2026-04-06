@@ -21,6 +21,7 @@ declare global {
       onSourceVisibility: (cb: (visible: boolean) => void) => void;
       reopenPicker: () => void;
       setMaxDepth: (depth: number) => void;
+      setChangeDetect: (enabled: boolean) => void;
       onResetPanelPosition: (cb: () => void) => void;
       minimizeApp: () => void;
       closeApp: () => void;
@@ -732,6 +733,17 @@ function initOverlay(): void {
       maxDepthVal.textContent = String(depth);
       savePrefs({ maxDepth: depth });
       window.chessRay.setMaxDepth(depth);
+    });
+  }
+
+  // ── Change detection toggle ──
+  const changeDetectCheckbox = document.getElementById('cv-change-detect') as HTMLInputElement | null;
+  if (changeDetectCheckbox) {
+    changeDetectCheckbox.checked = prefs.changeDetect;
+    window.chessRay.setChangeDetect(prefs.changeDetect);
+    changeDetectCheckbox.addEventListener('change', () => {
+      savePrefs({ changeDetect: changeDetectCheckbox.checked });
+      window.chessRay.setChangeDetect(changeDetectCheckbox.checked);
     });
   }
 
