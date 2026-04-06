@@ -197,24 +197,13 @@ function initOverlay(): void {
   setupResizeGrip('cv-resize-grip-tl', true, true);      // anchor bottom-right
 
   // ── Zoom controls ──
-  const zoomLabel = document.getElementById('cv-zoom-label');
-  const zoomSlider = document.getElementById('cv-zoom-slider') as HTMLInputElement | null;
-
-  function updateZoomUI(): void {
-    const pct = Math.round(panelScale * 100);
-    if (zoomLabel) zoomLabel.textContent = `${pct}%`;
-    if (zoomSlider) zoomSlider.value = String(pct);
-  }
-  updateZoomUI();
-
   function setZoom(scale: number): void {
     panelScale = Math.min(4, Math.max(0.5, scale));
-    applyScale(); updateZoomUI(); savePrefs({ panelScale });
+    applyScale(); savePrefs({ panelScale });
   }
 
   document.getElementById('cv-zoom-in')?.addEventListener('click', () => setZoom(panelScale + 0.1));
   document.getElementById('cv-zoom-out')?.addEventListener('click', () => setZoom(panelScale - 0.1));
-  zoomSlider?.addEventListener('input', () => setZoom(parseInt(zoomSlider.value, 10) / 100));
 
   // Restore visual state from prefs
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
