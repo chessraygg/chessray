@@ -364,6 +364,48 @@ function initOverlay(): void {
   let pvCyclePv: string[] = [];
 
   let pvCycleMovesTimer: ReturnType<typeof setTimeout> | null = null;
+  let pvCycleLineIndex = 0;
+
+  /** Get line indices eligible for cycling (filtered by loss threshold) */
+  function getCycleLineIndices(): number[] {
+    const moves = state.currentResult?.evaluation?.top_moves;
+    if (!moves?.length) return [];
+    const indices: number[] = [];
+    for (let i = 0; i < moves.length; i++) {
+      if (moves[i].loss_cp <= state.lossThreshold) indices.push(i);
+    }
+    return indices;
+  }
+
+  let pvCycleArrowsWas = false; // remember arrows state before interlude
+
+  /** Advance to next line, show moves in between, then start animating */
+  function pvCycleNextLine(): void {
+    const indices = getCycleLineIndices();
+    if (indices.length === 0) return;
+
+    // Advance to next line in the cycle
+    const curPos = indices.indexOf(pvCycleLineIndex);
+    const nextPos = (curPos + 1) % indices.length;
+    pvCycleLineIndex = indices[nextPos];
+    state.selectedLineIndex = pvCycleLineIndex;
+
+    // Show moves briefly between lines
+    pvCycleArrowsWas = state.arrowsVisible;
+    state.arrowsVisible = true;
+    state.lineVisible = false;
+    syncModeButtons();
+    renderVideoOverlay(state);
+    updateCompactMoves();
+
+    pvCycleMovesTimer = setTimeout(() => {
+      pvCycleMovesTimer = null;
+      state.arrowsVisible = pvCycleArrowsWas;
+      state.lineVisible = true;
+      syncModeButtons();
+      pvCycleStartCurrentLine();
+    }, autoDelaySec * 1000);
+  }
 
   function pvCycleStep(): void {
     if (state.pvDisplayDepth >= state.pvDepth || state.pvDisplayDepth >= pvCyclePv.length) {
@@ -381,23 +423,8 @@ function initOverlay(): void {
         }
       }
 
-      if (state.autoMode) {
-        // Show arrows, pause line, then restart line cycle
-        state.arrowsVisible = true;
-        state.lineVisible = false;
-        syncModeButtons();
-        renderVideoOverlay(state);
-        pvCycleMovesTimer = setTimeout(() => {
-          pvCycleMovesTimer = null;
-          state.lineVisible = true;
-          syncModeButtons();
-          pvCycleStart();
-        }, autoDelaySec * 1000);
-      } else {
-        // Non-auto: just loop the line cycle
-        renderVideoOverlay(state);
-        pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
-      }
+      // Advance to next line (with moves interlude)
+      pvCycleNextLine();
       return;
     }
 
@@ -540,13 +567,13 @@ function initOverlay(): void {
     }
   }
 
-  /** Start the unified cycle from step 1 */
-  function pvCycleStart(): void {
-    pvCycleStop();
+  /** Start animating the current pvCycleLineIndex */
+  function pvCycleStartCurrentLine(): void {
+    if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
     if (!state.lineVisible) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) return;
-    const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
+    const idx = Math.min(pvCycleLineIndex, result.evaluation.top_moves.length - 1);
     const pv = result.evaluation.top_moves[idx].pv;
     const baseFen = result.evaluation.fen;
     if (!baseFen || pv.length === 0) return;
@@ -565,12 +592,19 @@ function initOverlay(): void {
     pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
   }
 
+  /** Start the unified cycle from the selected line */
+  function pvCycleStart(): void {
+    pvCycleStop();
+    pvCycleLineIndex = state.selectedLineIndex;
+    pvCycleStartCurrentLine();
+  }
+
   /** Continue if displayed moves match, otherwise restart */
   function pvCycleContinue(): void {
     if (!state.lineVisible) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) return;
-    const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
+    const idx = Math.min(pvCycleLineIndex, result.evaluation.top_moves.length - 1);
     const newPv = result.evaluation.top_moves[idx].pv;
     const displayedMatch = state.pvDisplayDepth <= newPv.length &&
       pvCycleLastPv.slice(0, state.pvDisplayDepth).every((m, i) => m === newPv[i]);
@@ -585,7 +619,11 @@ function initOverlay(): void {
 
   function pvCycleStop(): void {
     if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
-    if (pvCycleMovesTimer !== null) { clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null; }
+    if (pvCycleMovesTimer !== null) {
+      clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null;
+      // Restore arrows state if stopped during interlude
+      state.arrowsVisible = pvCycleArrowsWas;
+    }
     const wasPlaying = (window as any).__chessrayPvPlaying;
     (window as any).__chessrayPvPlaying = false;
     const grid = document.getElementById('cv-debug-grid');
@@ -713,9 +751,10 @@ function initOverlay(): void {
     renderArrows(state);
     renderVideoOverlay(state);
 
-    // Add best line after delay (keep arrows visible)
+    // Switch to line after delay (hide moves)
     autoTimer = setTimeout(() => {
       autoTimer = null;
+      state.arrowsVisible = false;
       state.lineVisible = true;
       pvCycleStart();
       syncModeButtons();
