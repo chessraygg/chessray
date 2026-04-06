@@ -768,7 +768,7 @@ function initOverlay(): void {
 
   function resetAutoTimer(): void {
     if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
-    if (!state.autoMode || !state.overlayVisible) return;
+    if (!state.autoMode || (!state.overlayVisible && !state.vboardOverlayVisible)) return;
 
     // Show top moves immediately
     state.arrowsVisible = true;
