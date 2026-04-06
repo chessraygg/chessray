@@ -30,6 +30,84 @@ export interface OverlayState {
   } | null;
 }
 
+// ── Arrow fade animation ──
+
+interface AnimatedArrow extends ArrowDescriptor {
+  fadeOpacity: number; // current animated opacity (0→target)
+  fading: 'in' | 'out' | 'steady';
+}
+
+const FADE_DURATION = 200; // ms
+const FADE_STEP = 16; // ~60fps
+
+// Separate animation states for video overlay and virtual board
+const videoArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
+const vboardArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
+
+function arrowKey(a: ArrowDescriptor): string {
+  return `${a.from}-${a.to}-${a.color}`;
+}
+
+function updateAnimatedArrows(
+  target: ArrowDescriptor[],
+  animState: { animated: AnimatedArrow[]; timer: any },
+  onTick: () => void,
+): AnimatedArrow[] {
+  const targetMap = new Map<string, ArrowDescriptor>();
+  for (const a of target) targetMap.set(arrowKey(a), a);
+
+  const prevMap = new Map<string, AnimatedArrow>();
+  for (const a of animState.animated) prevMap.set(arrowKey(a), a);
+
+  const next: AnimatedArrow[] = [];
+
+  // Existing or new arrows
+  for (const a of target) {
+    const key = arrowKey(a);
+    const prev = prevMap.get(key);
+    if (prev) {
+      // Update arrow properties, keep fade state
+      next.push({ ...a, fadeOpacity: prev.fadeOpacity, fading: prev.fadeOpacity >= a.opacity ? 'steady' : 'in' });
+    } else {
+      // New arrow — fade in
+      next.push({ ...a, fadeOpacity: 0, fading: 'in' });
+    }
+  }
+
+  // Removed arrows — fade out
+  for (const a of animState.animated) {
+    if (!targetMap.has(arrowKey(a)) && a.fadeOpacity > 0) {
+      next.push({ ...a, fading: 'out' });
+    }
+  }
+
+  animState.animated = next;
+
+  // Start tick loop if not running
+  if (!animState.timer && next.some(a => a.fading !== 'steady')) {
+    const step = FADE_DURATION > 0 ? (FADE_STEP / FADE_DURATION) : 1;
+    animState.timer = setInterval(() => {
+      let needsTick = false;
+      animState.animated = animState.animated.filter(a => {
+        if (a.fading === 'in') {
+          a.fadeOpacity = Math.min(a.opacity, a.fadeOpacity + a.opacity * step);
+          if (a.fadeOpacity >= a.opacity) { a.fadeOpacity = a.opacity; a.fading = 'steady'; }
+          else needsTick = true;
+        } else if (a.fading === 'out') {
+          a.fadeOpacity = Math.max(0, a.fadeOpacity - a.opacity * step);
+          if (a.fadeOpacity <= 0) return false; // remove
+          needsTick = true;
+        }
+        return true;
+      });
+      onTick();
+      if (!needsTick) { clearInterval(animState.timer); animState.timer = 0; }
+    }, FADE_STEP);
+  }
+
+  return animState.animated;
+}
+
 /** Get the arrows to display based on current mode (top moves, PV line, or both) */
 export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
   const moveArrows = state.arrowsVisible
@@ -244,21 +322,28 @@ export function renderArrows(state: OverlayState): void {
     return;
   }
 
-  const arrows = getActiveArrows(state);
+  const targetArrows = getActiveArrows(state);
 
-  if (arrows.length === 0) return;
+  if (targetArrows.length === 0) {
+    vboardArrowState.animated = [];
+    if (vboardArrowState.timer) { clearInterval(vboardArrowState.timer); vboardArrowState.timer = 0; }
+    return;
+  }
 
-  const offsets = computeCurveOffsets(arrows);
-  for (let i = arrows.length - 1; i >= 0; i--) {
-    drawArrow(ctx, arrows[i], virtualBoard, 1, state.displayFlipped, offsets[i]);
+  const animated = updateAnimatedArrows(targetArrows, vboardArrowState, () => renderArrows(state));
+  const drawArrows = animated.map(a => ({ ...a, opacity: a.fadeOpacity }));
+
+  const offsets = computeCurveOffsets(drawArrows);
+  for (let i = drawArrows.length - 1; i >= 0; i--) {
+    drawArrow(ctx, drawArrows[i], virtualBoard, 1, state.displayFlipped, offsets[i]);
   }
 
   // Draw cp loss label for the active PV line
   if (state.lineVisible && state.pvDisplayDepth > 0 && state.currentResult?.evaluation?.top_moves?.length) {
     const idx = Math.min(state.selectedLineIndex, state.currentResult.evaluation.top_moves.length - 1);
     const move = state.currentResult.evaluation.top_moves[idx];
-    if (move.loss_cp >= 5 && arrows[0]) {
-      drawLossLabel(ctx, arrows[0].from, move.loss_cp, virtualBoard, state.displayFlipped);
+    if (move.loss_cp >= 5 && targetArrows[0]) {
+      drawLossLabel(ctx, targetArrows[0].from, move.loss_cp, virtualBoard, state.displayFlipped);
     }
   }
 }
@@ -319,12 +404,15 @@ export function renderVideoOverlay(state: OverlayState): void {
   }
 
   if (state.arrowsVisible || state.lineVisible) {
-    const arrows = getActiveArrows(state);
+    const targetArrows = getActiveArrows(state);
+    const animated = updateAnimatedArrows(targetArrows, videoArrowState, () => renderVideoOverlay(state));
+    // Draw with animated opacity
+    const drawArrows = animated.map(a => ({ ...a, opacity: a.fadeOpacity }));
     const arrowScale = (bw + bh) / 2 / 192;
 
-    const offsets = computeCurveOffsets(arrows);
-    for (let i = arrows.length - 1; i >= 0; i--) {
-      drawArrow(ctx, arrows[i], boardRect, arrowScale, state.displayFlipped, offsets[i]);
+    const offsets = computeCurveOffsets(drawArrows);
+    for (let i = drawArrows.length - 1; i >= 0; i--) {
+      drawArrow(ctx, drawArrows[i], boardRect, arrowScale, state.displayFlipped, offsets[i]);
     }
 
     // Draw cp loss label for the active PV line
@@ -332,12 +420,16 @@ export function renderVideoOverlay(state: OverlayState): void {
       const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
       const move = result.evaluation.top_moves[idx];
       if (move.loss_cp >= 5) {
-        const firstArrow = arrows[0];
+        const firstArrow = targetArrows[0];
         if (firstArrow) {
           drawLossLabel(ctx, firstArrow.from, move.loss_cp, boardRect, state.displayFlipped);
         }
       }
     }
+  } else {
+    // Clear animation state when arrows are hidden
+    videoArrowState.animated = [];
+    if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
   }
 
   // Eval bar
