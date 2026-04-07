@@ -30,6 +30,85 @@ export interface OverlayState {
   } | null;
 }
 
+// ── Arrow fade animation ──
+
+interface AnimatedArrow extends ArrowDescriptor {
+  fadeOpacity: number; // current animated opacity (0→target)
+  progress: number; // 0→1 extension from source to target
+  fading: 'in' | 'out' | 'steady';
+}
+
+const FADE_DURATION = 200; // ms
+const FADE_STEP = 16; // ~60fps
+
+// Separate animation states for video overlay and virtual board
+const videoArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
+const vboardArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
+
+function arrowKey(a: ArrowDescriptor): string {
+  return `${a.from}-${a.to}-${a.color}`;
+}
+
+function updateAnimatedArrows(
+  target: ArrowDescriptor[],
+  animState: { animated: AnimatedArrow[]; timer: any },
+  onTick: () => void,
+): AnimatedArrow[] {
+  const targetMap = new Map<string, ArrowDescriptor>();
+  for (const a of target) targetMap.set(arrowKey(a), a);
+
+  const prevMap = new Map<string, AnimatedArrow>();
+  for (const a of animState.animated) prevMap.set(arrowKey(a), a);
+
+  const next: AnimatedArrow[] = [];
+
+  // Existing or new arrows
+  for (const a of target) {
+    const key = arrowKey(a);
+    const prev = prevMap.get(key);
+    if (prev) {
+      // Update arrow properties, keep animation state
+      next.push({ ...a, fadeOpacity: prev.fadeOpacity, progress: prev.progress, fading: prev.progress >= 1 ? 'steady' : 'in' });
+    } else {
+      // New arrow — extend from source
+      next.push({ ...a, fadeOpacity: a.opacity, progress: 0, fading: 'in' });
+    }
+  }
+
+  // Removed arrows — fade out
+  for (const a of animState.animated) {
+    if (!targetMap.has(arrowKey(a)) && a.fadeOpacity > 0) {
+      next.push({ ...a, fading: 'out' });
+    }
+  }
+
+  animState.animated = next;
+
+  // Start tick loop if not running
+  if (!animState.timer && next.some(a => a.fading !== 'steady')) {
+    const step = FADE_DURATION > 0 ? (FADE_STEP / FADE_DURATION) : 1;
+    animState.timer = setInterval(() => {
+      let needsTick = false;
+      animState.animated = animState.animated.filter(a => {
+        if (a.fading === 'in') {
+          a.progress = Math.min(1, a.progress + step);
+          if (a.progress >= 1) { a.progress = 1; a.fading = 'steady'; }
+          else needsTick = true;
+        } else if (a.fading === 'out') {
+          a.fadeOpacity = Math.max(0, a.fadeOpacity - a.opacity * step);
+          if (a.fadeOpacity <= 0) return false;
+          needsTick = true;
+        }
+        return true;
+      });
+      onTick();
+      if (!needsTick) { clearInterval(animState.timer); animState.timer = 0; }
+    }, FADE_STEP);
+  }
+
+  return animState.animated;
+}
+
 /** Get the arrows to display based on current mode (top moves, PV line, or both) */
 export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
   const moveArrows = state.arrowsVisible
@@ -97,6 +176,8 @@ export function drawArrow(
   widthScale: number,
   displayFlipped: boolean,
   curveOffset: number = 0,
+  progress: number = 1,
+  noArrowhead: boolean = false,
 ): void {
   const squareW = board.width / 8;
   const squareH = board.height / 8;
@@ -115,8 +196,13 @@ export function drawArrow(
 
   const x1 = board.x + fromFile * squareW + squareW / 2;
   const y1 = board.y + (7 - fromRank) * squareH + squareH / 2;
-  const x2 = board.x + toFile * squareW + squareW / 2;
-  const y2 = board.y + (7 - toRank) * squareH + squareH / 2;
+  const fullX2 = board.x + toFile * squareW + squareW / 2;
+  const fullY2 = board.y + (7 - toRank) * squareH + squareH / 2;
+
+  // Interpolate endpoint based on progress (0 = at source, 1 = at target)
+  const t = Math.min(1, Math.max(0, progress));
+  const x2 = x1 + (fullX2 - x1) * t;
+  const y2 = y1 + (fullY2 - y1) * t;
 
   const lineWidth = arrow.width * widthScale;
   const headLength = lineWidth * 3;
@@ -138,16 +224,16 @@ export function drawArrow(
   // For a quadratic bezier, the tangent at t=1 is the direction from control point to end.
   const tipAngle = Math.atan2(y2 - my, x2 - mx);
 
-  // Shorten the curve so it ends before the arrowhead
-  const tipBackX = x2 - headLength * Math.cos(tipAngle);
-  const tipBackY = y2 - headLength * Math.sin(tipAngle);
+  // Shorten the curve so it ends before the arrowhead (unless no arrowhead)
+  const endX = noArrowhead ? x2 : x2 - headLength * Math.cos(tipAngle);
+  const endY = noArrowhead ? y2 : y2 - headLength * Math.sin(tipAngle);
 
   ctx.save();
   ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
 
-  // Gradient stroke: transparent at source, full opacity at arrowhead
-  const grad = ctx.createLinearGradient(x1, y1, tipBackX, tipBackY);
+  // Gradient stroke: transparent at source, full opacity at tip
+  const grad = ctx.createLinearGradient(x1, y1, endX, endY);
   const r = parseInt(arrow.color.slice(1, 3), 16);
   const g = parseInt(arrow.color.slice(3, 5), 16);
   const b = parseInt(arrow.color.slice(5, 7), 16);
@@ -159,24 +245,26 @@ export function drawArrow(
   ctx.beginPath();
   ctx.moveTo(x1, y1);
   if (curveOffset === 0) {
-    ctx.lineTo(tipBackX, tipBackY);
+    ctx.lineTo(endX, endY);
   } else {
-    ctx.quadraticCurveTo(mx, my, tipBackX, tipBackY);
+    ctx.quadraticCurveTo(mx, my, endX, endY);
   }
   ctx.stroke();
 
-  // Draw the arrowhead at full opacity
-  ctx.globalAlpha = arrow.opacity;
-  ctx.fillStyle = arrow.color;
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - headLength * Math.cos(tipAngle - Math.PI / 6), y2 - headLength * Math.sin(tipAngle - Math.PI / 6));
-  ctx.lineTo(x2 - headLength * Math.cos(tipAngle + Math.PI / 6), y2 - headLength * Math.sin(tipAngle + Math.PI / 6));
-  ctx.closePath();
-  ctx.fill();
+  // Draw the arrowhead at full opacity (unless disabled)
+  if (!noArrowhead) {
+    ctx.globalAlpha = arrow.opacity;
+    ctx.fillStyle = arrow.color;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - headLength * Math.cos(tipAngle - Math.PI / 6), y2 - headLength * Math.sin(tipAngle - Math.PI / 6));
+    ctx.lineTo(x2 - headLength * Math.cos(tipAngle + Math.PI / 6), y2 - headLength * Math.sin(tipAngle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+  }
 
-  // Draw label at midpoint of arrow
-  if (arrow.label) {
+  // Draw label at midpoint of arrow (only when fully extended)
+  if (arrow.label && t >= 1) {
     const fontSize = Math.max(8, lineWidth * 2);
     ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textAlign = 'center';
@@ -244,21 +332,29 @@ export function renderArrows(state: OverlayState): void {
     return;
   }
 
-  const arrows = getActiveArrows(state);
+  const targetArrows = getActiveArrows(state);
 
-  if (arrows.length === 0) return;
+  if (targetArrows.length === 0) {
+    vboardArrowState.animated = [];
+    if (vboardArrowState.timer) { clearInterval(vboardArrowState.timer); vboardArrowState.timer = 0; }
+    return;
+  }
 
-  const offsets = computeCurveOffsets(arrows);
-  for (let i = arrows.length - 1; i >= 0; i--) {
-    drawArrow(ctx, arrows[i], virtualBoard, 1, state.displayFlipped, offsets[i]);
+  const animated = updateAnimatedArrows(targetArrows, vboardArrowState, () => renderArrows(state));
+  const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
+
+  const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
+  for (let i = drawList.length - 1; i >= 0; i--) {
+    const isLineArrow = !!drawList[i].arrow.label;
+    drawArrow(ctx, drawList[i].arrow, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow);
   }
 
   // Draw cp loss label for the active PV line
   if (state.lineVisible && state.pvDisplayDepth > 0 && state.currentResult?.evaluation?.top_moves?.length) {
     const idx = Math.min(state.selectedLineIndex, state.currentResult.evaluation.top_moves.length - 1);
     const move = state.currentResult.evaluation.top_moves[idx];
-    if (move.loss_cp >= 5 && arrows[0]) {
-      drawLossLabel(ctx, arrows[0].from, move.loss_cp, virtualBoard, state.displayFlipped);
+    if (move.loss_cp >= 5 && targetArrows[0]) {
+      drawLossLabel(ctx, targetArrows[0].from, move.loss_cp, virtualBoard, state.displayFlipped);
     }
   }
 }
@@ -319,12 +415,15 @@ export function renderVideoOverlay(state: OverlayState): void {
   }
 
   if (state.arrowsVisible || state.lineVisible) {
-    const arrows = getActiveArrows(state);
+    const targetArrows = getActiveArrows(state);
+    const animated = updateAnimatedArrows(targetArrows, videoArrowState, () => renderVideoOverlay(state));
+    // Draw with animated opacity
+    const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
     const arrowScale = (bw + bh) / 2 / 192;
 
-    const offsets = computeCurveOffsets(arrows);
-    for (let i = arrows.length - 1; i >= 0; i--) {
-      drawArrow(ctx, arrows[i], boardRect, arrowScale, state.displayFlipped, offsets[i]);
+    const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
+    for (let i = drawList.length - 1; i >= 0; i--) {
+      drawArrow(ctx, drawList[i].arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress);
     }
 
     // Draw cp loss label for the active PV line
@@ -332,12 +431,16 @@ export function renderVideoOverlay(state: OverlayState): void {
       const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
       const move = result.evaluation.top_moves[idx];
       if (move.loss_cp >= 5) {
-        const firstArrow = arrows[0];
+        const firstArrow = targetArrows[0];
         if (firstArrow) {
           drawLossLabel(ctx, firstArrow.from, move.loss_cp, boardRect, state.displayFlipped);
         }
       }
     }
+  } else {
+    // Clear animation state when arrows are hidden
+    videoArrowState.animated = [];
+    if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
   }
 
   // Eval bar

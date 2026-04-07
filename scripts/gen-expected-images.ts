@@ -4,7 +4,7 @@
  * Reads test/fixtures/pipeline-cases.ts and produces annotated PNGs in
  * test/fixtures/expected-images/ showing:
  *   - Left: original screenshot with magenta bbox and cyan grid
- *   - Right: virtual board rendered from expectedFen with piece symbols and highlights
+ *   - Right: virtual board rendered from expectedFen with SVG pieces and highlights
  *
  * Usage:
  *   npm run gen-expected            # regenerate all
@@ -15,6 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { PNG } from 'pngjs';
+import { Resvg } from '@resvg/resvg-js';
 import { PIPELINE_CASES, type PipelineTestCase } from '../test/fixtures/pipeline-cases.js';
 import { buildFullFen, flipFen } from '@chessray/core';
 
@@ -27,121 +28,39 @@ const LIGHT_SQ = [240, 217, 181] as const;  // #f0d9b5
 const DARK_SQ = [181, 136, 99] as const;    // #b58863
 const HIGHLIGHT_LIGHT = [247, 247, 105] as const;  // #f7f769
 const HIGHLIGHT_DARK = [218, 202, 58] as const;    // #daca3a
-const WHITE_PIECE = [255, 255, 255] as const;
-const BLACK_PIECE = [0, 0, 0] as const;
-const PIECE_OUTLINE = [80, 80, 80] as const;
 
-// 16x16 piece shape bitmaps for recognizable chess figures
-const PIECE_SHAPES: Record<string, string[]> = {
-  K: [
-    '0000000110000000',
-    '0000001111000000',
-    '0000000110000000',
-    '0000011111100000',
-    '0000001111000000',
-    '0000011111100000',
-    '0001111111111000',
-    '0011111111111100',
-    '0011100110011100',
-    '0011000110001100',
-    '0011100110011100',
-    '0011111111111100',
-    '0001111111111000',
-    '0011111111111100',
-    '0111111111111110',
-    '1111111111111111',
-  ],
-  Q: [
-    '0100000110000010',
-    '0110001111000110',
-    '0111001111001110',
-    '0011101111011100',
-    '0011111111111100',
-    '0001111111111000',
-    '0000111111110000',
-    '0000011111100000',
-    '0000111111110000',
-    '0001111111111000',
-    '0011111111111100',
-    '0011111111111100',
-    '0001111111111000',
-    '0011111111111100',
-    '0111111111111110',
-    '1111111111111111',
-  ],
-  R: [
-    '0110011001100110',
-    '0111111111111110',
-    '0111111111111110',
-    '0011111111111100',
-    '0001111111111000',
-    '0000111111110000',
-    '0000111111110000',
-    '0000111111110000',
-    '0000111111110000',
-    '0000111111110000',
-    '0001111111111000',
-    '0011111111111100',
-    '0011111111111100',
-    '0011111111111100',
-    '0111111111111110',
-    '1111111111111111',
-  ],
-  B: [
-    '0000000110000000',
-    '0000001111000000',
-    '0000011111100000',
-    '0000111111110000',
-    '0000111111110000',
-    '0000011111100000',
-    '0000001111000000',
-    '0000011111100000',
-    '0000111111110000',
-    '0001111111111000',
-    '0001111111111000',
-    '0000111111110000',
-    '0001111111111000',
-    '0011111111111100',
-    '0111111111111110',
-    '1111111111111111',
-  ],
-  N: [
-    '0000111100000000',
-    '0001111110000000',
-    '0011111111000000',
-    '0111111111100000',
-    '1111111111110000',
-    '1111111111111000',
-    '0000111111111100',
-    '0000011111111000',
-    '0000001111110000',
-    '0000011111100000',
-    '0000111111110000',
-    '0001111111111000',
-    '0011111111111100',
-    '0011111111111100',
-    '0111111111111110',
-    '1111111111111111',
-  ],
-  P: [
-    '0000000000000000',
-    '0000000000000000',
-    '0000001111000000',
-    '0000011111100000',
-    '0000011111100000',
-    '0000011111100000',
-    '0000001111000000',
-    '0000001111000000',
-    '0000011111100000',
-    '0000111111110000',
-    '0001111111111000',
-    '0001111111111000',
-    '0001111111111000',
-    '0011111111111100',
-    '0111111111111110',
-    '1111111111111111',
-  ],
+// Inline SVG chess pieces — cburnett set from lichess (CC BY-SA 3.0).
+// Source: https://github.com/lichess-org/lila/tree/master/public/piece/cburnett
+const PIECE_SVGS: Record<string, string> = {
+  K: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path stroke-linejoin="miter" d="M22.5 11.63V6M20 8h5"/><path fill="#fff" stroke-linecap="butt" stroke-linejoin="miter" d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5"/><path fill="#fff" d="M11.5 37a22.3 22.3 0 0 0 21 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-3.5-7.5-13-10.5-16-4-3 6 5 10 5 10z"/><path d="M11.5 30c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0"/></g></svg>`,
+  Q: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><g fill="#fff" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M8 12a2 2 0 1 1-4 0 2 2 0 1 1 4 0m16.5-4.5a2 2 0 1 1-4 0 2 2 0 1 1 4 0M41 12a2 2 0 1 1-4 0 2 2 0 1 1 4 0M16 8.5a2 2 0 1 1-4 0 2 2 0 1 1 4 0M33 9a2 2 0 1 1-4 0 2 2 0 1 1 4 0"/><path stroke-linecap="butt" d="M9 26c8.5-1.5 21-1.5 27 0l2-12-7 11V11l-5.5 13.5-3-15-3 15-5.5-14V25L7 14z"/><path stroke-linecap="butt" d="M9 26c0 2 1.5 2 2.5 4 1 1.5 1 1 .5 3.5-1.5 1-1.5 2.5-1.5 2.5-1.5 1.5.5 2.5.5 2.5 6.5 1 16.5 1 23 0 0 0 1.5-1 0-2.5 0 0 .5-1.5-1-2.5-.5-2.5-.5-2 .5-3.5 1-2 2.5-2 2.5-4-8.5-1.5-18.5-1.5-27 0z"/><path fill="none" d="M11.5 30c3.5-1 18.5-1 22 0M12 33.5c6-1 15-1 21 0"/></g></svg>`,
+  R: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><g fill="#fff" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path stroke-linecap="butt" d="M9 39h27v-3H9zm3-3v-4h21v4zm-1-22V9h4v2h5V9h5v2h5V9h4v5"/><path d="m34 14-3 3H14l-3-3"/><path stroke-linecap="butt" stroke-linejoin="miter" d="M31 17v12.5H14V17"/><path d="m31 29.5 1.5 2.5h-20l1.5-2.5"/><path fill="none" stroke-linejoin="miter" d="M11 14h23"/></g></svg>`,
+  B: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><g fill="#fff" stroke-linecap="butt"><path d="M9 36c3.39-.97 10.11.43 13.5-2 3.39 2.43 10.11 1.03 13.5 2 0 0 1.65.54 3 2-.68.97-1.65.99-3 .5-3.39-.97-10.11.46-13.5-1-3.39 1.46-10.11.03-13.5 1-1.35.49-2.32.47-3-.5 1.35-1.94 3-2 3-2z"/><path d="M15 32c2.5 2.5 12.5 2.5 15 0 .5-1.5 0-2 0-2 0-2.5-2.5-4-2.5-4 5.5-1.5 6-11.5-5-15.5-11 4-10.5 14-5 15.5 0 0-2.5 1.5-2.5 4 0 0-.5.5 0 2z"/><path d="M25 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0z"/></g><path stroke-linejoin="miter" d="M17.5 26h10M15 30h15m-7.5-14.5v5M20 18h5"/></g></svg>`,
+  N: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path fill="#fff" d="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21"/><path fill="#fff" d="M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.042-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4.003 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-.994-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-1.992 2.5-3c1 0 1 3 1 3"/><path fill="#000" d="M9.5 25.5a.5.5 0 1 1-1 0 .5.5 0 1 1 1 0m5.433-9.75a.5 1.5 30 1 1-.866-.5.5 1.5 30 1 1 .866.5"/></g></svg>`,
+  P: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><path fill="#fff" stroke="#000" stroke-linecap="round" stroke-width="1.5" d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 16.5 16 18.59 16 21c0 2.03.94 3.84 2.41 5.03-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47 1.47-1.19 2.41-3 2.41-5.03 0-2.41-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z"/></svg>`,
+  k: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path stroke-linejoin="miter" d="M22.5 11.6V6"/><path fill="#000" stroke-linecap="butt" stroke-linejoin="miter" d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5"/><path fill="#000" d="M11.5 37a22.3 22.3 0 0 0 21 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-3.5-7.5-13-10.5-16-4-3 6 5 10 5 10z"/><path stroke-linejoin="miter" d="M20 8h5"/><path stroke="#ececec" d="M32 29.5s8.5-4 6-9.7C34.1 14 25 18 22.5 24.6v2.1-2.1C20 18 9.9 14 7 19.9c-2.5 5.6 4.8 9 4.8 9"/><path stroke="#ececec" d="M11.5 30c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0"/></g></svg>`,
+  q: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><g fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><g stroke="none"><circle cx="6" cy="12" r="2.75"/><circle cx="14" cy="9" r="2.75"/><circle cx="22.5" cy="8" r="2.75"/><circle cx="31" cy="9" r="2.75"/><circle cx="39" cy="12" r="2.75"/></g><path stroke-linecap="butt" d="M9 26c8.5-1.5 21-1.5 27 0l2.5-12.5L31 25l-.3-14.1-5.2 13.6-3-14.5-3 14.5-5.2-13.6L14 25 6.5 13.5z"/><path stroke-linecap="butt" d="M9 26c0 2 1.5 2 2.5 4 1 1.5 1 1 .5 3.5-1.5 1-1.5 2.5-1.5 2.5-1.5 1.5.5 2.5.5 2.5 6.5 1 16.5 1 23 0 0 0 1.5-1 0-2.5 0 0 .5-1.5-1-2.5-.5-2.5-.5-2 .5-3.5 1-2 2.5-2 2.5-4-8.5-1.5-18.5-1.5-27 0z"/><path fill="none" stroke-linecap="butt" d="M11 38.5a35 35 1 0 0 23 0"/><path fill="none" stroke="#ececec" d="M11 29a35 35 1 0 1 23 0m-21.5 2.5h20m-21 3a35 35 1 0 0 22 0m-23 3a35 35 1 0 0 24 0"/></g></svg>`,
+  r: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><g fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path stroke-linecap="butt" d="M9 39h27v-3H9zm3.5-7 1.5-2.5h17l1.5 2.5zm-.5 4v-4h21v4z"/><path stroke-linecap="butt" stroke-linejoin="miter" d="M14 29.5v-13h17v13z"/><path stroke-linecap="butt" d="M14 16.5 11 14h23l-3 2.5zM11 14V9h4v2h5V9h5v2h5V9h4v5z"/><path fill="none" stroke="#ececec" stroke-linejoin="miter" stroke-width="1" d="M12 35.5h21m-20-4h19m-18-2h17m-17-13h17M11 14h23"/></g></svg>`,
+  b: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><g fill="#000" stroke-linecap="butt"><path d="M9 36c3.4-1 10.1.4 13.5-2 3.4 2.4 10.1 1 13.5 2 0 0 1.6.5 3 2-.7 1-1.6 1-3 .5-3.4-1-10.1.5-13.5-1-3.4 1.5-10.1 0-13.5 1-1.4.5-2.3.5-3-.5 1.4-2 3-2 3-2z"/><path d="M15 32c2.5 2.5 12.5 2.5 15 0 .5-1.5 0-2 0-2 0-2.5-2.5-4-2.5-4 5.5-1.5 6-11.5-5-15.5-11 4-10.5 14-5 15.5 0 0-2.5 1.5-2.5 4 0 0-.5.5 0 2z"/><path d="M25 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0z"/></g><path stroke="#ececec" stroke-linejoin="miter" d="M17.5 26h10M15 30h15m-7.5-14.5v5M20 18h5"/></g></svg>`,
+  n: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path fill="#000" d="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21"/><path fill="#000" d="M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.04-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-1-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-2 2.5-3c1 0 1 3 1 3"/><path fill="#ececec" stroke="#ececec" d="M9.5 25.5a.5.5 0 1 1-1 0 .5.5 0 1 1 1 0m5.43-9.75a.5 1.5 30 1 1-.86-.5.5 1.5 30 1 1 .86.5"/><path fill="#ececec" stroke="none" d="m24.55 10.4-.45 1.45.5.15c3.15 1 5.65 2.49 7.9 6.75S35.75 29.06 35.25 39l-.05.5h2.25l.05-.5c.5-10.06-.88-16.85-3.25-21.34s-5.79-6.64-9.19-7.16z"/></g></svg>`,
+  p: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><path stroke="#000" stroke-linecap="round" stroke-width="1.5" d="M22.5 9a4 4 0 0 0-3.22 6.38 6.48 6.48 0 0 0-.87 10.65c-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47a6.46 6.46 0 0 0-.87-10.65A4.01 4.01 0 0 0 22.5 9z"/></svg>`,
 };
+
+/** Rasterize an SVG piece to RGBA pixel buffer at the given size */
+const pieceCache = new Map<string, PNG>();
+function rasterizePiece(piece: string, size: number): PNG {
+  const key = `${piece}_${size}`;
+  const cached = pieceCache.get(key);
+  if (cached) return cached;
+  const svg = PIECE_SVGS[piece];
+  const sized = svg.replace('<svg ', `<svg width="${size}" height="${size}" `);
+  const resvg = new Resvg(sized, { fitTo: { mode: 'width', value: size } });
+  const rendered = resvg.render();
+  const buf = rendered.asPng();
+  const png = PNG.sync.read(buf);
+  pieceCache.set(key, png);
+  return png;
+}
 
 // 5x7 bitmap font for labels (uppercase, digits, common symbols)
 const TEXT_FONT: Record<string, string[]> = {
@@ -186,7 +105,22 @@ const TEXT_FONT: Record<string, string[]> = {
   ':': ['00000','00100','00100','00000','00100','00100','00000'],
   ' ': ['00000','00000','00000','00000','00000','00000','00000'],
   '.': ['00000','00000','00000','00000','00000','01100','01100'],
+  '_': ['00000','00000','00000','00000','00000','00000','11111'],
+  '(': ['00010','00100','01000','01000','01000','00100','00010'],
+  ')': ['01000','00100','00010','00010','00010','00100','01000'],
+  '|': ['00100','00100','00100','00100','00100','00100','00100'],
+  ',': ['00000','00000','00000','00000','00110','00100','01000'],
 };
+
+function setPixelOnPng(png: PNG, x: number, y: number, r: number, g: number, b: number) {
+  if (x >= 0 && x < png.width && y >= 0 && y < png.height) {
+    const i = (y * png.width + x) * 4;
+    png.data[i] = r;
+    png.data[i + 1] = g;
+    png.data[i + 2] = b;
+    png.data[i + 3] = 255;
+  }
+}
 
 /** Draw a text string onto a PNG at (x, y) with given color and scale */
 function drawText(
@@ -197,7 +131,7 @@ function drawText(
 ) {
   let cx = x;
   for (const ch of text) {
-    const glyph = TEXT_FONT[ch.toUpperCase()];
+    const glyph = TEXT_FONT[ch.toUpperCase()] ?? TEXT_FONT[ch];
     if (!glyph) { cx += 4 * scale; continue; }
     for (let gr = 0; gr < 7; gr++) {
       for (let gc = 0; gc < 5; gc++) {
@@ -212,13 +146,6 @@ function drawText(
     }
     cx += 6 * scale; // 5px char + 1px gap
   }
-}
-
-function chessToGrid(sq: string, whitePawns: 'up' | 'down') {
-  const file = sq.charCodeAt(0) - 97;
-  const rank = parseInt(sq[1]);
-  if (whitePawns === 'up') return { row: 8 - rank, col: file };
-  return { row: rank - 1, col: 7 - file };
 }
 
 /** Parse FEN position string into 8x8 array */
@@ -238,6 +165,35 @@ function parseFen(fen: string): string[][] {
   return board;
 }
 
+/** Composite a piece PNG (with alpha) onto the output at (dx, dy) */
+function compositePiece(out: PNG, piece: PNG, dx: number, dy: number) {
+  for (let y = 0; y < piece.height; y++) {
+    for (let x = 0; x < piece.width; x++) {
+      const si = (y * piece.width + x) * 4;
+      const alpha = piece.data[si + 3];
+      if (alpha === 0) continue;
+      const ox = dx + x;
+      const oy = dy + y;
+      if (ox < 0 || ox >= out.width || oy < 0 || oy >= out.height) continue;
+      const di = (oy * out.width + ox) * 4;
+      if (alpha === 255) {
+        out.data[di] = piece.data[si];
+        out.data[di + 1] = piece.data[si + 1];
+        out.data[di + 2] = piece.data[si + 2];
+        out.data[di + 3] = 255;
+      } else {
+        // Alpha blend
+        const a = alpha / 255;
+        const ia = 1 - a;
+        out.data[di] = Math.round(piece.data[si] * a + out.data[di] * ia);
+        out.data[di + 1] = Math.round(piece.data[si + 1] * a + out.data[di + 1] * ia);
+        out.data[di + 2] = Math.round(piece.data[si + 2] * a + out.data[di + 2] * ia);
+        out.data[di + 3] = 255;
+      }
+    }
+  }
+}
+
 /** Draw a virtual board onto a PNG at the given position */
 function drawVirtualBoard(
   out: PNG,
@@ -249,6 +205,7 @@ function drawVirtualBoard(
 ) {
   const board = parseFen(fen);
   const sq = boardSize / 8;
+  const pieceSize = Math.round(sq * 0.9);
 
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
@@ -291,50 +248,13 @@ function drawVirtualBoard(
         }
       }
 
-      // Draw piece shape
+      // Draw SVG piece
       const piece = board[rank]?.[file];
-      if (piece && piece !== '.') {
-        const isWhitePiece = piece === piece.toUpperCase();
-        const pieceColor = isWhitePiece ? WHITE_PIECE : BLACK_PIECE;
-        const outlineColor = isWhitePiece ? PIECE_OUTLINE : [180, 180, 180] as const;
-        const shape = PIECE_SHAPES[piece.toUpperCase()];
-
-        if (shape) {
-          const shapeH = shape.length;     // 11
-          const shapeW = shape[0].length;  // 11
-          const scale = Math.max(1, Math.floor(sq * 0.8 / shapeH));
-          const pw = shapeW * scale;
-          const ph = shapeH * scale;
-          const px0 = Math.floor((x0 + x1) / 2 - pw / 2);
-          const py0 = Math.floor((y0 + y1) / 2 - ph / 2 + scale); // slightly lower
-
-          // Draw outline (1px border around shape)
-          for (let gr = 0; gr < shapeH; gr++) {
-            for (let gc = 0; gc < shapeW; gc++) {
-              if (shape[gr][gc] === '1') {
-                // Check if this pixel borders a '0' → outline pixel
-                const isEdge = (gr === 0 || shape[gr-1][gc] === '0') ||
-                               (gr === shapeH-1 || shape[gr+1][gc] === '0') ||
-                               (gc === 0 || shape[gr][gc-1] === '0') ||
-                               (gc === shapeW-1 || shape[gr][gc+1] === '0');
-                const color = isEdge ? outlineColor : pieceColor;
-                for (let sy = 0; sy < scale; sy++) {
-                  for (let sx = 0; sx < scale; sx++) {
-                    const px = px0 + gc * scale + sx;
-                    const py = py0 + gr * scale + sy;
-                    if (px >= 0 && px < out.width && py >= 0 && py < out.height) {
-                      const i = (py * out.width + px) * 4;
-                      out.data[i] = color[0];
-                      out.data[i + 1] = color[1];
-                      out.data[i + 2] = color[2];
-                      out.data[i + 3] = 255;
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+      if (piece && piece !== '.' && PIECE_SVGS[piece]) {
+        const piecePng = rasterizePiece(piece, pieceSize);
+        const px = Math.floor((x0 + x1) / 2 - pieceSize / 2);
+        const py = Math.floor((y0 + y1) / 2 - pieceSize / 2);
+        compositePiece(out, piecePng, px, py);
       }
     }
   }
@@ -352,15 +272,7 @@ function drawVirtualBoard(
   }
 }
 
-function setPixelOnPng(png: PNG, x: number, y: number, r: number, g: number, b: number) {
-  if (x >= 0 && x < png.width && y >= 0 && y < png.height) {
-    const i = (y * png.width + x) * 4;
-    png.data[i] = r;
-    png.data[i + 1] = g;
-    png.data[i + 2] = b;
-    png.data[i + 3] = 255;
-  }
-}
+// ── Main generation loop ──
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
@@ -379,7 +291,7 @@ for (const tc of PIPELINE_CASES) {
   const png = PNG.sync.read(fs.readFileSync(srcPath));
   const b = tc.bbox;
 
-  // Right panel layout: virtual board (75% height) + summary labels (25% height)
+  // Right panel layout: virtual board (75% height) + summary labels below
   const gap = 20;
   const panelH = png.height;
   const boardDisplaySize = Math.floor(panelH * 0.75);
@@ -387,8 +299,11 @@ for (const tc of PIPELINE_CASES) {
   const lineH = 9 * textScale;
   const panelW = Math.max(boardDisplaySize, 40 * 6 * textScale); // wide enough for ~40 char labels
 
+  // Count label lines to compute minimum height
+  const labelLineCount = countLabelLines(tc);
+  const minPanelH = boardDisplaySize + 8 + labelLineCount * lineH + 8;
   const outWidth = png.width + gap + panelW;
-  const outHeight = png.height;
+  const outHeight = Math.max(png.height, minPanelH);
   const out = new PNG({ width: outWidth, height: outHeight });
 
   // Fill entire image with dark background
@@ -447,30 +362,35 @@ for (const tc of PIPELINE_CASES) {
     }
   }
 
-  // Draw virtual board at top of right panel (highlights shown only here)
+  // Draw virtual board at top of right panel
   const boardX = png.width + gap;
   const boardY = 0;
   const hlSet = new Set(tc.highlighted);
   drawVirtualBoard(out, boardX, boardY, boardDisplaySize, tc.expectedFen, hlSet, tc.white_pawns);
 
-  // Draw annotation labels below the virtual board
+  // Draw all annotation labels below the virtual board
   const labelX = boardX + 4;
   let labelY = boardDisplaySize + 8;
+  const gray = [200, 200, 200] as const;
+  const dimGray = [160, 160, 160] as const;
+  const cyan = [100, 220, 220] as const;
+
+  const line = (text: string, color: readonly [number, number, number] = gray) => {
+    drawText(out, text, labelX, labelY, color[0], color[1], color[2], textScale);
+    labelY += lineH;
+  };
+
+  // File
+  line(`FILE: ${tc.file}`, dimGray);
 
   // Orientation: white pawns up/down
-  const orientLabel = tc.white_pawns === 'up' ? 'WHITE BOTTOM' : 'WHITE TOP';
-  drawText(out, orientLabel, labelX, labelY, 200, 200, 200, textScale);
-  labelY += lineH;
+  line(tc.white_pawns === 'up' ? 'WHITE BOTTOM' : 'WHITE TOP');
 
   // Turn
-  const turnLabel = `TURN: ${tc.turn === 'w' ? 'WHITE' : tc.turn === 'b' ? 'BLACK' : 'UNKNOWN'}`;
-  drawText(out, turnLabel, labelX, labelY, 200, 200, 200, textScale);
-  labelY += lineH;
+  line(`TURN: ${tc.turn === 'w' ? 'WHITE' : tc.turn === 'b' ? 'BLACK' : 'UNKNOWN'}`);
 
   // Move (highlighted squares)
-  const moveLabel = tc.highlighted ? `MOVE: ${tc.highlighted[0]}.${tc.highlighted[1]}` : 'MOVE: none';
-  drawText(out, moveLabel, labelX, labelY, 200, 200, 200, textScale);
-  labelY += lineH;
+  line(tc.highlighted ? `MOVE: ${tc.highlighted[0]}.${tc.highlighted[1]}` : 'MOVE: NONE');
 
   // Castling rights (infer from corrected FEN)
   const correctedFen = tc.white_pawns === 'down' ? flipFen(tc.expectedFen) : tc.expectedFen;
@@ -484,25 +404,38 @@ for (const tc of PIPELINE_CASES) {
   };
   const wRights = describeSide(castling.includes('K'), castling.includes('Q'));
   const bRights = describeSide(castling.includes('k'), castling.includes('q'));
-  drawText(out, `CASTLING RIGHTS: W ${wRights}. B ${bRights}`, labelX, labelY, 200, 200, 200, textScale);
-  labelY += lineH;
+  line(`CASTLING: W ${wRights}. B ${bRights}`);
 
   // Orientation source
-  drawText(out, `SOURCE: ${tc.orientation_source.toUpperCase()}`, labelX, labelY, 200, 200, 200, textScale);
-  labelY += lineH;
+  line(`SOURCE: ${tc.orientation_source.toUpperCase()}`);
 
   // Bbox
-  drawText(out, `BBOX: ${tc.bbox.x},${tc.bbox.y} ${tc.bbox.width}X${tc.bbox.height}`, labelX, labelY, 200, 200, 200, textScale);
-  labelY += lineH;
+  line(`BBOX: ${tc.bbox.x},${tc.bbox.y} ${tc.bbox.width}X${tc.bbox.height}`);
 
   // Square size
-  drawText(out, `SQUARE: ${tc.squareSize}PX`, labelX, labelY, 200, 200, 200, textScale);
-  labelY += lineH;
+  line(`SQUARE: ${tc.squareSize}PX`);
 
-  // Full FEN
-  drawText(out, `FEN:`, labelX, labelY, 160, 160, 160, textScale);
-  labelY += lineH;
-  drawText(out, correctedFen, labelX, labelY, 160, 160, 160, textScale);
+  // Raw FEN (image orientation)
+  line(`RAW FEN:`, dimGray);
+  line(tc.expectedFen, dimGray);
+
+  // Corrected FEN (standard orientation)
+  line(`CORRECTED FEN:`, dimGray);
+  line(correctedFen, dimGray);
+
+  // Full FEN (6-field)
+  line(`FULL FEN:`, dimGray);
+  line(fullFen, dimGray);
+
+  // Labels
+  if (tc.expected_labels === null || tc.expected_labels === undefined) {
+    line(`LABELS: NONE`, cyan);
+  } else {
+    line(`LABELS:`, cyan);
+    for (const lbl of tc.expected_labels) {
+      line(`  ${lbl.side.toUpperCase()} ${lbl.type.toUpperCase()} ${lbl.chars.toUpperCase()} ${lbl.direction.toUpperCase()}`, cyan);
+    }
+  }
 
   const outName = tc.file.replace('.png', '-expected.png');
   fs.writeFileSync(path.join(OUT_DIR, outName), PNG.sync.write(out));
@@ -511,3 +444,27 @@ for (const tc of PIPELINE_CASES) {
 }
 
 console.log(`\nGenerated ${generated} expected image(s) in test/fixtures/expected-images/`);
+
+/** Count the number of text lines that will be drawn for a test case */
+function countLabelLines(tc: PipelineTestCase): number {
+  let count = 0;
+  count += 1; // file
+  count += 1; // orientation
+  count += 1; // turn
+  count += 1; // move
+  count += 1; // castling
+  count += 1; // source
+  count += 1; // bbox
+  count += 1; // square size
+  count += 2; // raw fen (label + value)
+  count += 2; // corrected fen (label + value)
+  count += 2; // full fen (label + value)
+  // labels
+  if (tc.expected_labels === null || tc.expected_labels === undefined) {
+    count += 1; // "LABELS: NONE"
+  } else {
+    count += 1; // "LABELS:"
+    count += tc.expected_labels.length; // one line per label
+  }
+  return count;
+}
