@@ -373,6 +373,16 @@ export function renderArrows(state: OverlayState): void {
       drawLossLabel(ctx, targetArrows[0].from, move.loss_cp, virtualBoard, state.displayFlipped);
     }
   }
+
+  // Draw cp loss label during preview mode on the highlighted arrow
+  if (state.pvPreviewLineIndex !== null && state.currentResult?.evaluation?.top_moves?.length) {
+    const idx = Math.min(state.pvPreviewLineIndex, state.currentResult.evaluation.top_moves.length - 1);
+    const move = state.currentResult.evaluation.top_moves[idx];
+    if (move.loss_cp >= 5) {
+      const from = move.move.slice(0, 2);
+      drawLossLabel(ctx, from, move.loss_cp, virtualBoard, state.displayFlipped);
+    }
+  }
 }
 
 /** Draw arrows and eval bar on the full-screen overlay canvas */
@@ -451,6 +461,16 @@ export function renderVideoOverlay(state: OverlayState): void {
         if (firstArrow) {
           drawLossLabel(ctx, firstArrow.from, move.loss_cp, boardRect, state.displayFlipped);
         }
+      }
+    }
+
+    // Draw cp loss label during preview mode on the highlighted arrow
+    if (state.pvPreviewLineIndex !== null && result.evaluation?.top_moves?.length) {
+      const idx = Math.min(state.pvPreviewLineIndex, result.evaluation.top_moves.length - 1);
+      const move = result.evaluation.top_moves[idx];
+      if (move.loss_cp >= 5) {
+        const from = move.move.slice(0, 2);
+        drawLossLabel(ctx, from, move.loss_cp, boardRect, state.displayFlipped);
       }
     }
   } else {
