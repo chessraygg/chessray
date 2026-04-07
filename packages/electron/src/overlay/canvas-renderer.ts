@@ -123,7 +123,7 @@ export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
       if (a.from === previewFrom && a.to === previewTo) {
         return { ...a, opacity: 1, width: Math.max(a.width, 5) };
       }
-      return { ...a, opacity: a.opacity * 0.3 };
+      return { ...a, opacity: a.opacity * 0.12, width: Math.max(1.5, a.width * 0.4) };
     });
   }
 
