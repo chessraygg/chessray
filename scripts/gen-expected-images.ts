@@ -388,7 +388,9 @@ for (const tc of PIPELINE_CASES) {
   const panelW = Math.max(boardDisplaySize, 40 * 6 * textScale); // wide enough for ~40 char labels
 
   const outWidth = png.width + gap + panelW;
-  const outHeight = png.height;
+  const numLabels = 9; // orientation, turn, move, castling, source, bbox, square, fen label, fen value
+  const minPanelH = boardDisplaySize + 8 + numLabels * lineH + 8;
+  const outHeight = Math.max(png.height, minPanelH);
   const out = new PNG({ width: outWidth, height: outHeight });
 
   // Fill entire image with dark background
