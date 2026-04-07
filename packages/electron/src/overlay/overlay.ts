@@ -57,6 +57,7 @@ const state: OverlayState = {
   lossThreshold: 50,
   autoMode: false,
   vboardOverlayVisible: true,
+  pvPreviewLineIndex: null,
   panelScale: 1,
   displayInfo: null,
 };
@@ -397,6 +398,7 @@ function initOverlay(): void {
   let pvCyclePv: string[] = [];
 
   let pvCycleMovesTimer: ReturnType<typeof setTimeout> | null = null;
+  let pvCyclePreviewTimer: ReturnType<typeof setTimeout> | null = null;
   let pvCycleLineIndex = 0;
 
   /** Get line indices eligible for cycling (filtered by loss threshold) */
@@ -627,6 +629,7 @@ function initOverlay(): void {
   /** Start animating the current pvCycleLineIndex */
   function pvCycleStartCurrentLine(): void {
     if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
+    if (pvCyclePreviewTimer !== null) { clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null; }
     if (!state.lineVisible) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) return;
@@ -640,13 +643,27 @@ function initOverlay(): void {
     pvCycleFlipped = !!result.flipped;
     pvCycleLastPv = [...pv];
     state.pvDisplayDepth = 0;
-    (window as any).__chessrayPvPlaying = true;
-    document.getElementById('cv-debug-grid')?.classList.add('analysis');
 
-    // First step immediately
-    pvCycleStep();
-    // Then continue on interval
-    pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
+    // Preview phase: show all move arrows with the selected line's first move emphasized
+    const arrowsWasBeforePreview = pvCycleArrowsWas;
+    state.pvPreviewLineIndex = idx;
+    state.arrowsVisible = true;
+    state.lineVisible = false;
+    renderArrows(state);
+    renderVideoOverlay(state);
+
+    pvCyclePreviewTimer = setTimeout(() => {
+      pvCyclePreviewTimer = null;
+      state.pvPreviewLineIndex = null;
+      state.arrowsVisible = arrowsWasBeforePreview;
+      state.lineVisible = true;
+      (window as any).__chessrayPvPlaying = true;
+      document.getElementById('cv-debug-grid')?.classList.add('analysis');
+
+      // First step immediately, then continue on interval
+      pvCycleStep();
+      pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
+    }, pvGrowDelaySec * 1000);
   }
 
   /** Start the unified cycle from the selected line */
@@ -676,6 +693,10 @@ function initOverlay(): void {
 
   function pvCycleStop(): void {
     if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
+    if (pvCyclePreviewTimer !== null) {
+      clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null;
+      state.pvPreviewLineIndex = null;
+    }
     if (pvCycleMovesTimer !== null) {
       clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null;
       // Restore mode state if stopped during interlude

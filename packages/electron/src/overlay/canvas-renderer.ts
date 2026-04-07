@@ -21,6 +21,7 @@ export interface OverlayState {
   lossThreshold: number;
   autoMode: boolean;
   vboardOverlayVisible: boolean;
+  pvPreviewLineIndex: number | null;
   panelScale: number;
   displayInfo: {
     size: { width: number; height: number };
@@ -111,6 +112,21 @@ function updateAnimatedArrows(
 
 /** Get the arrows to display based on current mode (top moves, PV line, or both) */
 export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
+  // Preview mode: show all move arrows but emphasize the selected line's first move
+  if (state.pvPreviewLineIndex !== null && state.currentResult?.evaluation?.top_moves?.length) {
+    const allArrows = state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold);
+    const idx = Math.min(state.pvPreviewLineIndex, state.currentResult.evaluation.top_moves.length - 1);
+    const previewMove = state.currentResult.evaluation.top_moves[idx].move;
+    const previewFrom = previewMove.slice(0, 2);
+    const previewTo = previewMove.slice(2, 4);
+    return allArrows.map(a => {
+      if (a.from === previewFrom && a.to === previewTo) {
+        return { ...a, opacity: 1, width: Math.max(a.width, 5) };
+      }
+      return { ...a, opacity: a.opacity * 0.3 };
+    });
+  }
+
   const moveArrows = state.arrowsVisible
     ? state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold)
     : [];
