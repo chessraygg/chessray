@@ -646,7 +646,10 @@ function initOverlay(): void {
     state.pvDisplayDepth = 0;
 
     // Preview phase: show all move arrows with the selected line's first move emphasized
-    const arrowsWasBeforePreview = pvCycleArrowsWas;
+    // Only save arrowsWas if not already in a preview/interlude (where arrowsVisible is temporarily true)
+    if (!wasInPreview && pvCycleMovesTimer === null) {
+      pvCycleArrowsWas = state.arrowsVisible;
+    }
     state.pvPreviewLineIndex = idx;
     state.arrowsVisible = true;
     state.lineVisible = false;
@@ -656,7 +659,7 @@ function initOverlay(): void {
     pvCyclePreviewTimer = setTimeout(() => {
       pvCyclePreviewTimer = null;
       state.pvPreviewLineIndex = null;
-      state.arrowsVisible = arrowsWasBeforePreview;
+      state.arrowsVisible = pvCycleArrowsWas;
       state.lineVisible = true;
       (window as any).__chessrayPvPlaying = true;
       document.getElementById('cv-debug-grid')?.classList.add('analysis');
@@ -697,6 +700,12 @@ function initOverlay(): void {
     if (pvCyclePreviewTimer !== null) {
       clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null;
       state.pvPreviewLineIndex = null;
+      // Restore mode state if stopped during preview
+      state.arrowsVisible = pvCycleArrowsWas;
+      if (!state.autoMode) {
+        state.lineVisible = true;
+      }
+      syncModeButtons();
     }
     if (pvCycleMovesTimer !== null) {
       clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null;
