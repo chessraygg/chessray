@@ -454,6 +454,21 @@ function initOverlay(): void {
   }
 
   function pvCycleStep(): void {
+    // Validate that our cached PV still matches the live eval — restart if stale
+    const liveResult = state.currentResult;
+    if (liveResult?.evaluation?.top_moves?.length) {
+      const idx = Math.min(pvCycleLineIndex, liveResult.evaluation.top_moves.length - 1);
+      const livePv = liveResult.evaluation.top_moves[idx].pv;
+      const depth = Math.max(state.pvDisplayDepth, 1);
+      const stale = depth > livePv.length ||
+        pvCyclePv.slice(0, depth).some((m, i) => m !== livePv[i]);
+      if (stale) {
+        if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
+        pvCycleStart();
+        return;
+      }
+    }
+
     if (state.pvDisplayDepth >= state.pvDepth || state.pvDisplayDepth >= pvCyclePv.length) {
       // Sequence complete
       if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
