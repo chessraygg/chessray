@@ -209,7 +209,7 @@ export function updateDebugPanel(
     const turn = result.turn ?? result.evaluation?.fen?.split(' ')[1] ?? null;
     if (turn) {
       turnDot.className = `turn-dot ${turn === 'w' ? 'white' : 'black'}`;
-      turnText.textContent = turn === 'w' ? 'White' : 'Black';
+      turnText.textContent = turn === 'w' ? "White's turn" : "Black's turn";
     }
   }
 
