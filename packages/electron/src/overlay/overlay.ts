@@ -676,8 +676,10 @@ function initOverlay(): void {
     if (!result?.evaluation?.top_moves?.length) return;
     const idx = Math.min(pvCycleLineIndex, result.evaluation.top_moves.length - 1);
     const newPv = result.evaluation.top_moves[idx].pv;
-    const displayedMatch = state.pvDisplayDepth <= newPv.length &&
-      pvCycleLastPv.slice(0, state.pvDisplayDepth).every((m, i) => m === newPv[i]);
+    // Check that all moves we've already displayed still match the new PV
+    const depth = Math.max(state.pvDisplayDepth, 1); // always check at least the first move
+    const displayedMatch = depth <= newPv.length &&
+      pvCycleLastPv.slice(0, depth).every((m, i) => m === newPv[i]);
     if (displayedMatch) {
       pvCycleLastPv = [...newPv];
       pvCyclePv = [...newPv];
@@ -1080,8 +1082,8 @@ function processPendingResult(): void {
     (window as any).__chessrayResetAutoTimer?.();
     // If line is already visible (non-auto mode), restart grow from 2
     if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
-  } else if (evalDepth > lastEvalDepth) {
-    // Same position, deeper eval — continue grow if displayed moves match
+  } else if (evalDepth >= lastEvalDepth) {
+    // Same position, same or deeper eval — continue grow if displayed moves still match
     lastEvalDepth = evalDepth;
     if (state.lineVisible) (window as any).__chessrayPvGrowContinue?.();
   }
