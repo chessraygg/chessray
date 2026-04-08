@@ -330,4 +330,15 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     orientation_source: 'piece_count',
     expected_labels: null,
   },
+  {
+    file: 'test-carlsen-titled8.png',
+    white_pawns: 'up',
+    highlighted: ['e8', 'c8'],
+    turn: 'w',
+    bbox: { x: 31, y: 53, width: 699, height: 699 },
+    squareSize: 87,
+    expectedFen: '2kr1n1r/ppq1bpp1/2p2nb1/3p2Bp/3P1P1P/2N1P1N1/PP1QB1P1/2KR3R',
+    orientation_source: 'piece_count',
+    expected_labels: null,
+  },
 ];
