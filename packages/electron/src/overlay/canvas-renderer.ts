@@ -437,7 +437,7 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.strokeRect(bx, by, bw, bh);
   }
 
-  if (state.arrowsVisible || state.lineVisible) {
+  if (state.arrowsVisible || state.lineVisible || state.pvPreviewLineIndex !== null) {
     const targetArrows = getActiveArrows(state);
     const animated = updateAnimatedArrows(targetArrows, videoArrowState, () => renderVideoOverlay(state));
     // Draw with animated opacity

@@ -629,9 +629,8 @@ function initOverlay(): void {
   /** Start animating the current pvCycleLineIndex */
   function pvCycleStartCurrentLine(): void {
     if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
-    const wasInPreview = state.pvPreviewLineIndex !== null;
     if (pvCyclePreviewTimer !== null) { clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null; state.pvPreviewLineIndex = null; }
-    if (!state.lineVisible && !wasInPreview) return;
+    if (!state.lineVisible) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) return;
     const idx = Math.min(pvCycleLineIndex, result.evaluation.top_moves.length - 1);
@@ -645,22 +644,15 @@ function initOverlay(): void {
     pvCycleLastPv = [...pv];
     state.pvDisplayDepth = 0;
 
-    // Preview phase: show all move arrows with the selected line's first move emphasized
-    // Only save arrowsWas if not already in a preview/interlude (where arrowsVisible is temporarily true)
-    if (!wasInPreview && pvCycleMovesTimer === null) {
-      pvCycleArrowsWas = state.arrowsVisible;
-    }
+    // Preview phase: show the selected line's first move arrow only
+    // pvPreviewLineIndex drives getActiveArrows — no need to touch arrowsVisible/lineVisible
     state.pvPreviewLineIndex = idx;
-    state.arrowsVisible = true;
-    state.lineVisible = false;
     renderArrows(state);
     renderVideoOverlay(state);
 
     pvCyclePreviewTimer = setTimeout(() => {
       pvCyclePreviewTimer = null;
       state.pvPreviewLineIndex = null;
-      state.arrowsVisible = pvCycleArrowsWas;
-      state.lineVisible = true;
       (window as any).__chessrayPvPlaying = true;
       document.getElementById('cv-debug-grid')?.classList.add('analysis');
 
@@ -700,12 +692,6 @@ function initOverlay(): void {
     if (pvCyclePreviewTimer !== null) {
       clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null;
       state.pvPreviewLineIndex = null;
-      // Restore mode state if stopped during preview
-      state.arrowsVisible = pvCycleArrowsWas;
-      if (!state.autoMode) {
-        state.lineVisible = true;
-      }
-      syncModeButtons();
     }
     if (pvCycleMovesTimer !== null) {
       clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null;
@@ -1047,8 +1033,8 @@ let lastEvalDepth: number = 0;
 function selectLine(index: number): void {
   state.selectedLineIndex = index;
   if (state.currentResult) {
-    // Restart grow/preview when a different line is selected
-    if (state.lineVisible || state.pvPreviewLineIndex !== null) (window as any).__chessrayPvGrowStart?.();
+    // Restart grow from 2 when a different line is selected
+    if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
     updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine);
     renderArrows(state);
     renderVideoOverlay(state);
