@@ -629,8 +629,9 @@ function initOverlay(): void {
   /** Start animating the current pvCycleLineIndex */
   function pvCycleStartCurrentLine(): void {
     if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
-    if (pvCyclePreviewTimer !== null) { clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null; }
-    if (!state.lineVisible) return;
+    const wasInPreview = state.pvPreviewLineIndex !== null;
+    if (pvCyclePreviewTimer !== null) { clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null; state.pvPreviewLineIndex = null; }
+    if (!state.lineVisible && !wasInPreview) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) return;
     const idx = Math.min(pvCycleLineIndex, result.evaluation.top_moves.length - 1);
@@ -1037,8 +1038,8 @@ let lastEvalDepth: number = 0;
 function selectLine(index: number): void {
   state.selectedLineIndex = index;
   if (state.currentResult) {
-    // Restart grow from 2 when a different line is selected
-    if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
+    // Restart grow/preview when a different line is selected
+    if (state.lineVisible || state.pvPreviewLineIndex !== null) (window as any).__chessrayPvGrowStart?.();
     updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine);
     renderArrows(state);
     renderVideoOverlay(state);
