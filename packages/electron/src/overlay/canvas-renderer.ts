@@ -158,9 +158,9 @@ function drawLossLabel(
   const fontSize = Math.max(7, Math.round(squareW * 0.28));
   const r = fontSize * 1.3;
 
-  // Position: top-right corner of square, inset by radius
-  const cx = board.x + (file + 1) * squareW - r - 1;
-  const cy = board.y + (7 - rank) * squareH + r + 1;
+  // Position: center of square
+  const cx = board.x + (file + 0.5) * squareW;
+  const cy = board.y + (7 - rank + 0.5) * squareH;
 
   ctx.save();
   const color = lossToColor(lossCp);
