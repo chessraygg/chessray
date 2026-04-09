@@ -21,6 +21,8 @@ declare global {
       onSourceVisibility: (cb: (visible: boolean) => void) => void;
       reopenPicker: () => void;
       setMaxDepth: (depth: number) => void;
+      setMultiPvMax: (n: number) => void;
+      setMultiPvRamp: (n: number) => void;
       setChangeDetect: (enabled: boolean) => void;
       onResetPanelPosition: (cb: () => void) => void;
       minimizeApp: () => void;
@@ -822,6 +824,36 @@ function initOverlay(): void {
       maxDepthVal.textContent = String(depth);
       savePrefs({ maxDepth: depth });
       window.chessRay.setMaxDepth(depth);
+    });
+  }
+
+  // ── MultiPV max slider ──
+  const multiPvSlider = document.getElementById('cv-multi-pv-max') as HTMLInputElement | null;
+  const multiPvVal = document.getElementById('cv-multi-pv-max-val');
+  if (multiPvSlider && multiPvVal) {
+    multiPvSlider.value = String(prefs.multiPvMax);
+    multiPvVal.textContent = String(prefs.multiPvMax);
+    window.chessRay.setMultiPvMax(prefs.multiPvMax);
+    multiPvSlider.addEventListener('input', () => {
+      const n = parseInt(multiPvSlider.value, 10);
+      multiPvVal.textContent = String(n);
+      savePrefs({ multiPvMax: n });
+      window.chessRay.setMultiPvMax(n);
+    });
+  }
+
+  // ── MultiPV ramp slider ──
+  const multiPvRampSlider = document.getElementById('cv-multi-pv-ramp') as HTMLInputElement | null;
+  const multiPvRampVal = document.getElementById('cv-multi-pv-ramp-val');
+  if (multiPvRampSlider && multiPvRampVal) {
+    multiPvRampSlider.value = String(prefs.multiPvRamp);
+    multiPvRampVal.textContent = String(prefs.multiPvRamp);
+    window.chessRay.setMultiPvRamp(prefs.multiPvRamp);
+    multiPvRampSlider.addEventListener('input', () => {
+      const n = parseInt(multiPvRampSlider.value, 10);
+      multiPvRampVal.textContent = String(n);
+      savePrefs({ multiPvRamp: n });
+      window.chessRay.setMultiPvRamp(n);
     });
   }
 

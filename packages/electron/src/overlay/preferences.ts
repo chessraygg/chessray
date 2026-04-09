@@ -9,6 +9,8 @@ export interface Prefs {
   pvDepth: number;
   lossThreshold: number;
   maxDepth: number;
+  multiPvMax: number;
+  multiPvRamp: number;
   evalBarVisible: boolean;
   panelScale: number;
   collapsed: boolean;
@@ -41,6 +43,8 @@ export const DEFAULT_PREFS: Prefs = {
   pvDepth: 10,
   lossThreshold: 0,
   maxDepth: 28,
+  multiPvMax: 5,
+  multiPvRamp: 1,
   evalBarVisible: true,
   panelScale: 1,
   collapsed: false,
