@@ -105,10 +105,22 @@ export function drawLiveBoardAnimated(
   state: OverlayState,
 ): boolean {
   const anim = state.pvLiveAnim;
+  const arrowScale = (boardRect.width + boardRect.height) / 2 / 192;
+
+  // Helper: draw all PV arrows (completed steps) on top of the board
+  const drawPvArrows = () => {
+    const pvArrows = getActiveArrows(state);
+    const offsets = computeCurveOffsets(pvArrows);
+    for (let i = pvArrows.length - 1; i >= 0; i--) {
+      drawArrow(ctx, pvArrows[i], boardRect, arrowScale, state.displayFlipped, offsets[i], 1, true);
+    }
+  };
+
   if (!anim) {
-    // No animation — draw static board
+    // No animation — draw static board with PV arrows
     if (state.pvLiveFen) {
       drawLiveBoard(ctx, boardRect, state.pvLiveFen, state.pvLiveHighlight, state.displayFlipped);
+      drawPvArrows();
     }
     return false;
   }
@@ -117,14 +129,25 @@ export function drawLiveBoardAnimated(
   const t = easeInOut(Math.min(1, elapsed / anim.duration));
 
   if (t >= 1) {
-    // Animation complete — draw final position and clear anim
+    // Animation complete — draw final position with all PV arrows
     state.pvLiveAnim = null;
     drawLiveBoard(ctx, boardRect, anim.afterFen, anim.highlight, state.displayFlipped);
+    drawPvArrows();
     return false; // done
   }
 
   // Draw board with piece removed from source
   drawLiveBoard(ctx, boardRect, anim.pickedUpFen, anim.highlight, state.displayFlipped);
+
+  // Draw completed PV arrows (previous steps, excluding the current animating one)
+  const pvArrows = getActiveArrows(state);
+  const prevArrows = pvArrows.slice(0, -1); // all except the last (current step)
+  if (prevArrows.length > 0) {
+    const offsets = computeCurveOffsets(prevArrows);
+    for (let i = prevArrows.length - 1; i >= 0; i--) {
+      drawArrow(ctx, prevArrows[i], boardRect, arrowScale, state.displayFlipped, offsets[i], 1, true);
+    }
+  }
 
   const sqW = boardRect.width / 8;
   const sqH = boardRect.height / 8;
@@ -141,7 +164,6 @@ export function drawLiveBoardAnimated(
   }
 
   // Draw arrow following piece (progress matches piece movement)
-  const arrowScale = (boardRect.width + boardRect.height) / 2 / 192;
   drawArrow(ctx, anim.arrow, boardRect, arrowScale, state.displayFlipped, 0, t, true);
 
   return true; // still animating
