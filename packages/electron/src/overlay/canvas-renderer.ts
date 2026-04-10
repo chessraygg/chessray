@@ -80,6 +80,73 @@ export function drawLiveBoard(
   }
 }
 
+export interface LiveBoardAnim {
+  pickedUpFen: string;       // FEN with moving piece removed from source
+  afterFen: string;          // FEN after move completes
+  highlight: number[];       // [fromIdx, toIdx]
+  piece: string;             // FEN char of moving piece
+  fromFile: number;          // source file (visual, after flip)
+  fromRank: number;          // source rank (visual, after flip)
+  toFile: number;            // dest file (visual, after flip)
+  toRank: number;            // dest rank (visual, after flip)
+  arrow: ArrowDescriptor;    // arrow to draw alongside piece
+  startTime: number;         // performance.now() when animation started
+  duration: number;          // ms (350 to match virtual board)
+}
+
+const LIVE_ANIM_DURATION = 350;
+
+function easeInOut(t: number): number { return t * t * (3 - 2 * t); }
+
+/** Draw live board with animated piece movement */
+export function drawLiveBoardAnimated(
+  ctx: CanvasRenderingContext2D,
+  boardRect: { x: number; y: number; width: number; height: number },
+  state: OverlayState,
+): boolean {
+  const anim = state.pvLiveAnim;
+  if (!anim) {
+    // No animation — draw static board
+    if (state.pvLiveFen) {
+      drawLiveBoard(ctx, boardRect, state.pvLiveFen, state.pvLiveHighlight, state.displayFlipped);
+    }
+    return false;
+  }
+
+  const elapsed = performance.now() - anim.startTime;
+  const t = easeInOut(Math.min(1, elapsed / anim.duration));
+
+  if (t >= 1) {
+    // Animation complete — draw final position and clear anim
+    state.pvLiveAnim = null;
+    drawLiveBoard(ctx, boardRect, anim.afterFen, anim.highlight, state.displayFlipped);
+    return false; // done
+  }
+
+  // Draw board with piece removed from source
+  drawLiveBoard(ctx, boardRect, anim.pickedUpFen, anim.highlight, state.displayFlipped);
+
+  const sqW = boardRect.width / 8;
+  const sqH = boardRect.height / 8;
+
+  // Interpolate piece position
+  const px = boardRect.x + (anim.fromFile + (anim.toFile - anim.fromFile) * t) * sqW;
+  const py = boardRect.y + (anim.fromRank + (anim.toRank - anim.fromRank) * t) * sqH;
+
+  // Draw floating piece
+  const img = getPieceImage(anim.piece);
+  if (img) {
+    const padding = sqW * 0.05;
+    ctx.drawImage(img, px + padding, py + padding, sqW - padding * 2, sqH - padding * 2);
+  }
+
+  // Draw arrow following piece (progress matches piece movement)
+  const arrowScale = (boardRect.width + boardRect.height) / 2 / 192;
+  drawArrow(ctx, anim.arrow, boardRect, arrowScale, state.displayFlipped, 0, t, true);
+
+  return true; // still animating
+}
+
 export interface OverlayState {
   videoCanvas: HTMLCanvasElement | null;
   canvas: HTMLCanvasElement | null;
@@ -104,6 +171,7 @@ export interface OverlayState {
   liveBoardMode: boolean;
   pvLiveFen: string | null;
   pvLiveHighlight: number[];
+  pvLiveAnim: LiveBoardAnim | null;
   panelScale: number;
   displayInfo: {
     size: { width: number; height: number };
@@ -520,8 +588,11 @@ export function renderVideoOverlay(state: OverlayState): void {
   }
 
   // Live board mode: draw analysis board on top of actual board during PV playback
-  if (state.liveBoardMode && state.lineVisible && state.pvLiveFen && state.pvDisplayDepth > 0) {
-    drawLiveBoard(ctx, boardRect, state.pvLiveFen, state.pvLiveHighlight, state.displayFlipped);
+  if (state.liveBoardMode && state.lineVisible && (state.pvLiveFen || state.pvLiveAnim) && state.pvDisplayDepth > 0) {
+    const stillAnimating = drawLiveBoardAnimated(ctx, boardRect, state);
+    if (stillAnimating) {
+      requestAnimationFrame(() => renderVideoOverlay(state));
+    }
   } else if (state.arrowsVisible || state.lineVisible || state.pvPreviewLineIndex !== null) {
     const targetArrows = getActiveArrows(state);
     const animated = updateAnimatedArrows(targetArrows, videoArrowState, () => renderVideoOverlay(state));

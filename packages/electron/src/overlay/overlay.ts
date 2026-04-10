@@ -63,6 +63,7 @@ const state: OverlayState = {
   liveBoardMode: false,
   pvLiveFen: null,
   pvLiveHighlight: [],
+  pvLiveAnim: null,
   panelScale: 1,
   displayInfo: null,
 };
@@ -520,24 +521,10 @@ function initOverlay(): void {
     const afterPos = applyUciMoves(pvCycleBaseFen, pvCyclePv, step);
     if (!afterPos) { pvCycleStop(); return; }
 
-    // Update live board state for video overlay
-    state.pvLiveFen = afterPos.fen;
-    state.pvLiveHighlight = afterPos.highlight;
-
-    // Update actual board overlay (shows arrows or live board depending on mode)
-    renderVideoOverlay(state);
-
-    // Animate piece movement on virtual board
+    // Animate piece movement
     const uci = pvCyclePv[step - 1];
     const fromSq = uci.slice(0, 2);
     const toSq = uci.slice(2, 4);
-
-    // Skip virtual board animation if vboard overlay is hidden
-    if (!state.vboardOverlayVisible) return;
-
-    const grid = document.getElementById('cv-debug-grid');
-    const container = grid?.parentElement;
-    if (!grid || !container) { pvCycleStop(); return; }
 
     // Figure out which piece is moving (from the before position)
     const beforeRows = beforePos.fen.split('/');
@@ -552,12 +539,11 @@ function initOverlay(): void {
       }
     }
 
-    // Render board BEFORE the move with source square emptied (piece "picked up")
-    // and highlight on source square
     const fromIdx = fromRank * 8 + fromFile;
     const toFileN = toSq.charCodeAt(0) - 97;
     const toRankN = 8 - parseInt(toSq[1]);
     const toIdx = toRankN * 8 + toFileN;
+
     // Build a FEN with the moving piece removed from source
     const pickedUpFen = beforePos.fen.split('/').map((row, rank) => {
       if (rank !== fromRank) return row;
@@ -575,9 +561,50 @@ function initOverlay(): void {
           file++;
         }
       }
-      // Compress consecutive 1s
       return result.replace(/1+/g, m => String(m.length));
     }).join('/');
+
+    // Update live board state for video overlay (with animation)
+    state.pvLiveFen = afterPos.fen;
+    state.pvLiveHighlight = afterPos.highlight;
+    if (state.liveBoardMode) {
+      // Compute visual file/rank for animation (account for board flip)
+      let visFromFile = fromFile, visFromRank = fromRank;
+      let visToFile = toFileN, visToRank = toRankN;
+      if (pvCycleFlipped) {
+        visFromFile = 7 - visFromFile; visFromRank = 7 - visFromRank;
+        visToFile = 7 - visToFile; visToRank = 7 - visToRank;
+      }
+      const turn = pvCycleBaseFen.split(' ')[1] || 'w';
+      const isWhite = (step % 2 === 1) === (turn === 'w');
+      state.pvLiveAnim = {
+        pickedUpFen,
+        afterFen: afterPos.fen,
+        highlight: [fromIdx, toIdx],
+        piece: movingPiece,
+        fromFile: visFromFile, fromRank: visFromRank,
+        toFile: visToFile, toRank: visToRank,
+        arrow: {
+          from: fromSq, to: toSq,
+          color: isWhite ? '#e5e5e5' : '#1a1a1a',
+          width: 3, opacity: 0.8, loss_cp: 0,
+          label: String(step),
+        },
+        startTime: performance.now(),
+        duration: 350,
+      };
+    }
+
+    // Update actual board overlay (shows arrows or live board depending on mode)
+    renderVideoOverlay(state);
+
+    // Virtual board animation
+    if (!state.vboardOverlayVisible) return;
+
+    const grid = document.getElementById('cv-debug-grid');
+    const container = grid?.parentElement;
+    if (!grid || !container) { pvCycleStop(); return; }
+
     renderBoardGrid(grid, pickedUpFen, pvCycleFlipped, [fromIdx, toIdx]);
 
     // Compute pixel positions for source and destination squares
@@ -754,6 +781,7 @@ function initOverlay(): void {
       state.pvDisplayDepth = state.pvDepth; // restore full depth
       state.pvLiveFen = null;
       state.pvLiveHighlight = [];
+      state.pvLiveAnim = null;
       renderArrows(state);
       renderVideoOverlay(state);
     }
