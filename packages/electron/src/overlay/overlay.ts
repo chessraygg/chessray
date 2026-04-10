@@ -33,39 +33,6 @@ declare global {
 
 // ── Module-level state ──
 
-/** Position the live board overlay over the detected board bbox */
-function updateLiveBoardOverlay(): void {
-  const overlay = document.getElementById('live-board-overlay');
-  if (!overlay) return;
-
-  const result = state.currentResult;
-  const playing = (window as any).__chessrayPvPlaying;
-  const shouldShow = state.liveBoardMode && state.lineVisible && playing &&
-    result?.board_detection?.found && result.board_detection.bbox;
-
-  if (!shouldShow) {
-    overlay.classList.add('hidden');
-    return;
-  }
-
-  const bbox = result!.board_detection!.bbox!;
-  const dpr = state.displayInfo?.scaleFactor ?? window.devicePixelRatio;
-  const overlayY = state.displayInfo?.overlayBounds?.y ?? 0;
-  const displayY = (state.displayInfo as any)?.displayBounds?.y ?? 0;
-  const overlayYOffset = overlayY - displayY;
-
-  const x = bbox.x / dpr;
-  const y = bbox.y / dpr - overlayYOffset;
-  const w = bbox.width / dpr;
-  const h = bbox.height / dpr;
-
-  overlay.style.left = `${x}px`;
-  overlay.style.top = `${y}px`;
-  overlay.style.width = `${w}px`;
-  overlay.style.height = `${h}px`;
-  overlay.classList.remove('hidden');
-}
-
 let userPanel: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
 let debugFen: HTMLDivElement | null = null;
@@ -93,7 +60,6 @@ const state: OverlayState = {
   autoMode: false,
   vboardOverlayVisible: true,
   pvPreviewLineIndex: null,
-  liveBoardMode: false,
   panelScale: 1,
   displayInfo: null,
 };
@@ -405,19 +371,6 @@ function initOverlay(): void {
     });
   }
 
-  // ── Live board toggle ──
-  const liveBoardBtn = document.getElementById('cv-liveboard-btn');
-  if (liveBoardBtn) {
-    state.liveBoardMode = prefs.liveBoardMode ?? false;
-    liveBoardBtn.classList.toggle('active', state.liveBoardMode);
-    liveBoardBtn.addEventListener('click', () => {
-      state.liveBoardMode = !state.liveBoardMode;
-      liveBoardBtn.classList.toggle('active', state.liveBoardMode);
-      savePrefs({ liveBoardMode: state.liveBoardMode } as any);
-      renderVideoOverlay(state);
-    });
-  }
-
   if (pvDepthSlider && pvDepthVal) {
     const PV_ALL = 999;
     const sliderVal = state.pvDepth >= PV_ALL ? 11 : state.pvDepth;
@@ -541,8 +494,16 @@ function initOverlay(): void {
     state.pvDisplayDepth++;
     const step = state.pvDisplayDepth;
 
-    // Update actual board overlay (shows arrows)
+    // Update actual board overlay (shows arrows 1..step)
     renderVideoOverlay(state);
+
+    // Skip virtual board animation if vboard overlay is hidden
+    if (!state.vboardOverlayVisible) return;
+
+    // Animate piece movement on virtual board
+    const uci = pvCyclePv[step - 1];
+    const fromSq = uci.slice(0, 2);
+    const toSq = uci.slice(2, 4);
 
     // Get the board position BEFORE this move (step-1 moves applied)
     const beforePos = step === 1
@@ -554,110 +515,132 @@ function initOverlay(): void {
     const afterPos = applyUciMoves(pvCycleBaseFen, pvCyclePv, step);
     if (!afterPos) { pvCycleStop(); return; }
 
-    // Animate piece movement on virtual board(s)
-    const uci = pvCyclePv[step - 1];
-    const fromSq = uci.slice(0, 2);
-    const toSq = uci.slice(2, 4);
+    const grid = document.getElementById('cv-debug-grid');
+    const container = grid?.parentElement;
+    if (!grid || !container) { pvCycleStop(); return; }
 
-    if (!state.vboardOverlayVisible && !state.liveBoardMode) return;
+    // Figure out which piece is moving (from the before position)
+    const beforeRows = beforePos.fen.split('/');
+    const fromFile = fromSq.charCodeAt(0) - 97;
+    const fromRank = 8 - parseInt(fromSq[1]);
+    let movingPiece = '';
+    {
+      let file = 0;
+      for (const ch of beforeRows[fromRank]) {
+        if (ch >= '1' && ch <= '8') { file += parseInt(ch); }
+        else { if (file === fromFile) { movingPiece = ch; break; } file++; }
+      }
+    }
 
+    // Render board BEFORE the move with source square emptied (piece "picked up")
+    // and highlight on source square
+    const fromIdx = fromRank * 8 + fromFile;
+    const toFileN = toSq.charCodeAt(0) - 97;
+    const toRankN = 8 - parseInt(toSq[1]);
+    const toIdx = toRankN * 8 + toFileN;
+    // Build a FEN with the moving piece removed from source
+    const pickedUpFen = beforePos.fen.split('/').map((row, rank) => {
+      if (rank !== fromRank) return row;
+      let result = '';
+      let file = 0;
+      for (const ch of row) {
+        if (ch >= '1' && ch <= '8') {
+          const n = parseInt(ch);
+          for (let i = 0; i < n; i++) {
+            result += file === fromFile ? '1' : '1';
+            file++;
+          }
+        } else {
+          result += file === fromFile ? '1' : ch;
+          file++;
+        }
+      }
+      // Compress consecutive 1s
+      return result.replace(/1+/g, m => String(m.length));
+    }).join('/');
+    renderBoardGrid(grid, pickedUpFen, pvCycleFlipped, [fromIdx, toIdx]);
+
+    // Compute pixel positions for source and destination squares
+    const sq = 25; // grid square size in CSS px
     let srcFile = fromFile, srcRank = fromRank, dstFile = toFileN, dstRank = toRankN;
     if (pvCycleFlipped) {
       srcFile = 7 - srcFile; srcRank = 7 - srcRank;
       dstFile = 7 - dstFile; dstRank = 7 - dstRank;
     }
 
-    const turn = pvCycleBaseFen.split(' ')[1] || 'w';
-    const isWhite = (step % 2 === 1) === (turn === 'w');
-    const moveArrow = {
-      from: fromSq, to: toSq,
-      color: isWhite ? '#e5e5e5' : '#1a1a1a',
-      width: 3, opacity: 0.8, loss_cp: 0,
-      label: String(step),
-    };
+    // Create floating piece at source
+    const floater = document.createElement('div');
+    floater.className = 'piece-anim';
+    floater.style.width = `${sq}px`;
+    floater.style.height = `${sq}px`;
+    floater.style.left = `${srcFile * sq}px`;
+    floater.style.top = `${srcRank * sq}px`;
+    floater.innerHTML = movingPiece ? pieceSvg(movingPiece, 22) : '';
+    container.appendChild(floater);
 
-    // Animate on a given board (grid + container + canvas)
-    function animateBoard(grid: HTMLElement, container: HTMLElement, canvas: HTMLCanvasElement | null, sqSize: number, pieceSize: number) {
-      renderBoardGrid(grid, pickedUpFen, pvCycleFlipped, [fromIdx, toIdx]);
+    // Trigger animation to destination
+    requestAnimationFrame(() => {
+      floater.style.left = `${dstFile * sq}px`;
+      floater.style.top = `${dstRank * sq}px`;
+    });
 
-      const floater = document.createElement('div');
-      floater.className = 'piece-anim';
-      floater.style.width = `${sqSize}px`;
-      floater.style.height = `${sqSize}px`;
-      floater.style.left = `${srcFile * sqSize}px`;
-      floater.style.top = `${srcRank * sqSize}px`;
-      floater.innerHTML = movingPiece ? pieceSvg(movingPiece, pieceSize) : '';
-      container.appendChild(floater);
-
-      requestAnimationFrame(() => {
-        floater.style.left = `${dstFile * sqSize}px`;
-        floater.style.top = `${dstRank * sqSize}px`;
-      });
-
-      floater.addEventListener('transitionend', () => {
+    // On transition end, render final board and remove floater
+    floater.addEventListener('transitionend', () => {
+      floater.remove();
+      if ((window as any).__chessrayPvPlaying) {
+        renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight);
+      }
+    }, { once: true });
+    // Fallback if transitionend doesn't fire
+    setTimeout(() => {
+      if (floater.parentElement) {
         floater.remove();
         if ((window as any).__chessrayPvPlaying) {
           renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight);
         }
-      }, { once: true });
-      setTimeout(() => {
-        if (floater.parentElement) {
-          floater.remove();
-          if ((window as any).__chessrayPvPlaying) {
-            renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight);
-          }
+      }
+    }, 500);
+
+    // Animate arrow following piece movement (time-based, no DOM reads)
+    if (state.canvas) {
+      const turn = pvCycleBaseFen.split(' ')[1] || 'w';
+      const isWhite = (step % 2 === 1) === (turn === 'w');
+      const moveArrow = {
+        from: fromSq, to: toSq,
+        color: isWhite ? '#e5e5e5' : '#1a1a1a',
+        width: 3, opacity: 0.8, loss_cp: 0,
+        label: String(step),
+      };
+      const TRANSITION_MS = 350; // matches CSS transition duration
+      const startTime = performance.now();
+
+      // ease-in-out approximation: 3t² - 2t³
+      function easeInOut(t: number): number { return t * t * (3 - 2 * t); }
+
+      function tickArrow(): void {
+        if (!state.canvas || !(window as any).__chessrayPvPlaying) return;
+        const elapsed = performance.now() - startTime;
+        const progress = easeInOut(Math.min(1, elapsed / TRANSITION_MS));
+
+        const size = 200;
+        const dpr = window.devicePixelRatio || 1;
+        const effectiveDpr = dpr * (state.panelScale || 1);
+        const bufferSize = Math.ceil(size * effectiveDpr);
+        if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
+          state.canvas.width = bufferSize;
+          state.canvas.height = bufferSize;
+          state.canvas.style.width = `${size}px`;
+          state.canvas.style.height = `${size}px`;
         }
-      }, 500);
+        const ctx = state.canvas.getContext('2d')!;
+        ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
+        ctx.clearRect(0, 0, size, size);
+        drawArrow(ctx, moveArrow, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, progress, true);
 
-      if (canvas) {
-        const TRANSITION_MS = 350;
-        const startTime = performance.now();
-        function easeInOut(t: number): number { return t * t * (3 - 2 * t); }
-        const canvasSize = parseInt(canvas.style.width) || canvas.width;
-
-        function tickArrow(): void {
-          if (!canvas || !(window as any).__chessrayPvPlaying) return;
-          const elapsed = performance.now() - startTime;
-          const progress = easeInOut(Math.min(1, elapsed / TRANSITION_MS));
-
-          const dpr = window.devicePixelRatio || 1;
-          const bufferSize = Math.ceil(canvasSize * dpr);
-          if (canvas.width !== bufferSize || canvas.height !== bufferSize) {
-            canvas.width = bufferSize;
-            canvas.height = bufferSize;
-          }
-          const ctx = canvas.getContext('2d')!;
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          ctx.clearRect(0, 0, canvasSize, canvasSize);
-          drawArrow(ctx, moveArrow, { x: 0, y: 0, width: canvasSize, height: canvasSize }, 1, state.displayFlipped, 0, progress, true);
-
-          if (progress < 1) requestAnimationFrame(tickArrow);
-        }
-        requestAnimationFrame(tickArrow);
+        if (progress < 1) requestAnimationFrame(tickArrow);
       }
+      requestAnimationFrame(tickArrow);
     }
-
-    // Animate on the panel virtual board
-    if (state.vboardOverlayVisible) {
-      const grid = document.getElementById('cv-debug-grid');
-      const container = grid?.parentElement;
-      if (grid && container) {
-        animateBoard(grid, container, state.canvas, 25, 22);
-      }
-    }
-
-    // Animate on the live board overlay
-    if (state.liveBoardMode) {
-      const liveGrid = document.getElementById('live-board-grid');
-      const liveContainer = liveGrid?.parentElement;
-      const liveCanvas = document.getElementById('live-board-canvas') as HTMLCanvasElement | null;
-      if (liveGrid && liveContainer) {
-        const liveSqSize = liveGrid.offsetWidth / 8;
-        const livePieceSize = Math.round(liveSqSize * 0.88);
-        animateBoard(liveGrid, liveContainer, liveCanvas, liveSqSize, livePieceSize);
-      }
-    }
-
   }
 
   /** Start animating the current pvCycleLineIndex */
@@ -689,8 +672,6 @@ function initOverlay(): void {
       state.pvPreviewLineIndex = null;
       (window as any).__chessrayPvPlaying = true;
       document.getElementById('cv-debug-grid')?.classList.add('analysis');
-      document.getElementById('live-board-grid')?.classList.add('analysis');
-      updateLiveBoardOverlay();
 
       // First step immediately, then continue on interval
       pvCycleStep();
@@ -752,15 +733,6 @@ function initOverlay(): void {
     if (wasPlaying) {
       state.pvDisplayDepth = state.pvDepth; // restore full depth
       renderArrows(state);
-      renderVideoOverlay(state);
-      // Clean up live board overlay
-      const liveGrid = document.getElementById('live-board-grid');
-      liveGrid?.classList.remove('analysis');
-      document.querySelectorAll('#live-board-overlay .piece-anim').forEach(el => el.remove());
-      if (pvCycleBaseFen && liveGrid) {
-        renderBoardGrid(liveGrid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, []);
-      }
-      updateLiveBoardOverlay();
     }
   }
 
@@ -1175,7 +1147,6 @@ function processPendingResult(): void {
   state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
   renderVideoOverlay(state);
-  updateLiveBoardOverlay();
 }
 
 window.chessRay.onFrameResult((result) => {

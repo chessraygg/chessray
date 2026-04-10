@@ -22,7 +22,6 @@ export interface OverlayState {
   autoMode: boolean;
   vboardOverlayVisible: boolean;
   pvPreviewLineIndex: number | null;
-  liveBoardMode: boolean;
   panelScale: number;
   displayInfo: {
     size: { width: number; height: number };
@@ -277,14 +276,15 @@ export function drawArrow(
     ctx.fill();
   }
 
-  // Draw label: at source square while extending, at midpoint when fully extended
-  if (arrow.label) {
+  // Draw label at midpoint of arrow (only when fully extended)
+  if (arrow.label && t >= 1) {
     const fontSize = Math.max(8, lineWidth * 2);
     ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.globalAlpha = arrow.opacity;
     const r = fontSize * 0.55;
+    // Midpoint: for curved arrows use the control point, for straight use midpoint
     const ox = curveOffset === 0 ? (x1 + x2) / 2 : mx;
     const oy = curveOffset === 0 ? (y1 + y2) / 2 : my;
     ctx.beginPath();
