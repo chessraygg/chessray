@@ -1,5 +1,84 @@
 import type { ArrowDescriptor, PipelineResult } from '@chessray/core';
 import { computeCurveOffsets, computePvArrows, lossToColor } from '@chessray/core';
+import { pieceSvg } from './piece-svg.js';
+
+// ── Piece image cache for canvas rendering ──
+const pieceImageCache = new Map<string, HTMLImageElement>();
+
+function getPieceImage(piece: string): HTMLImageElement | null {
+  const cached = pieceImageCache.get(piece);
+  if (cached) return cached.complete ? cached : null;
+  const svg = pieceSvg(piece, 128);
+  const img = new Image();
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  pieceImageCache.set(piece, img);
+  return img.complete ? img : null;
+}
+
+// Analysis board colors (blue-gray tint, matching virtual board .analysis class)
+const LIVE_LIGHT = '#cdd5de';
+const LIVE_DARK = '#7e8ea3';
+const LIVE_HL_LIGHT = '#a8c4f0';
+const LIVE_HL_DARK = '#6a8fc4';
+
+/** Draw a full analysis board (squares + pieces) onto the video canvas */
+export function drawLiveBoard(
+  ctx: CanvasRenderingContext2D,
+  boardRect: { x: number; y: number; width: number; height: number },
+  fen: string,
+  highlightIndices: number[],
+  displayFlipped: boolean,
+): void {
+  const sqW = boardRect.width / 8;
+  const sqH = boardRect.height / 8;
+  const hlSet = new Set(highlightIndices);
+
+  // Parse FEN
+  const rows = fen.split('/');
+
+  for (let rank = 0; rank < 8; rank++) {
+    for (let file = 0; file < 8; file++) {
+      // Map visual rank/file to chess rank/file
+      const chessRank = displayFlipped ? rank : 7 - rank;
+      const chessFile = displayFlipped ? 7 - file : file;
+      const idx = (7 - chessRank) * 8 + chessFile;
+
+      const x = boardRect.x + file * sqW;
+      const y = boardRect.y + rank * sqH;
+      const isLight = (rank + file) % 2 === 0;
+      const isHighlighted = hlSet.has(idx);
+
+      // Draw square
+      if (isHighlighted) {
+        ctx.fillStyle = isLight ? LIVE_HL_LIGHT : LIVE_HL_DARK;
+      } else {
+        ctx.fillStyle = isLight ? LIVE_LIGHT : LIVE_DARK;
+      }
+      ctx.fillRect(x, y, sqW, sqH);
+
+      // Draw piece
+      const fenRow = rows[7 - chessRank];
+      if (fenRow) {
+        let fenFile = 0;
+        let piece = '';
+        for (const ch of fenRow) {
+          if (ch >= '1' && ch <= '8') { fenFile += parseInt(ch); }
+          else {
+            if (fenFile === chessFile) { piece = ch; break; }
+            fenFile++;
+          }
+        }
+        if (piece) {
+          const img = getPieceImage(piece);
+          if (img) {
+            const padding = sqW * 0.05;
+            ctx.drawImage(img, x + padding, y + padding, sqW - padding * 2, sqH - padding * 2);
+          }
+        }
+      }
+    }
+  }
+}
 
 export interface OverlayState {
   videoCanvas: HTMLCanvasElement | null;
@@ -22,6 +101,9 @@ export interface OverlayState {
   autoMode: boolean;
   vboardOverlayVisible: boolean;
   pvPreviewLineIndex: number | null;
+  liveBoardMode: boolean;
+  pvLiveFen: string | null;
+  pvLiveHighlight: number[];
   panelScale: number;
   displayInfo: {
     size: { width: number; height: number };
@@ -437,7 +519,10 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.strokeRect(bx, by, bw, bh);
   }
 
-  if (state.arrowsVisible || state.lineVisible || state.pvPreviewLineIndex !== null) {
+  // Live board mode: draw analysis board on top of actual board during PV playback
+  if (state.liveBoardMode && state.lineVisible && state.pvLiveFen && state.pvDisplayDepth > 0) {
+    drawLiveBoard(ctx, boardRect, state.pvLiveFen, state.pvLiveHighlight, state.displayFlipped);
+  } else if (state.arrowsVisible || state.lineVisible || state.pvPreviewLineIndex !== null) {
     const targetArrows = getActiveArrows(state);
     const animated = updateAnimatedArrows(targetArrows, videoArrowState, () => renderVideoOverlay(state));
     // Draw with animated opacity

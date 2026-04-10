@@ -60,6 +60,9 @@ const state: OverlayState = {
   autoMode: false,
   vboardOverlayVisible: true,
   pvPreviewLineIndex: null,
+  liveBoardMode: false,
+  pvLiveFen: null,
+  pvLiveHighlight: [],
   panelScale: 1,
   displayInfo: null,
 };
@@ -371,6 +374,19 @@ function initOverlay(): void {
     });
   }
 
+  // ── Live board toggle ──
+  const liveBoardBtn = document.getElementById('cv-liveboard-btn');
+  if (liveBoardBtn) {
+    state.liveBoardMode = prefs.liveBoardMode ?? false;
+    liveBoardBtn.classList.toggle('active', state.liveBoardMode);
+    liveBoardBtn.addEventListener('click', () => {
+      state.liveBoardMode = !state.liveBoardMode;
+      liveBoardBtn.classList.toggle('active', state.liveBoardMode);
+      savePrefs({ liveBoardMode: state.liveBoardMode } as any);
+      renderVideoOverlay(state);
+    });
+  }
+
   if (pvDepthSlider && pvDepthVal) {
     const PV_ALL = 999;
     const sliderVal = state.pvDepth >= PV_ALL ? 11 : state.pvDepth;
@@ -494,17 +510,6 @@ function initOverlay(): void {
     state.pvDisplayDepth++;
     const step = state.pvDisplayDepth;
 
-    // Update actual board overlay (shows arrows 1..step)
-    renderVideoOverlay(state);
-
-    // Skip virtual board animation if vboard overlay is hidden
-    if (!state.vboardOverlayVisible) return;
-
-    // Animate piece movement on virtual board
-    const uci = pvCyclePv[step - 1];
-    const fromSq = uci.slice(0, 2);
-    const toSq = uci.slice(2, 4);
-
     // Get the board position BEFORE this move (step-1 moves applied)
     const beforePos = step === 1
       ? { fen: pvCycleBaseFen.split(' ')[0], highlight: [] as number[] }
@@ -514,6 +519,21 @@ function initOverlay(): void {
     // Get the board position AFTER this move
     const afterPos = applyUciMoves(pvCycleBaseFen, pvCyclePv, step);
     if (!afterPos) { pvCycleStop(); return; }
+
+    // Update live board state for video overlay
+    state.pvLiveFen = afterPos.fen;
+    state.pvLiveHighlight = afterPos.highlight;
+
+    // Update actual board overlay (shows arrows or live board depending on mode)
+    renderVideoOverlay(state);
+
+    // Animate piece movement on virtual board
+    const uci = pvCyclePv[step - 1];
+    const fromSq = uci.slice(0, 2);
+    const toSq = uci.slice(2, 4);
+
+    // Skip virtual board animation if vboard overlay is hidden
+    if (!state.vboardOverlayVisible) return;
 
     const grid = document.getElementById('cv-debug-grid');
     const container = grid?.parentElement;
@@ -732,7 +752,10 @@ function initOverlay(): void {
     }
     if (wasPlaying) {
       state.pvDisplayDepth = state.pvDepth; // restore full depth
+      state.pvLiveFen = null;
+      state.pvLiveHighlight = [];
       renderArrows(state);
+      renderVideoOverlay(state);
     }
   }
 
