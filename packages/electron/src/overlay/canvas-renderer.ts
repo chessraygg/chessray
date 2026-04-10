@@ -434,15 +434,8 @@ export function drawArrow(
     ctx.textBaseline = 'middle';
     ctx.globalAlpha = arrow.opacity;
     const r = fontSize * 0.55;
-    // Source while extending, midpoint when done
-    let ox: number, oy: number;
-    if (t >= 1) {
-      ox = curveOffset === 0 ? (x1 + x2) / 2 : mx;
-      oy = curveOffset === 0 ? (y1 + y2) / 2 : my;
-    } else {
-      ox = x1;
-      oy = y1;
-    }
+    const ox = curveOffset === 0 ? (x1 + x2) / 2 : mx;
+    const oy = curveOffset === 0 ? (y1 + y2) / 2 : my;
     ctx.beginPath();
     ctx.arc(ox, oy, r, 0, Math.PI * 2);
     ctx.fillStyle = arrow.color;
