@@ -8,6 +8,14 @@
 <body>
   <canvas id="video-overlay"></canvas>
 
+  <!-- Live board overlay: positioned over detected board area when active -->
+  <div id="live-board-overlay" class="live-board-overlay hidden">
+    <div class="board-container">
+      <div class="piece-grid analysis" id="live-board-grid"></div>
+      <canvas id="live-board-canvas" width="200" height="200"></canvas>
+    </div>
+  </div>
+
   <div class="panel user-panel" id="user-panel">
     <!-- Top bar: always visible — icon toggles + collapse/close -->
     <div class="top-bar" id="cv-main-toggles">
