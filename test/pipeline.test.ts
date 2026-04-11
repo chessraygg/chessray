@@ -63,6 +63,69 @@ describe('end-to-end detection pipeline', () => {
       const squares = result.highlightedSquares.map(indexToChess);
       console.log(`${tc.file}: highlights=${squares}, flipped=${result.flipped}, turn=${result.turn}, source=${result.orientationSource}`);
 
+      // --- Save annotated debug image (before assertions so it's always generated) ---
+      const out = new PNG({ width, height });
+      out.data = Buffer.from(data);
+      const rough = board.roughBbox!;
+      const sqW = bbox.width / 8;
+      const sqH = bbox.height / 8;
+
+      const setPixel = (px: number, py: number, r: number, g: number, b: number) => {
+        if (px >= 0 && px < width && py >= 0 && py < height) {
+          const i = (py * width + px) * 4;
+          out.data[i] = r; out.data[i + 1] = g; out.data[i + 2] = b; out.data[i + 3] = 255;
+        }
+      };
+
+      const drawRect = (b: BoardBBox, r: number, g: number, bl: number, thickness: number) => {
+        for (let t = 0; t < thickness; t++) {
+          for (let x = b.x - t; x <= b.x + b.width + t; x++) {
+            setPixel(x, b.y - t, r, g, bl);
+            setPixel(x, b.y + b.height + t, r, g, bl);
+          }
+          for (let y = b.y - t; y <= b.y + b.height + t; y++) {
+            setPixel(b.x - t, y, r, g, bl);
+            setPixel(b.x + b.width + t, y, r, g, bl);
+          }
+        }
+      };
+
+      drawRect(rough, 255, 0, 0, 3);
+      drawRect(bbox, 0, 100, 255, 2);
+
+      for (let k = 1; k < 8; k++) {
+        const gx = bbox.x + Math.round(k * sqW);
+        const gy = bbox.y + Math.round(k * sqH);
+        for (let y = bbox.y; y <= bbox.y + bbox.height; y++) setPixel(gx, y, 0, 200, 0);
+        for (let x = bbox.x; x <= bbox.x + bbox.width; x++) setPixel(x, gy, 0, 200, 0);
+      }
+
+      // Draw highlight patches with their sampled colors
+      const { patches: hlPatches } = detectHighlightedSquares(cropped);
+      for (const patch of hlPatches) {
+        const [pr, pg, pb] = patch.color.map(v => Math.round(v));
+        // Fill patch with its sampled color
+        for (let py = patch.y; py < patch.y + patch.h; py++)
+          for (let px = patch.x; px < patch.x + patch.w; px++)
+            setPixel(bbox.x + px, bbox.y + py, pr, pg, pb);
+        // Border: white for median patches, black for non-median
+        const [br, bg, bb] = patch.isMedian ? [255, 255, 255] : [0, 0, 0];
+        for (let px = patch.x - 1; px <= patch.x + patch.w; px++) {
+          setPixel(bbox.x + px, bbox.y + patch.y - 1, br, bg, bb);
+          setPixel(bbox.x + px, bbox.y + patch.y + patch.h, br, bg, bb);
+        }
+        for (let py = patch.y - 1; py <= patch.y + patch.h; py++) {
+          setPixel(bbox.x + patch.x - 1, bbox.y + py, br, bg, bb);
+          setPixel(bbox.x + patch.x + patch.w, bbox.y + py, br, bg, bb);
+        }
+      }
+
+      const outDir = path.join(__dirname, 'output');
+      fs.mkdirSync(outDir, { recursive: true });
+      const outName = tc.file.replace('.png', '-highlight.png');
+      fs.writeFileSync(path.join(outDir, outName), PNG.sync.write(out));
+
+      // --- Assertions ---
       // Verify raw FEN
       expect(result.rawFen).toBe(tc.expectedFen);
 
@@ -111,56 +174,6 @@ describe('end-to-end detection pipeline', () => {
           // (detectLabels returns overall result; chars are verified via the expected config)
         }
       }
-
-      // Save annotated debug image
-      const out = new PNG({ width, height });
-      out.data = Buffer.from(data);
-      const rough = board.roughBbox!;
-      const sqW = bbox.width / 8;
-      const sqH = bbox.height / 8;
-
-      const setPixel = (px: number, py: number, r: number, g: number, b: number) => {
-        if (px >= 0 && px < width && py >= 0 && py < height) {
-          const i = (py * width + px) * 4;
-          out.data[i] = r; out.data[i + 1] = g; out.data[i + 2] = b; out.data[i + 3] = 255;
-        }
-      };
-
-      const drawRect = (b: BoardBBox, r: number, g: number, bl: number, thickness: number) => {
-        for (let t = 0; t < thickness; t++) {
-          for (let x = b.x - t; x <= b.x + b.width + t; x++) {
-            setPixel(x, b.y - t, r, g, bl);
-            setPixel(x, b.y + b.height + t, r, g, bl);
-          }
-          for (let y = b.y - t; y <= b.y + b.height + t; y++) {
-            setPixel(b.x - t, y, r, g, bl);
-            setPixel(b.x + b.width + t, y, r, g, bl);
-          }
-        }
-      };
-
-      drawRect(rough, 255, 0, 0, 3);
-      drawRect(bbox, 0, 100, 255, 2);
-
-      for (let k = 1; k < 8; k++) {
-        const gx = bbox.x + Math.round(k * sqW);
-        const gy = bbox.y + Math.round(k * sqH);
-        for (let y = bbox.y; y <= bbox.y + bbox.height; y++) setPixel(gx, y, 0, 200, 0);
-        for (let x = bbox.x; x <= bbox.x + bbox.width; x++) setPixel(x, gy, 0, 200, 0);
-      }
-
-      // Get highlight patches for debug visualization
-      const { patches } = detectHighlightedSquares(cropped);
-      for (const [px0, py0, pw, ph] of patches) {
-        for (let py = py0; py < py0 + ph; py++)
-          for (let px = px0; px < px0 + pw; px++)
-            setPixel(bbox.x + px, bbox.y + py, 0, 255, 255);
-      }
-
-      const outDir = path.join(__dirname, 'output');
-      fs.mkdirSync(outDir, { recursive: true });
-      const outName = tc.file.replace('.png', '-highlight.png');
-      fs.writeFileSync(path.join(outDir, outName), PNG.sync.write(out));
 
     }, 120000);
   }

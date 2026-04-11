@@ -1,10 +1,20 @@
 import type { PixelBuffer } from './pixel-utils.js';
 
+export interface CornerPatch {
+  /** Patch position and size (relative to cropped board) */
+  x: number; y: number; w: number; h: number;
+  /** Sampled RGB color */
+  color: [number, number, number];
+  /** Whether this corner was chosen as the median representative */
+  isMedian: boolean;
+}
+
 export interface HighlightResult {
   highlighted: number[];
-  patches: Array<[number, number, number, number]>;
+  /** All 4 corner patches per square (256 total), with sampled colors */
+  patches: CornerPatch[];
   scores?: Array<{ idx: number; dist: number }>;
-  /** Per-square sampled colors (top-left inset patch), indexed 0-63 */
+  /** Per-square representative color (median of 4 corners), indexed 0-63 */
   colors?: Array<[number, number, number]>;
   /** Median colors for light and dark squares */
   medians?: { light: [number, number, number]; dark: [number, number, number] };
@@ -38,16 +48,48 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   const insetY = Math.max(2, Math.floor(sqH * insetPct));
 
   const colors: Array<[number, number, number]> = [];
-  const patches: Array<[number, number, number, number]> = [];
+  const patches: CornerPatch[] = [];
 
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
-      const x0 = Math.floor(file * sqW);
-      const y0 = Math.floor(rank * sqH);
+      const sqX0 = Math.floor(file * sqW);
+      const sqY0 = Math.floor(rank * sqH);
+      const sqX1 = Math.floor((file + 1) * sqW);
+      const sqY1 = Math.floor((rank + 1) * sqH);
 
-      // Use top-left inset patch as the representative color for median computation
-      patches.push([x0 + insetX, y0 + insetY, pw, ph]);
-      colors.push(samplePatch(x0 + insetX, y0 + insetY));
+      // Sample all 4 corners
+      const corners: Array<[number, number]> = [
+        [sqX0 + insetX, sqY0 + insetY],
+        [sqX1 - insetX - pw, sqY0 + insetY],
+        [sqX0 + insetX, sqY1 - insetY - ph],
+        [sqX1 - insetX - pw, sqY1 - insetY - ph],
+      ];
+      const cornerColors = corners.map(([cx, cy]) => samplePatch(cx, cy));
+
+      // Representative color: median of 4 corners (robust to piece/annotation on 1-2 corners)
+      const sorted = [0, 1, 2, 3].sort((a, b) => {
+        const sumA = cornerColors[a][0] + cornerColors[a][1] + cornerColors[a][2];
+        const sumB = cornerColors[b][0] + cornerColors[b][1] + cornerColors[b][2];
+        return sumA - sumB;
+      });
+      // Median = average of middle two
+      const m1 = cornerColors[sorted[1]];
+      const m2 = cornerColors[sorted[2]];
+      const medianColor: [number, number, number] = [
+        (m1[0] + m2[0]) / 2,
+        (m1[1] + m2[1]) / 2,
+        (m1[2] + m2[2]) / 2,
+      ];
+      colors.push(medianColor);
+
+      // Store all 4 corner patches with colors, mark median ones
+      for (let ci = 0; ci < 4; ci++) {
+        patches.push({
+          x: corners[ci][0], y: corners[ci][1], w: pw, h: ph,
+          color: cornerColors[ci],
+          isMedian: ci === sorted[1] || ci === sorted[2],
+        });
+      }
     }
   }
 
@@ -91,28 +133,17 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   // MINIMUM. Move highlights cover the entire square (all 4 corners show the
   // highlight color → min is high), while annotations only affect 1-2 corners
   // (other corners show normal background → min is low).
+  // Reuse corner colors already sampled above.
   const scores: Array<{ idx: number; dist: number }> = [];
   for (let i = 0; i < 64; i++) {
     const rank = Math.floor(i / 8);
     const file = i % 8;
     const expected = (rank + file) % 2 === 0 ? lightMedian : darkMedian;
 
-    const sqX0 = Math.floor(file * sqW);
-    const sqY0 = Math.floor(rank * sqH);
-    const sqX1 = Math.floor((file + 1) * sqW);
-    const sqY1 = Math.floor((rank + 1) * sqH);
-
-    const cornerPatches: Array<[number, number]> = [
-      [sqX0 + insetX, sqY0 + insetY],
-      [sqX1 - insetX - pw, sqY0 + insetY],
-      [sqX0 + insetX, sqY1 - insetY - ph],
-      [sqX1 - insetX - pw, sqY1 - insetY - ph],
-    ];
-
     const cornerScores: number[] = [];
-    for (const [cx, cy] of cornerPatches) {
-      const c = samplePatch(cx, cy);
-      cornerScores.push(highlightScore(c, expected));
+    for (let ci = 0; ci < 4; ci++) {
+      const patch = patches[i * 4 + ci];
+      cornerScores.push(highlightScore(patch.color, expected));
     }
     // Use the minimum score across corners. Highlights cover the entire square
     // (all corners show highlight color → min is high), while annotations only
