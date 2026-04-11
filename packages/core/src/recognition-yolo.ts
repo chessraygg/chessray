@@ -226,7 +226,11 @@ export class YoloPieceRecognizer implements PieceRecognizerInterface {
     const numChannels = output.dims[1];   // 17
 
     const detections: Detection[] = [];
-    const confThreshold = 0.5;
+    // Lower threshold to capture more anchor votes for confidence-sum voting.
+    // Each piece generates many overlapping detections from different anchors;
+    // summing their confidences per class is more robust than picking the single
+    // highest-confidence detection (which can be wrong when overlays shift color).
+    const confThreshold = 0.3;
 
     for (let i = 0; i < numDetections; i++) {
       // Find best class
@@ -256,30 +260,42 @@ export class YoloPieceRecognizer implements PieceRecognizerInterface {
       });
     }
 
-    // NMS: remove overlapping detections
-    const nmsDetections = nonMaxSuppression(detections, 0.5);
-
-    // Map detections to 8x8 grid
+    // Group detections by grid square and vote by summed confidence per class.
+    // Multiple YOLO anchors produce overlapping detections for the same piece;
+    // voting is more robust than NMS (which just picks the single highest conf
+    // and can be wrong when an overlay shifts the color balance).
     const board: (string | null)[][] = Array.from({ length: 8 }, () => Array(8).fill(null));
     const tiles: TileClassification[] = [];
 
-    for (const det of nmsDetections) {
-      // Coords are normalized (0-1), map directly to 0-7 grid
+    // Accumulate confidence per (square, class)
+    const squareVotes = new Map<string, Map<number, number>>();
+    for (const det of detections) {
       const file = Math.min(7, Math.floor(det.x * 8));
       const rank = Math.min(7, Math.floor(det.y * 8));
+      if (file < 0 || file >= 8 || rank < 0 || rank >= 8) continue;
+      const key = `${rank},${file}`;
+      if (!squareVotes.has(key)) squareVotes.set(key, new Map());
+      const votes = squareVotes.get(key)!;
+      votes.set(det.classId, (votes.get(det.classId) ?? 0) + det.confidence);
+    }
 
-      if (file >= 0 && file < 8 && rank >= 0 && rank < 8) {
-        const piece = CLASS_TO_FEN[det.classId];
-        if (!piece) continue;
-        // Keep highest confidence detection per square
-        if (!board[rank][file] || det.confidence > (tiles.find(t => t.square === indexToSquare(rank, file))?.confidence ?? 0)) {
-          board[rank][file] = piece;
-          const existing = tiles.findIndex(t => t.square === indexToSquare(rank, file));
-          const tile = { square: indexToSquare(rank, file), piece, confidence: det.confidence };
-          if (existing >= 0) tiles[existing] = tile;
-          else tiles.push(tile);
-        }
+    for (const [key, votes] of squareVotes) {
+      const [rank, file] = key.split(',').map(Number);
+      // Pick class with highest total confidence
+      let bestClass = 0, bestTotal = 0;
+      for (const [classId, total] of votes) {
+        if (total > bestTotal) { bestTotal = total; bestClass = classId; }
       }
+      const piece = CLASS_TO_FEN[bestClass];
+      if (!piece) continue;
+      // Use the max individual confidence for the tile's reported confidence
+      const maxConf = detections
+        .filter(d => d.classId === bestClass &&
+          Math.min(7, Math.floor(d.x * 8)) === file &&
+          Math.min(7, Math.floor(d.y * 8)) === rank)
+        .reduce((max, d) => Math.max(max, d.confidence), 0);
+      board[rank][file] = piece;
+      tiles.push({ square: indexToSquare(rank, file), piece, confidence: maxConf });
     }
 
     // Build FEN from board
