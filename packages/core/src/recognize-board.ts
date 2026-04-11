@@ -84,10 +84,11 @@ export async function recognizeBoard(
   const tDisambiguate = Date.now() - t;
 
   // Step 4: Refine orientation using pawn move direction from highlights.
-  // Only needed for sparse positions (<20 pieces) where piece_count heuristic
-  // can be wrong. With 20+ pieces, piece_count is reliable.
+  // Only needed when piece_count was used as the orientation source (sparse
+  // positions where it can be wrong). Skip when orientation came from labels
+  // or cache — those are already reliable.
   t = Date.now();
-  if (pieceCount < 20 && highlightedSquares.length === 2) {
+  if (orientation.source === 'piece_count' && highlightedSquares.length === 2) {
     const fenRows = rawFen.split('/');
     const fenBoard: (string | null)[] = new Array(64).fill(null);
     for (let r = 0; r < 8; r++) {
