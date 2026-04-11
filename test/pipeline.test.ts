@@ -100,23 +100,71 @@ describe('end-to-end detection pipeline', () => {
         for (let x = bbox.x; x <= bbox.x + bbox.width; x++) setPixel(x, gy, 0, 200, 0);
       }
 
+      // Draw the border frame that's sampled for each square (magenta outline)
+      const insetPctDbg = sqW > 100 ? 0.15 : 0.08;
+      const insetXDbg = Math.max(2, Math.floor(sqW * insetPctDbg));
+      const insetYDbg = Math.max(2, Math.floor(sqH * insetPctDbg));
+      const frameInnerDbg = Math.max(3, Math.floor(Math.min(sqW, sqH) * 0.25));
+      for (let rank2 = 0; rank2 < 8; rank2++) {
+        for (let file2 = 0; file2 < 8; file2++) {
+          const sx0 = bbox.x + Math.floor(file2 * sqW) + insetXDbg;
+          const sy0 = bbox.y + Math.floor(rank2 * sqH) + insetYDbg;
+          const sx1 = bbox.x + Math.floor((file2 + 1) * sqW) - insetXDbg;
+          const sy1 = bbox.y + Math.floor((rank2 + 1) * sqH) - insetYDbg;
+          // Outer border of frame
+          for (let px = sx0; px < sx1; px++) { setPixel(px, sy0, 255, 0, 255); setPixel(px, sy1 - 1, 255, 0, 255); }
+          for (let py = sy0; py < sy1; py++) { setPixel(sx0, py, 255, 0, 255); setPixel(sx1 - 1, py, 255, 0, 255); }
+          // Inner border of frame (where center exclusion starts)
+          const ix0 = sx0 + frameInnerDbg;
+          const iy0 = sy0 + frameInnerDbg;
+          const ix1 = sx1 - frameInnerDbg;
+          const iy1 = sy1 - frameInnerDbg;
+          if (ix0 < ix1 && iy0 < iy1) {
+            for (let px = ix0; px < ix1; px++) { setPixel(px, iy0, 255, 0, 255); setPixel(px, iy1 - 1, 255, 0, 255); }
+            for (let py = iy0; py < iy1; py++) { setPixel(ix0, py, 255, 0, 255); setPixel(ix1 - 1, py, 255, 0, 255); }
+          }
+        }
+      }
+
       // Draw highlight patches with their sampled colors
-      const { patches: hlPatches } = detectHighlightedSquares(cropped);
-      for (const patch of hlPatches) {
+      const hlResult = detectHighlightedSquares(cropped);
+      for (const patch of hlResult.patches) {
         const [pr, pg, pb] = patch.color.map(v => Math.round(v));
-        // Fill patch with its sampled color
         for (let py = patch.y; py < patch.y + patch.h; py++)
           for (let px = patch.x; px < patch.x + patch.w; px++)
             setPixel(bbox.x + px, bbox.y + py, pr, pg, pb);
-        // Border: white for median patches, black for non-median
-        const [br, bg, bb] = patch.isMedian ? [255, 255, 255] : [0, 0, 0];
+        // Black border on corner patches
         for (let px = patch.x - 1; px <= patch.x + patch.w; px++) {
-          setPixel(bbox.x + px, bbox.y + patch.y - 1, br, bg, bb);
-          setPixel(bbox.x + px, bbox.y + patch.y + patch.h, br, bg, bb);
+          setPixel(bbox.x + px, bbox.y + patch.y - 1, 0, 0, 0);
+          setPixel(bbox.x + px, bbox.y + patch.y + patch.h, 0, 0, 0);
         }
         for (let py = patch.y - 1; py <= patch.y + patch.h; py++) {
-          setPixel(bbox.x + patch.x - 1, bbox.y + py, br, bg, bb);
-          setPixel(bbox.x + patch.x + patch.w, bbox.y + py, br, bg, bb);
+          setPixel(bbox.x + patch.x - 1, bbox.y + py, 0, 0, 0);
+          setPixel(bbox.x + patch.x + patch.w, bbox.y + py, 0, 0, 0);
+        }
+      }
+
+      // Draw median color patch in center of each square (white border)
+      if (hlResult.colors) {
+        const patchW = Math.max(2, Math.floor(sqW * 0.1));
+        const patchH = Math.max(2, Math.floor(sqH * 0.1));
+        for (let i = 0; i < 64; i++) {
+          const r2 = Math.floor(i / 8);
+          const f2 = i % 8;
+          const cx = bbox.x + Math.floor((f2 + 0.5) * sqW) - Math.floor(patchW / 2);
+          const cy = bbox.y + Math.floor((r2 + 0.5) * sqH) - Math.floor(patchH / 2);
+          const [mr, mg, mb] = hlResult.colors[i].map(v => Math.round(v));
+          for (let py = cy; py < cy + patchH; py++)
+            for (let px = cx; px < cx + patchW; px++)
+              setPixel(px, py, mr, mg, mb);
+          for (let px = cx - 1; px <= cx + patchW; px++) {
+            setPixel(px, cy - 1, 255, 255, 255);
+            setPixel(px, cy + patchH, 255, 255, 255);
+          }
+          for (let py = cy - 1; py <= cy + patchH; py++) {
+            setPixel(cx - 1, py, 255, 255, 255);
+            setPixel(cx + patchW, py, 255, 255, 255);
+          }
         }
       }
 

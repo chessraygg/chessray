@@ -50,6 +50,43 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   const colors: Array<[number, number, number]> = [];
   const patches: CornerPatch[] = [];
 
+  // Per-channel median of pixels in a border frame around the square.
+  // Inset from the edge to avoid grid lines/anti-aliasing, and exclude
+  // the center where pieces sit. The border frame captures bare board
+  // background reliably even when a piece or annotation is present.
+  const frameInner = Math.max(3, Math.floor(Math.min(sqW, sqH) * 0.25));
+  function squareFrameMedianColor(sqX0: number, sqY0: number, sqX1: number, sqY1: number): [number, number, number] {
+    const x0 = sqX0 + insetX;
+    const y0 = sqY0 + insetY;
+    const x1 = sqX1 - insetX;
+    const y1 = sqY1 - insetY;
+    // Inner boundary: exclude center
+    const ix0 = x0 + frameInner;
+    const iy0 = y0 + frameInner;
+    const ix1 = x1 - frameInner;
+    const iy1 = y1 - frameInner;
+    const rs: number[] = [];
+    const gs: number[] = [];
+    const bs: number[] = [];
+    for (let py = y0; py < y1; py++) {
+      for (let px = x0; px < x1; px++) {
+        // Skip inner rectangle (piece area)
+        if (px >= ix0 && px < ix1 && py >= iy0 && py < iy1) continue;
+        const cx = Math.min(Math.max(px, 0), width - 1);
+        const cy = Math.min(Math.max(py, 0), height - 1);
+        const i = (cy * width + cx) * 4;
+        rs.push(data[i]);
+        gs.push(data[i + 1]);
+        bs.push(data[i + 2]);
+      }
+    }
+    rs.sort((a, b) => a - b);
+    gs.sort((a, b) => a - b);
+    bs.sort((a, b) => a - b);
+    const mid = Math.floor(rs.length / 2);
+    return [rs[mid], gs[mid], bs[mid]];
+  }
+
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
       const sqX0 = Math.floor(file * sqW);
@@ -57,7 +94,10 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
       const sqX1 = Math.floor((file + 1) * sqW);
       const sqY1 = Math.floor((rank + 1) * sqH);
 
-      // Sample all 4 corners
+      // Representative color: per-channel median of border frame pixels
+      colors.push(squareFrameMedianColor(sqX0, sqY0, sqX1, sqY1));
+
+      // Sample 4 corners for scoring (MIN of corners detects full-square highlights)
       const corners: Array<[number, number]> = [
         [sqX0 + insetX, sqY0 + insetY],
         [sqX1 - insetX - pw, sqY0 + insetY],
@@ -66,28 +106,11 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
       ];
       const cornerColors = corners.map(([cx, cy]) => samplePatch(cx, cy));
 
-      // Representative color: median of 4 corners (robust to piece/annotation on 1-2 corners)
-      const sorted = [0, 1, 2, 3].sort((a, b) => {
-        const sumA = cornerColors[a][0] + cornerColors[a][1] + cornerColors[a][2];
-        const sumB = cornerColors[b][0] + cornerColors[b][1] + cornerColors[b][2];
-        return sumA - sumB;
-      });
-      // Median = average of middle two
-      const m1 = cornerColors[sorted[1]];
-      const m2 = cornerColors[sorted[2]];
-      const medianColor: [number, number, number] = [
-        (m1[0] + m2[0]) / 2,
-        (m1[1] + m2[1]) / 2,
-        (m1[2] + m2[2]) / 2,
-      ];
-      colors.push(medianColor);
-
-      // Store all 4 corner patches with colors, mark median ones
       for (let ci = 0; ci < 4; ci++) {
         patches.push({
           x: corners[ci][0], y: corners[ci][1], w: pw, h: ph,
           color: cornerColors[ci],
-          isMedian: ci === sorted[1] || ci === sorted[2],
+          isMedian: false,
         });
       }
     }
