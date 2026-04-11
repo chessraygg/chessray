@@ -124,12 +124,21 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   const minAbsolute = 18;
   if (scores[0].dist < minAbsolute) return { highlighted: [], patches, scores };
 
-  // Find the biggest gap in the top 8 scores, starting from index 2
-  // (highlights always come in pairs — source and destination).
+  // Find the biggest gap in the top 8 scores.
+  // Start from index 2 (highlights usually come in pairs) but also consider
+  // index 1: one highlight may score much higher than the other (e.g. the
+  // source square is empty while the destination has a piece absorbing the
+  // highlight color). In that case, emit just the strong highlight and let
+  // disambiguateHighlights search the score list for its partner.
   let maxGap = 0;
   let cutIdx = 2;
   const limit = Math.min(8, scores.length);
-  for (let i = 2; i < limit; i++) {
+  // Consider the gap at index 1 (single strong highlight) only when the
+  // top score is in plausible highlight range. Extreme outliers (500+)
+  // are usually annotations/overlays, not real move highlights — for those
+  // we want to look deeper into the score list, so start from index 2.
+  const startIdx = scores[0].dist < 300 ? 1 : 2;
+  for (let i = startIdx; i < limit; i++) {
     const gap = scores[i - 1].dist - scores[i].dist;
     if (gap > maxGap) {
       maxGap = gap;
@@ -211,7 +220,7 @@ export function disambiguateHighlights(
   fen: string,
   scores?: Array<{ idx: number; dist: number }>,
 ): number[] {
-  if (candidates.length < 2) return candidates;
+  if (candidates.length === 0) return candidates;
 
   const rows = fen.split('/');
   const board: (string | null)[] = new Array(64).fill(null);
@@ -315,7 +324,17 @@ export function disambiguateHighlights(
     }
 
     if (validPairs.length > 0) {
-      validPairs.sort((a, b) => b.combinedScore - a.combinedScore);
+      // Prefer shorter moves: highlights mark adjacent from/to squares,
+      // so close pairs are more likely correct than distant ones.
+      // Use Chebyshev distance (max of rank/file distance) as tiebreaker.
+      validPairs.sort((a, b) => {
+        const distA = Math.max(Math.abs(Math.floor(a.src / 8) - Math.floor(a.dest / 8)),
+                               Math.abs((a.src % 8) - (a.dest % 8)));
+        const distB = Math.max(Math.abs(Math.floor(b.src / 8) - Math.floor(b.dest / 8)),
+                               Math.abs((b.src % 8) - (b.dest % 8)));
+        if (distA !== distB) return distA - distB;
+        return b.combinedScore - a.combinedScore;
+      });
       return [validPairs[0].src, validPairs[0].dest];
     }
   }
