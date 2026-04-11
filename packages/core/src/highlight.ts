@@ -271,6 +271,55 @@ export function disambiguateHighlights(
     return [validPairs[0].src, validPairs[0].dest];
   }
 
+  // No valid pair among initial candidates. Expand: for each candidate piece,
+  // search the full score list for an empty square that forms a legal move.
+  // This handles annotations/overlays that create false-positive highlights
+  // while the real partner square scored below the initial threshold.
+  if (scores) {
+    const minScore = 18;
+    const expandedEmpty = scores
+      .filter(s => !candidates.includes(s.idx) && s.dist >= minScore && board[s.idx] === null);
+
+    for (const dest of withPiece) {
+      const piece = board[dest]!;
+      const destRank = Math.floor(dest / 8);
+      const destFile = dest % 8;
+
+      for (const s of expandedEmpty) {
+        const srcRank = Math.floor(s.idx / 8);
+        const srcFile = s.idx % 8;
+        if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, likelyFlipped)) {
+          const destScore = scoreMap.get(dest) ?? 0;
+          validPairs.push({ src: s.idx, dest, combinedScore: s.dist + destScore });
+        }
+      }
+    }
+
+    // Also try: candidate empty square + expanded piece destination
+    const expandedPiece = scores
+      .filter(s => !candidates.includes(s.idx) && s.dist >= minScore && board[s.idx] !== null);
+
+    for (const src of empty) {
+      const srcRank = Math.floor(src / 8);
+      const srcFile = src % 8;
+
+      for (const s of expandedPiece) {
+        const piece = board[s.idx]!;
+        const destRank = Math.floor(s.idx / 8);
+        const destFile = s.idx % 8;
+        if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, likelyFlipped)) {
+          const srcScore = scoreMap.get(src) ?? 0;
+          validPairs.push({ src, dest: s.idx, combinedScore: srcScore + s.dist });
+        }
+      }
+    }
+
+    if (validPairs.length > 0) {
+      validPairs.sort((a, b) => b.combinedScore - a.combinedScore);
+      return [validPairs[0].src, validPairs[0].dest];
+    }
+  }
+
   // Fallback: pick top 2 by score
   return candidates.slice(0, 2);
 }
