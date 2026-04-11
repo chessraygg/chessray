@@ -113,6 +113,28 @@ function initOverlay(): void {
   // ── Panel zoom (Cmd+scroll) ──
   let panelScale = prefs.panelScale;
   state.panelScale = panelScale;
+  function clampPanelPosition(): void {
+    if (!userPanel) return;
+    const scaledW = userPanel.offsetWidth * panelScale;
+    const scaledH = userPanel.offsetHeight * panelScale;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let left = userPanel.offsetLeft;
+    let top = userPanel.offsetTop;
+    // Since transform-origin is top-right, the panel extends left from (left + offsetWidth)
+    // Ensure right edge doesn't go past viewport right
+    if (left + scaledW > vw) left = vw - scaledW;
+    // Ensure left edge doesn't go past viewport left
+    if (left < 0) left = 0;
+    // Ensure top doesn't go above viewport
+    if (top < 0) top = 0;
+    // Ensure bottom doesn't go below viewport
+    if (top + scaledH > vh) top = Math.max(0, vh - scaledH);
+    userPanel.style.left = `${left}px`;
+    userPanel.style.top = `${top}px`;
+    userPanel.style.right = 'auto';
+  }
+
   function applyScale(): void {
     if (!userPanel) return;
     userPanel.style.transform = `scale(${panelScale})`;
@@ -121,6 +143,8 @@ function initOverlay(): void {
     const maxH = Math.floor((window.innerHeight - 20) / panelScale);
     userPanel.style.maxHeight = `${maxH}px`;
     state.panelScale = panelScale;
+    // Clamp position so panel stays within viewport
+    clampPanelPosition();
     // Update zoom UI if it exists (called before zoom controls are wired)
     const lbl = document.getElementById('cv-zoom-label');
     const sld = document.getElementById('cv-zoom-slider') as HTMLInputElement | null;

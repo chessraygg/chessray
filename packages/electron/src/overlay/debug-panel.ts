@@ -56,8 +56,17 @@ export function setupDrag(handle: HTMLElement, panel: HTMLElement): void {
     if (!isDragging) return;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
-    panel.style.left = `${startLeft + dx}px`;
-    panel.style.top = `${startTop + dy}px`;
+    // Clamp so panel stays within viewport
+    const scaledW = panel.getBoundingClientRect().width;
+    const scaledH = panel.getBoundingClientRect().height;
+    let left = startLeft + dx;
+    let top = startTop + dy;
+    if (left < 0) left = 0;
+    if (top < 0) top = 0;
+    if (left + scaledW > window.innerWidth) left = window.innerWidth - scaledW;
+    if (top + scaledH > window.innerHeight) top = Math.max(0, window.innerHeight - scaledH);
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
     panel.style.right = 'auto';
   });
 
