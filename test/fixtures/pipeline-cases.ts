@@ -355,14 +355,13 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     ],
   },
   {
-    // h7 pawn misclassified as white (P) due to red YouTube annotation overlay
     file: 'test-agadmator-carlsen-svidler2.png',
     white_pawns: 'up',
     highlighted: ['g4', 'f6'],
     turn: 'b',
     bbox: { x: 225, y: 116, width: 640, height: 640 },
     squareSize: 80,
-    expectedFen: '4r2k/2bq1p1P/5NpQ/2p1p3/2B5/3P1bP1/1P3P1P/4R1K1',
+    expectedFen: '4r2k/2bq1p1p/5NpQ/2p1p3/2B5/3P1bP1/1P3P1P/4R1K1',
     orientation_source: 'piece_count',
     expected_labels: [
       { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
