@@ -40,7 +40,7 @@ export async function recognizeBoard(
 
   // Step 2: Detect and disambiguate highlights
   const hlResult = detectHighlightedSquares(cropped);
-  let highlightedSquares = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores);
+  let highlightedSquares = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians);
 
   // Step 3: Detect orientation
   // With 20+ pieces, heuristic (pawn_move / piece_count) is fast and reliable.

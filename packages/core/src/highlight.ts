@@ -4,6 +4,10 @@ export interface HighlightResult {
   highlighted: number[];
   patches: Array<[number, number, number, number]>;
   scores?: Array<{ idx: number; dist: number }>;
+  /** Per-square sampled colors (top-left inset patch), indexed 0-63 */
+  colors?: Array<[number, number, number]>;
+  /** Median colors for light and dark squares */
+  medians?: { light: [number, number, number]; dark: [number, number, number] };
 }
 
 export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
@@ -122,7 +126,7 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   // Non-standard board themes (blue/ice) produce uniformly high scores with no clear gap.
 
   const minAbsolute = 18;
-  if (scores[0].dist < minAbsolute) return { highlighted: [], patches, scores };
+  if (scores[0].dist < minAbsolute) return { highlighted: [], patches, scores, colors, medians: { light: lightMedian, dark: darkMedian } };
 
   // Find the biggest gap in the top 8 scores.
   // Start from index 2 (highlights usually come in pairs) but also consider
@@ -153,7 +157,7 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   const scoreAboveGap = scores[cutIdx - 1].dist;
   const gapIsSignificant = maxGap >= scores[0].dist * 0.3 ||
     maxGap >= scoreAboveGap * 0.35;
-  if (!gapIsSignificant) return { highlighted: [], patches, scores };
+  if (!gapIsSignificant) return { highlighted: [], patches, scores, colors, medians: { light: lightMedian, dark: darkMedian } };
 
   const primary = scores.slice(0, cutIdx).map(s => s.idx);
 
@@ -168,7 +172,7 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   }
   const highlighted = scores.slice(0, extendedCount).map(s => s.idx);
 
-  return { highlighted, patches, scores };
+  return { highlighted, patches, scores, colors, medians: { light: lightMedian, dark: darkMedian } };
 }
 
 /**
@@ -219,6 +223,8 @@ export function disambiguateHighlights(
   candidates: number[],
   fen: string,
   scores?: Array<{ idx: number; dist: number }>,
+  colors?: Array<[number, number, number]>,
+  medians?: { light: [number, number, number]; dark: [number, number, number] },
 ): number[] {
   if (candidates.length === 0) return candidates;
 
@@ -253,6 +259,27 @@ export function disambiguateHighlights(
     }
   }
   const likelyFlipped = blackBottom > whiteBottom;
+
+  // Compute highlight "naturalness" for a square: how board-like is its color?
+  // Real highlights tint the board color uniformly (low channel-ratio variance).
+  // Annotations replace the board color entirely (high channel-ratio variance).
+  // Returns 0 (natural highlight) to 1+ (annotation-like). Board-agnostic.
+  function annotationPenalty(idx: number): number {
+    if (!colors || !medians) return 0;
+    const color = colors[idx];
+    const rank = Math.floor(idx / 8);
+    const file = idx % 8;
+    const expected = (rank + file) % 2 === 0 ? medians.light : medians.dark;
+    // Per-channel ratio of actual color to expected median
+    const ratios = [
+      expected[0] > 10 ? color[0] / expected[0] : 1,
+      expected[1] > 10 ? color[1] / expected[1] : 1,
+      expected[2] > 10 ? color[2] / expected[2] : 1,
+    ];
+    const mean = (ratios[0] + ratios[1] + ratios[2]) / 3;
+    const variance = ((ratios[0] - mean) ** 2 + (ratios[1] - mean) ** 2 + (ratios[2] - mean) ** 2) / 3;
+    return variance;
+  }
 
   // Try to find a valid (empty_source, piece_destination) pair.
   // The source must be empty (the piece left it) and the destination has the piece.
@@ -323,11 +350,35 @@ export function disambiguateHighlights(
       }
     }
 
+    // Also try: expanded empty × expanded piece (both outside initial candidates).
+    // When all candidates are annotation squares (all empty, all foreign-colored),
+    // the real highlight pair may be entirely outside the candidate list.
+    for (const srcEntry of expandedEmpty) {
+      const srcRank = Math.floor(srcEntry.idx / 8);
+      const srcFile = srcEntry.idx % 8;
+
+      for (const destEntry of expandedPiece) {
+        const piece = board[destEntry.idx]!;
+        const destRank = Math.floor(destEntry.idx / 8);
+        const destFile = destEntry.idx % 8;
+        if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, likelyFlipped)) {
+          validPairs.push({ src: srcEntry.idx, dest: destEntry.idx, combinedScore: srcEntry.dist + destEntry.dist });
+        }
+      }
+    }
+
     if (validPairs.length > 0) {
-      // Prefer shorter moves: highlights mark adjacent from/to squares,
-      // so close pairs are more likely correct than distant ones.
-      // Use Chebyshev distance (max of rank/file distance) as tiebreaker.
+      // Rank by naturalness: prefer pairs without annotation-colored squares.
+      // A square is "annotation-like" when its channel-ratio variance is high
+      // (>0.08). Small variance differences between real highlights and normal
+      // squares are ignored — only penalize clearly foreign colors.
+      const annotationThreshold = 0.08;
       validPairs.sort((a, b) => {
+        const penA = (annotationPenalty(a.src) > annotationThreshold ? 1 : 0) +
+                     (annotationPenalty(a.dest) > annotationThreshold ? 1 : 0);
+        const penB = (annotationPenalty(b.src) > annotationThreshold ? 1 : 0) +
+                     (annotationPenalty(b.dest) > annotationThreshold ? 1 : 0);
+        if (penA !== penB) return penA - penB;
         const distA = Math.max(Math.abs(Math.floor(a.src / 8) - Math.floor(a.dest / 8)),
                                Math.abs((a.src % 8) - (a.dest % 8)));
         const distB = Math.max(Math.abs(Math.floor(b.src / 8) - Math.floor(b.dest / 8)),
