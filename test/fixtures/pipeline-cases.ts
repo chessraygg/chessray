@@ -394,4 +394,17 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
       { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
     ],
   },
+  {
+    file: 'test-agadmator-carlsen-svidler5.png',
+    white_pawns: 'up',
+    highlighted: ['e7', 'd8'],
+    turn: 'w',
+    bbox: { x: 182, y: 146, width: 640, height: 640 },
+    squareSize: 80,
+    expectedFen: 'b2b1rk1/3q1ppp/3pnn2/1pp1pN2/4P3/1B1P1N2/1PPB1PPP/3Q1RK1',
+    orientation_source: 'piece_count',
+    expected_labels: [
+      { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
+    ],
+  },
 ];
