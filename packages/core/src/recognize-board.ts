@@ -23,6 +23,8 @@ export interface BoardRecognitionResult {
   turn: 'w' | 'b' | null;
   /** How orientation was detected */
   orientationSource: OrientationSource;
+  /** True when highlights indicate a move but the piece hasn't landed yet (mid-animation) */
+  midAnimation: boolean;
   /** Per-step timing breakdown (ms) */
   timing: {
     pieces_ms: number;
@@ -122,6 +124,26 @@ export async function recognizeBoard(
     highlightedSquares = highlightedSquares.map(i => 63 - i);
   }
 
+  // Step 5b: Check for mid-animation frames.
+  // Highlights indicate a move (from=empty, to=piece) but if both highlighted
+  // squares are empty, the piece is still sliding and hasn't landed yet.
+  let midAnimation = false;
+  if (highlightedSquares.length === 2) {
+    const corrRows = correctedFen.split('/');
+    const corrBoard: (string | null)[] = new Array(64).fill(null);
+    for (let r = 0; r < 8; r++) {
+      let f = 0;
+      for (const ch of corrRows[r]) {
+        if (ch >= '1' && ch <= '8') f += parseInt(ch);
+        else { corrBoard[r * 8 + f] = ch; f++; }
+      }
+    }
+    const h0 = corrBoard[highlightedSquares[0]];
+    const h1 = corrBoard[highlightedSquares[1]];
+    // Both empty = piece mid-slide (hasn't landed on either square)
+    if (!h0 && !h1) midAnimation = true;
+  }
+
   // Step 6: Determine turn from highlights
   t = Date.now();
   const turn = turnFromHighlight(highlightedSquares, correctedFen);
@@ -139,6 +161,7 @@ export async function recognizeBoard(
     highlightedSquares,
     flipped: orientation.flipped,
     turn,
+    midAnimation,
     orientationSource: orientation.source,
     timing: {
       pieces_ms: tPieces,

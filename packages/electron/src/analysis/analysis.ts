@@ -182,16 +182,29 @@ async function processFrame(imageData: ImageData): Promise<void> {
       t = Date.now();
       if (recognizer) {
         const boardResult = await recognizeBoard(cropped, recognizer, cachedOrientation);
-        recognition = boardResult.recognition;
-        rawFen = boardResult.rawFen;
-        isFlipped = boardResult.flipped;
-        orientationSource = boardResult.orientationSource;
-        highlightedSquares = boardResult.highlightedSquares;
-        highlightTurn = boardResult.turn;
         brTiming = boardResult.timing;
-        cachedOrientation = { prevFen: rawFen, orientation: { flipped: isFlipped, source: orientationSource } };
-        if (frameCount <= 3) {
-          debugLog(`Recognition: rawFen=${rawFen} conf=${recognition.confidence.toFixed(2)}`);
+
+        // Skip mid-animation frames — piece is still sliding, FEN is inconsistent
+        if (boardResult.midAnimation) {
+          debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms recog=${Date.now() - t}ms [mid-animation, skipped] total=${Date.now() - startTime}ms`);
+          // Reuse previous result
+          recognition = lastRecognitionResult;
+          rawFen = lastRawFen;
+          isFlipped = lastIsFlipped;
+          orientationSource = lastOrientationSource;
+          highlightedSquares = lastHighlightedSquares;
+          highlightTurn = lastHighlightTurn;
+        } else {
+          recognition = boardResult.recognition;
+          rawFen = boardResult.rawFen;
+          isFlipped = boardResult.flipped;
+          orientationSource = boardResult.orientationSource;
+          highlightedSquares = boardResult.highlightedSquares;
+          highlightTurn = boardResult.turn;
+          cachedOrientation = { prevFen: rawFen, orientation: { flipped: isFlipped, source: orientationSource } };
+          if (frameCount <= 3) {
+            debugLog(`Recognition: rawFen=${rawFen} conf=${recognition.confidence.toFixed(2)}`);
+          }
         }
       }
       tRecog = Date.now() - t;
