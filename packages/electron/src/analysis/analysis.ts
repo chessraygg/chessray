@@ -53,6 +53,7 @@ let lastHighlightTurn: 'w' | 'b' | null = null;
 let lastArrows: ArrowDescriptor[] = [];
 let lastFullFen: string | null = null;
 let lastPlayedMove: PipelineResult['played_move'] = null;
+let cachedOrientation: { prevFen: string; orientation: { flipped: boolean; source: OrientationSource } } | null = null;
 let cachedBbox: BoardBBox | null = null;
 let frameCount = 0;
 let EVAL_MAX_DEPTH = DEFAULT_MAX_DEPTH;
@@ -77,6 +78,7 @@ function resetPipelineState(): void {
   lastArrows = [];
   lastFullFen = null;
   lastPlayedMove = null;
+  cachedOrientation = null;
   lastBoardSample = null;
   lastRecognitionResult = null;
   cachedBbox = null;
@@ -178,7 +180,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     } else {
       t = Date.now();
       if (recognizer) {
-        const boardResult = await recognizeBoard(cropped, recognizer);
+        const boardResult = await recognizeBoard(cropped, recognizer, cachedOrientation);
         recognition = boardResult.recognition;
         rawFen = boardResult.rawFen;
         isFlipped = boardResult.flipped;
@@ -186,6 +188,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
         highlightedSquares = boardResult.highlightedSquares;
         highlightTurn = boardResult.turn;
         brTiming = boardResult.timing;
+        cachedOrientation = { prevFen: rawFen, orientation: { flipped: isFlipped, source: orientationSource } };
         if (frameCount <= 3) {
           debugLog(`Recognition: rawFen=${rawFen} conf=${recognition.confidence.toFixed(2)}`);
         }

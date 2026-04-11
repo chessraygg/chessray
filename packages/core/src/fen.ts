@@ -81,6 +81,33 @@ export function compareFen(a: string, b: string): boolean {
 }
 
 /**
+ * Compute similarity between two FEN positions (0-1).
+ * Expands both to 64 squares and counts matches.
+ */
+export function fenSimilarity(a: string, b: string): number {
+  const expand = (fen: string): string[] => {
+    const squares: string[] = [];
+    for (const ch of fen.split(' ')[0]) {
+      if (ch === '/') continue;
+      if (ch >= '1' && ch <= '8') {
+        for (let i = 0; i < parseInt(ch); i++) squares.push('.');
+      } else {
+        squares.push(ch);
+      }
+    }
+    return squares;
+  };
+  const sa = expand(a);
+  const sb = expand(b);
+  if (sa.length !== 64 || sb.length !== 64) return 0;
+  let matches = 0;
+  for (let i = 0; i < 64; i++) {
+    if (sa[i] === sb[i]) matches++;
+  }
+  return matches / 64;
+}
+
+/**
  * Guess whose turn it is by comparing previous and current FEN.
  * Looks at which side lost a piece or which side's pieces moved.
  */

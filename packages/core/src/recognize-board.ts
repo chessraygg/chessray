@@ -2,7 +2,8 @@ import type { RecognitionResult } from './types.js';
 import type { PixelBuffer } from './pixel-utils.js';
 import { detectHighlightedSquares, disambiguateHighlights, turnFromHighlight } from './highlight.js';
 import { detectBoardFlipped, type OrientationSource } from './orientation.js';
-import { flipFen, buildFullFen } from './fen.js';
+import { flipFen, buildFullFen, fenSimilarity } from './fen.js';
+import type { OrientationResult } from './image-utils.js';
 import { detectLabels } from './label-detect.js';
 
 export interface BoardRecognitionResult {
@@ -43,6 +44,7 @@ export interface BoardRecognitionResult {
 export async function recognizeBoard(
   cropped: PixelBuffer,
   recognizer: { recognize(imageData: ImageData): Promise<RecognitionResult> },
+  cachedOrientation?: { prevFen: string; orientation: OrientationResult } | null,
 ): Promise<BoardRecognitionResult> {
   const t0 = Date.now();
 
@@ -52,10 +54,16 @@ export async function recognizeBoard(
   const tPieces = Date.now() - t0;
 
   // Step 2: Detect orientation (before highlights — disambiguation needs flip info)
+  // Use cached orientation when the position is similar to the previous one
+  // (same game, just a few moves played). Only re-detect when the board
+  // changes significantly (new game, different stream).
   let t = Date.now();
   const pieceCount = rawFen.replace(/[0-8/]/g, '').length;
-  let orientation: import('./image-utils.js').OrientationResult;
-  if (pieceCount >= 20) {
+  let orientation: OrientationResult;
+  const similarity = cachedOrientation ? fenSimilarity(cachedOrientation.prevFen, rawFen) : 0;
+  if (cachedOrientation && similarity > 0.5) {
+    orientation = cachedOrientation.orientation;
+  } else if (pieceCount >= 20) {
     orientation = detectBoardFlipped(rawFen);
   } else {
     const labelResult = await detectLabels(cropped);
