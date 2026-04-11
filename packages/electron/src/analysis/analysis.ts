@@ -153,9 +153,11 @@ async function processFrame(imageData: ImageData): Promise<void> {
     const boardImageUrl = previewCanvas.toDataURL('image/jpeg', 0.7);
     const tPreview = Date.now() - t;
 
+    t = Date.now();
     const boardSample = sampleBoardPixels(cropped.data, cropped.width, cropped.height);
     const visuallyUnchanged = changeDetectEnabled && lastBoardSample && boardUnchanged(lastBoardSample, boardSample);
     lastBoardSample = boardSample;
+    const tChangeDetect = Date.now() - t;
 
     let recognition: RecognitionResult | null = null;
     let isFlipped = false;
@@ -164,6 +166,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     let highlightedSquares: number[] = [];
     let highlightTurn: 'w' | 'b' | null = null;
     let tRecog = 0;
+    let brTiming: { pieces_ms: number; orientation_ms: number; highlights_ms: number; disambiguate_ms: number; pawnRefine_ms: number; turn_ms: number; total_ms: number } | null = null;
 
     if (visuallyUnchanged && lastRecognitionResult) {
       recognition = lastRecognitionResult;
@@ -182,6 +185,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
         orientationSource = boardResult.orientationSource;
         highlightedSquares = boardResult.highlightedSquares;
         highlightTurn = boardResult.turn;
+        brTiming = boardResult.timing;
         if (frameCount <= 3) {
           debugLog(`Recognition: rawFen=${rawFen} conf=${recognition.confidence.toFixed(2)}`);
         }
@@ -215,12 +219,18 @@ async function processFrame(imageData: ImageData): Promise<void> {
       total_elapsed_ms: Date.now() - startTime,
     });
 
-    const recogDetail = recognition?.timing
-      ? `recog=${tRecog}ms(prep=${recognition.timing.prep_ms} infer=${recognition.timing.infer_ms} post=${recognition.timing.post_ms})`
-      : `recog=${tRecog}ms`;
+    // Build detailed timing string for this frame
+    let recogDetail: string;
+    if (brTiming) {
+      const rt = recognition?.timing;
+      const yolo = rt ? `yolo=${rt.prep_ms}+${rt.infer_ms}+${rt.post_ms}` : '';
+      recogDetail = `recog=${tRecog}ms(${yolo} orient=${brTiming.orientation_ms} hl=${brTiming.highlights_ms} disamb=${brTiming.disambiguate_ms} pawn=${brTiming.pawnRefine_ms} turn=${brTiming.turn_ms})`;
+    } else {
+      recogDetail = `recog=${tRecog}ms [cached]`;
+    }
 
     if (!recognition || recognition.confidence < 0.3) {
-      debugLog(`Timing: detect=${tDetect}ms preview=${tPreview}ms ${recogDetail} [low conf] total=${Date.now() - startTime}ms`);
+      debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [low conf] total=${Date.now() - startTime}ms`);
       sendResult(makeResult({}));
       return;
     }
@@ -229,7 +239,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     // Dedup: same position AND turn hasn't been corrected by highlight detection
     const evalTurnMismatch = highlightTurn && lastEval?.fen?.split(' ')[1] && lastEval.fen.split(' ')[1] !== highlightTurn;
     if (lastPositionFen && compareFen(lastPositionFen, positionFen) && !evalTurnMismatch) {
-      debugLog(`Timing: detect=${tDetect}ms preview=${tPreview}ms ${recogDetail} [dedup] total=${Date.now() - startTime}ms`);
+      debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [dedup] total=${Date.now() - startTime}ms`);
       sendResult(makeResult({
         evaluation: lastEval,
         arrows: lastArrows,
@@ -269,20 +279,23 @@ async function processFrame(imageData: ImageData): Promise<void> {
       return;
     }
 
+    t = Date.now();
     const turn = highlightTurn ?? guessTurn(prevPositionFen, positionFen);
-    debugLog(`Turn: highlight=${highlightTurn} guess=${guessTurn(prevPositionFen, positionFen)} final=${turn} hl=[${highlightedSquares}]`);
     const fullFen = buildFullFen(positionFen, turn);
+    const tFenBuild = Date.now() - t;
 
     // Detect sequential move before updating lastFullFen
     // (detection needs the PREVIOUS fullFen)
 
     // Detect checkmate/stalemate — skip engine if game is over
+    t = Date.now();
     let gameOver: 'checkmate' | 'stalemate' | undefined;
     try {
       const chess = new Chess(fullFen);
       if (chess.isCheckmate()) gameOver = 'checkmate';
       else if (chess.isStalemate()) gameOver = 'stalemate';
     } catch { /* invalid FEN — continue to engine */ }
+    const tGameOver = Date.now() - t;
 
     if (gameOver) {
       debugLog(`Game over: ${gameOver}`);
@@ -291,6 +304,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     }
 
     // Detect if this position is one legal move from the previous
+    t = Date.now();
     lastPlayedMove = null;
     let prevBestScore: number | null = null;
     if (lastFullFen && lastEval) {
@@ -314,6 +328,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
         }
       }
     }
+    const tSeqMove = Date.now() - t;
 
     // Track whether loss was already known from previous top moves
     const playedMoveLossKnown = lastPlayedMove ? lastPlayedMove.loss_cp !== 0 : true;
@@ -348,7 +363,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       lastEval = cached.evaluation;
       lastArrows = cached.arrows;
       const cachedDepth = cached.evaluation.depth;
-      debugLog(`Timing: detect=${tDetect}ms preview=${tPreview}ms ${recogDetail} [cache d=${cachedDepth}] total=${Date.now() - startTime}ms`);
+      debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms [cache d=${cachedDepth}] total=${Date.now() - startTime}ms`);
       sendResult(makeResult({
         evaluation: cached.evaluation,
         arrows: cached.arrows,
@@ -415,7 +430,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       }));
     }
 
-    debugLog(`Timing: detect=${tDetect}ms preview=${tPreview}ms ${recogDetail} eval=${tEval}ms d=${firstResult?.depth ?? 'abort'}/${EVAL_MAX_DEPTH} [new pos] total=${Date.now() - startTime}ms`);
+    debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms eval=${tEval}ms d=${firstResult?.depth ?? 'abort'}/${EVAL_MAX_DEPTH} [new pos] total=${Date.now() - startTime}ms`);
 
     // Continue deepening in background
     if (firstResult && EVAL_START_DEPTH + EVAL_DEPTH_STEP <= EVAL_MAX_DEPTH) {

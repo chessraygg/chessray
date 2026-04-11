@@ -22,6 +22,16 @@ export interface BoardRecognitionResult {
   turn: 'w' | 'b' | null;
   /** How orientation was detected */
   orientationSource: OrientationSource;
+  /** Per-step timing breakdown (ms) */
+  timing: {
+    pieces_ms: number;
+    orientation_ms: number;
+    highlights_ms: number;
+    disambiguate_ms: number;
+    pawnRefine_ms: number;
+    turn_ms: number;
+    total_ms: number;
+  };
 }
 
 /**
@@ -34,11 +44,15 @@ export async function recognizeBoard(
   cropped: PixelBuffer,
   recognizer: { recognize(imageData: ImageData): Promise<RecognitionResult> },
 ): Promise<BoardRecognitionResult> {
+  const t0 = Date.now();
+
   // Step 1: Recognize pieces
   const recognition = await recognizer.recognize(cropped as unknown as ImageData);
   const rawFen = recognition.fen;
+  const tPieces = Date.now() - t0;
 
   // Step 2: Detect orientation (before highlights — disambiguation needs flip info)
+  let t = Date.now();
   const pieceCount = rawFen.replace(/[0-8/]/g, '').length;
   let orientation: import('./image-utils.js').OrientationResult;
   if (pieceCount >= 20) {
@@ -47,14 +61,22 @@ export async function recognizeBoard(
     const labelResult = await detectLabels(cropped);
     orientation = labelResult ?? detectBoardFlipped(rawFen);
   }
+  const tOrientation = Date.now() - t;
 
-  // Step 3: Detect and disambiguate highlights
+  // Step 3: Detect highlights
+  t = Date.now();
   const hlResult = detectHighlightedSquares(cropped);
+  const tHighlights = Date.now() - t;
+
+  // Step 3b: Disambiguate highlights
+  t = Date.now();
   let highlightedSquares = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians, orientation.flipped);
+  const tDisambiguate = Date.now() - t;
 
   // Step 4: Refine orientation using pawn move direction from highlights.
   // If a pawn moved, its direction is an authoritative orientation signal
   // that can correct piece_count errors in sparse positions.
+  t = Date.now();
   if (highlightedSquares.length === 2) {
     const fenRows = rawFen.split('/');
     const fenBoard: (string | null)[] = new Array(64).fill(null);
@@ -84,17 +106,22 @@ export async function recognizeBoard(
     }
   }
 
+  const tPawnRefine = Date.now() - t;
+
   // Step 5: Correct for flip
   const correctedFen = orientation.flipped ? flipFen(rawFen) : rawFen;
   if (orientation.flipped) {
     highlightedSquares = highlightedSquares.map(i => 63 - i);
   }
 
-  // Step 5: Determine turn from highlights
+  // Step 6: Determine turn from highlights
+  t = Date.now();
   const turn = turnFromHighlight(highlightedSquares, correctedFen);
 
-  // Step 6: Build full FEN (only when turn is known)
+  // Step 7: Build full FEN (only when turn is known)
   const fullFen = turn ? buildFullFen(correctedFen, turn) : null;
+  const tTurn = Date.now() - t;
+  const tTotal = Date.now() - t0;
 
   return {
     rawFen,
@@ -105,5 +132,14 @@ export async function recognizeBoard(
     flipped: orientation.flipped,
     turn,
     orientationSource: orientation.source,
+    timing: {
+      pieces_ms: tPieces,
+      orientation_ms: tOrientation,
+      highlights_ms: tHighlights,
+      disambiguate_ms: tDisambiguate,
+      pawnRefine_ms: tPawnRefine,
+      turn_ms: tTurn,
+      total_ms: tTotal,
+    },
   };
 }
