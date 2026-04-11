@@ -47,7 +47,7 @@ const videoArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
 const vboardArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
 
 function arrowKey(a: ArrowDescriptor): string {
-  return `${a.from}-${a.to}-${a.color}`;
+  return `${a.from}-${a.to}`;
 }
 
 function updateAnimatedArrows(
@@ -68,8 +68,9 @@ function updateAnimatedArrows(
     const key = arrowKey(a);
     const prev = prevMap.get(key);
     if (prev) {
-      // Update arrow properties, keep animation state
-      next.push({ ...a, fadeOpacity: prev.fadeOpacity, progress: prev.progress, fading: prev.progress >= 1 ? 'steady' : 'in' });
+      // Update arrow properties (color, width, opacity), keep animation state
+      const steady = prev.progress >= 1;
+      next.push({ ...a, fadeOpacity: steady ? a.opacity : prev.fadeOpacity, progress: prev.progress, fading: steady ? 'steady' : 'in' });
     } else {
       // New arrow — extend from source
       next.push({ ...a, fadeOpacity: a.opacity, progress: 0, fading: 'in' });
