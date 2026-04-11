@@ -671,7 +671,9 @@ function initOverlay(): void {
       pvCyclePreviewTimer = null;
       state.pvPreviewLineIndex = null;
       (window as any).__chessrayPvPlaying = true;
-      document.getElementById('cv-debug-grid')?.classList.add('analysis');
+      if (state.vboardOverlayVisible) {
+        document.getElementById('cv-debug-grid')?.classList.add('analysis');
+      }
 
       // First step immediately, then continue on interval
       pvCycleStep();
