@@ -122,7 +122,7 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   // Non-standard board themes (blue/ice) produce uniformly high scores with no clear gap.
 
   const minAbsolute = 18;
-  if (scores[0].dist < minAbsolute) return { highlighted: [], patches };
+  if (scores[0].dist < minAbsolute) return { highlighted: [], patches, scores };
 
   // Find the biggest gap in the top 8 scores, starting from index 2
   // (highlights always come in pairs — source and destination).
@@ -143,8 +143,8 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   // 600+ while real highlights score ~200, giving a 30% threshold of 180+).
   const scoreAboveGap = scores[cutIdx - 1].dist;
   const gapIsSignificant = maxGap >= scores[0].dist * 0.3 ||
-    maxGap >= scoreAboveGap * 0.5;
-  if (!gapIsSignificant) return { highlighted: [], patches };
+    maxGap >= scoreAboveGap * 0.35;
+  if (!gapIsSignificant) return { highlighted: [], patches, scores };
 
   const primary = scores.slice(0, cutIdx).map(s => s.idx);
 

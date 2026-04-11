@@ -350,6 +350,8 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 80,
     expectedFen: 'b3r3/2bq1pkp/3pn1pN/2p1p1Nn/2B1P3/3P2P1/1P1B1P1P/2Q1R1K1',
     orientation_source: 'piece_count',
-    expected_labels: null,
+    expected_labels: [
+      { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
+    ],
   },
 ];
