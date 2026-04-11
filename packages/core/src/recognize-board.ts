@@ -38,23 +38,53 @@ export async function recognizeBoard(
   const recognition = await recognizer.recognize(cropped as unknown as ImageData);
   const rawFen = recognition.fen;
 
-  // Step 2: Detect and disambiguate highlights
-  const hlResult = detectHighlightedSquares(cropped);
-  let highlightedSquares = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians);
-
-  // Step 3: Detect orientation
-  // With 20+ pieces, heuristic (pawn_move / piece_count) is fast and reliable.
-  // Only run slow OCR label detection in sparse positions where heuristic is unreliable.
+  // Step 2: Detect orientation (before highlights — disambiguation needs flip info)
   const pieceCount = rawFen.replace(/[0-8/]/g, '').length;
   let orientation: import('./image-utils.js').OrientationResult;
   if (pieceCount >= 20) {
-    orientation = detectBoardFlipped(rawFen, highlightedSquares, { skipPawnMove: true });
+    orientation = detectBoardFlipped(rawFen);
   } else {
     const labelResult = await detectLabels(cropped);
-    orientation = labelResult ?? detectBoardFlipped(rawFen, highlightedSquares);
+    orientation = labelResult ?? detectBoardFlipped(rawFen);
   }
 
-  // Step 4: Correct for flip
+  // Step 3: Detect and disambiguate highlights
+  const hlResult = detectHighlightedSquares(cropped);
+  let highlightedSquares = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians, orientation.flipped);
+
+  // Step 4: Refine orientation using pawn move direction from highlights.
+  // If a pawn moved, its direction is an authoritative orientation signal
+  // that can correct piece_count errors in sparse positions.
+  if (highlightedSquares.length === 2) {
+    const fenRows = rawFen.split('/');
+    const fenBoard: (string | null)[] = new Array(64).fill(null);
+    for (let r = 0; r < 8; r++) {
+      let f = 0;
+      for (const ch of fenRows[r]) {
+        if (ch >= '1' && ch <= '8') f += parseInt(ch);
+        else { fenBoard[r * 8 + f] = ch; f++; }
+      }
+    }
+    const [idx0, idx1] = highlightedSquares;
+    const p0 = fenBoard[idx0];
+    const p1 = fenBoard[idx1];
+    let pawn: string | null = null;
+    let fromRow = -1, toRow = -1;
+    if (p0 && (p0 === 'P' || p0 === 'p') && !p1) {
+      pawn = p0; toRow = Math.floor(idx0 / 8); fromRow = Math.floor(idx1 / 8);
+    } else if (p1 && (p1 === 'P' || p1 === 'p') && !p0) {
+      pawn = p1; toRow = Math.floor(idx1 / 8); fromRow = Math.floor(idx0 / 8);
+    }
+    if (pawn && fromRow !== toRow) {
+      const movedDown = toRow > fromRow;
+      const pawnFlipped = pawn === 'P' ? movedDown : !movedDown;
+      if (pawnFlipped !== orientation.flipped) {
+        orientation = { flipped: pawnFlipped, source: 'pawn_move' };
+      }
+    }
+  }
+
+  // Step 5: Correct for flip
   const correctedFen = orientation.flipped ? flipFen(rawFen) : rawFen;
   if (orientation.flipped) {
     highlightedSquares = highlightedSquares.map(i => 63 - i);

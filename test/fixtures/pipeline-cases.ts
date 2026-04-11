@@ -305,7 +305,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     bbox: { x: 64, y: 199, width: 431, height: 431 },
     squareSize: 54,
     expectedFen: '4r2k/pppq1r1p/4Np2/3n2Q1/5P2/8/PPP5/2KR3R',
-    orientation_source: 'pawn_move',
+    orientation_source: 'piece_count',
     expected_labels: null,
   },
   {

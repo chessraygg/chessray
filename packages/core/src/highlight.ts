@@ -222,6 +222,7 @@ export function disambiguateHighlights(
   scores?: Array<{ idx: number; dist: number }>,
   colors?: Array<[number, number, number]>,
   medians?: { light: [number, number, number]; dark: [number, number, number] },
+  flipped?: boolean,
 ): number[] {
   if (candidates.length === 0) return candidates;
 
@@ -244,18 +245,6 @@ export function disambiguateHighlights(
   // Find candidates that have a piece vs empty
   const withPiece = candidates.filter(idx => board[idx] !== null);
   const empty = candidates.filter(idx => board[idx] === null);
-
-  // Determine likely orientation from piece positions for pawn direction validation.
-  // Count white vs black pieces in bottom half of image.
-  let whiteBottom = 0, blackBottom = 0;
-  for (let rank = 0; rank < 8; rank++) {
-    for (const ch of rows[rank]) {
-      if (ch >= '1' && ch <= '8') continue;
-      const isWhite = ch === ch.toUpperCase();
-      if (rank >= 4) { if (isWhite) whiteBottom++; else blackBottom++; }
-    }
-  }
-  const likelyFlipped = blackBottom > whiteBottom;
 
   // Compute highlight "naturalness" for a square: how board-like is its color?
   // Real highlights tint the board color uniformly (low channel-ratio variance).
@@ -291,7 +280,7 @@ export function disambiguateHighlights(
       const srcRank = Math.floor(src / 8);
       const srcFile = src % 8;
       // Use piece_count orientation for pawn direction validation
-      if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, likelyFlipped)) {
+      if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, flipped)) {
         const srcScore = scoreMap.get(src) ?? 0;
         const destScore = scoreMap.get(dest) ?? 0;
         validPairs.push({ src, dest, combinedScore: srcScore + destScore });
@@ -321,7 +310,7 @@ export function disambiguateHighlights(
       for (const s of expandedEmpty) {
         const srcRank = Math.floor(s.idx / 8);
         const srcFile = s.idx % 8;
-        if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, likelyFlipped)) {
+        if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, flipped)) {
           const destScore = scoreMap.get(dest) ?? 0;
           validPairs.push({ src: s.idx, dest, combinedScore: s.dist + destScore });
         }
@@ -340,7 +329,7 @@ export function disambiguateHighlights(
         const piece = board[s.idx]!;
         const destRank = Math.floor(s.idx / 8);
         const destFile = s.idx % 8;
-        if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, likelyFlipped)) {
+        if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, flipped)) {
           const srcScore = scoreMap.get(src) ?? 0;
           validPairs.push({ src, dest: s.idx, combinedScore: srcScore + s.dist });
         }
@@ -348,9 +337,11 @@ export function disambiguateHighlights(
     }
 
     // Also try: expanded empty × expanded piece (both outside initial candidates).
-    // When all candidates are annotation squares (all empty, all foreign-colored),
-    // the real highlight pair may be entirely outside the candidate list.
-    for (const srcEntry of expandedEmpty) {
+    // Only when all candidates look like annotations (high channel-ratio variance),
+    // meaning the real highlight pair is likely entirely outside the candidate list.
+    const allCandidatesAnnotation = candidates.length >= 2 &&
+      candidates.every(idx => annotationPenalty(idx) > 0.08);
+    if (allCandidatesAnnotation) for (const srcEntry of expandedEmpty) {
       const srcRank = Math.floor(srcEntry.idx / 8);
       const srcFile = srcEntry.idx % 8;
 
@@ -358,7 +349,7 @@ export function disambiguateHighlights(
         const piece = board[destEntry.idx]!;
         const destRank = Math.floor(destEntry.idx / 8);
         const destFile = destEntry.idx % 8;
-        if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, likelyFlipped)) {
+        if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, flipped)) {
           validPairs.push({ src: srcEntry.idx, dest: destEntry.idx, combinedScore: srcEntry.dist + destEntry.dist });
         }
       }
