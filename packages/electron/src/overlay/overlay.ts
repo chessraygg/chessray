@@ -21,6 +21,8 @@ declare global {
       onSourceVisibility: (cb: (visible: boolean) => void) => void;
       reopenPicker: () => void;
       setMaxDepth: (depth: number) => void;
+      setMultiPvMax: (n: number) => void;
+      setMultiPvRamp: (n: number) => void;
       setChangeDetect: (enabled: boolean) => void;
       onResetPanelPosition: (cb: () => void) => void;
       minimizeApp: () => void;
@@ -57,6 +59,7 @@ const state: OverlayState = {
   lossThreshold: 50,
   autoMode: false,
   vboardOverlayVisible: true,
+  pvPreviewLineIndex: null,
   panelScale: 1,
   displayInfo: null,
 };
@@ -397,6 +400,7 @@ function initOverlay(): void {
   let pvCyclePv: string[] = [];
 
   let pvCycleMovesTimer: ReturnType<typeof setTimeout> | null = null;
+  let pvCyclePreviewTimer: ReturnType<typeof setTimeout> | null = null;
   let pvCycleLineIndex = 0;
 
   /** Get line indices eligible for cycling (filtered by loss threshold) */
@@ -452,6 +456,21 @@ function initOverlay(): void {
   }
 
   function pvCycleStep(): void {
+    // Validate that our cached PV still matches the live eval — restart if stale
+    const liveResult = state.currentResult;
+    if (liveResult?.evaluation?.top_moves?.length) {
+      const idx = Math.min(pvCycleLineIndex, liveResult.evaluation.top_moves.length - 1);
+      const livePv = liveResult.evaluation.top_moves[idx].pv;
+      const depth = Math.max(state.pvDisplayDepth, 1);
+      const stale = depth > livePv.length ||
+        pvCyclePv.slice(0, depth).some((m, i) => m !== livePv[i]);
+      if (stale) {
+        if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
+        pvCycleStart();
+        return;
+      }
+    }
+
     if (state.pvDisplayDepth >= state.pvDepth || state.pvDisplayDepth >= pvCyclePv.length) {
       // Sequence complete
       if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
@@ -627,6 +646,7 @@ function initOverlay(): void {
   /** Start animating the current pvCycleLineIndex */
   function pvCycleStartCurrentLine(): void {
     if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
+    if (pvCyclePreviewTimer !== null) { clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null; state.pvPreviewLineIndex = null; }
     if (!state.lineVisible) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) return;
@@ -640,13 +660,23 @@ function initOverlay(): void {
     pvCycleFlipped = !!result.flipped;
     pvCycleLastPv = [...pv];
     state.pvDisplayDepth = 0;
-    (window as any).__chessrayPvPlaying = true;
-    document.getElementById('cv-debug-grid')?.classList.add('analysis');
 
-    // First step immediately
-    pvCycleStep();
-    // Then continue on interval
-    pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
+    // Preview phase: show the selected line's first move arrow only
+    // pvPreviewLineIndex drives getActiveArrows — no need to touch arrowsVisible/lineVisible
+    state.pvPreviewLineIndex = idx;
+    renderArrows(state);
+    renderVideoOverlay(state);
+
+    pvCyclePreviewTimer = setTimeout(() => {
+      pvCyclePreviewTimer = null;
+      state.pvPreviewLineIndex = null;
+      (window as any).__chessrayPvPlaying = true;
+      document.getElementById('cv-debug-grid')?.classList.add('analysis');
+
+      // First step immediately, then continue on interval
+      pvCycleStep();
+      pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
+    }, pvGrowDelaySec * 1000);
   }
 
   /** Start the unified cycle from the selected line */
@@ -663,8 +693,10 @@ function initOverlay(): void {
     if (!result?.evaluation?.top_moves?.length) return;
     const idx = Math.min(pvCycleLineIndex, result.evaluation.top_moves.length - 1);
     const newPv = result.evaluation.top_moves[idx].pv;
-    const displayedMatch = state.pvDisplayDepth <= newPv.length &&
-      pvCycleLastPv.slice(0, state.pvDisplayDepth).every((m, i) => m === newPv[i]);
+    // Check that all moves we've already displayed still match the new PV
+    const depth = Math.max(state.pvDisplayDepth, 1); // always check at least the first move
+    const displayedMatch = depth <= newPv.length &&
+      pvCycleLastPv.slice(0, depth).every((m, i) => m === newPv[i]);
     if (displayedMatch) {
       pvCycleLastPv = [...newPv];
       pvCyclePv = [...newPv];
@@ -676,6 +708,10 @@ function initOverlay(): void {
 
   function pvCycleStop(): void {
     if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
+    if (pvCyclePreviewTimer !== null) {
+      clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null;
+      state.pvPreviewLineIndex = null;
+    }
     if (pvCycleMovesTimer !== null) {
       clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null;
       // Restore mode state if stopped during interlude
@@ -788,6 +824,36 @@ function initOverlay(): void {
       maxDepthVal.textContent = String(depth);
       savePrefs({ maxDepth: depth });
       window.chessRay.setMaxDepth(depth);
+    });
+  }
+
+  // ── MultiPV max slider ──
+  const multiPvSlider = document.getElementById('cv-multi-pv-max') as HTMLInputElement | null;
+  const multiPvVal = document.getElementById('cv-multi-pv-max-val');
+  if (multiPvSlider && multiPvVal) {
+    multiPvSlider.value = String(prefs.multiPvMax);
+    multiPvVal.textContent = String(prefs.multiPvMax);
+    window.chessRay.setMultiPvMax(prefs.multiPvMax);
+    multiPvSlider.addEventListener('input', () => {
+      const n = parseInt(multiPvSlider.value, 10);
+      multiPvVal.textContent = String(n);
+      savePrefs({ multiPvMax: n });
+      window.chessRay.setMultiPvMax(n);
+    });
+  }
+
+  // ── MultiPV ramp slider ──
+  const multiPvRampSlider = document.getElementById('cv-multi-pv-ramp') as HTMLInputElement | null;
+  const multiPvRampVal = document.getElementById('cv-multi-pv-ramp-val');
+  if (multiPvRampSlider && multiPvRampVal) {
+    multiPvRampSlider.value = String(prefs.multiPvRamp);
+    multiPvRampVal.textContent = String(prefs.multiPvRamp);
+    window.chessRay.setMultiPvRamp(prefs.multiPvRamp);
+    multiPvRampSlider.addEventListener('input', () => {
+      const n = parseInt(multiPvRampSlider.value, 10);
+      multiPvRampVal.textContent = String(n);
+      savePrefs({ multiPvRamp: n });
+      window.chessRay.setMultiPvRamp(n);
     });
   }
 
@@ -1063,8 +1129,8 @@ function processPendingResult(): void {
     (window as any).__chessrayResetAutoTimer?.();
     // If line is already visible (non-auto mode), restart grow from 2
     if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
-  } else if (evalDepth > lastEvalDepth) {
-    // Same position, deeper eval — continue grow if displayed moves match
+  } else if (evalDepth >= lastEvalDepth) {
+    // Same position, same or deeper eval — continue grow if displayed moves still match
     lastEvalDepth = evalDepth;
     if (state.lineVisible) (window as any).__chessrayPvGrowContinue?.();
   }

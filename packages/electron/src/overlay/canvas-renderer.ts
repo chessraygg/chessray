@@ -21,6 +21,7 @@ export interface OverlayState {
   lossThreshold: number;
   autoMode: boolean;
   vboardOverlayVisible: boolean;
+  pvPreviewLineIndex: number | null;
   panelScale: number;
   displayInfo: {
     size: { width: number; height: number };
@@ -111,6 +112,18 @@ function updateAnimatedArrows(
 
 /** Get the arrows to display based on current mode (top moves, PV line, or both) */
 export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
+  // Preview mode: show all move arrows but emphasize the selected line's first move
+  if (state.pvPreviewLineIndex !== null && state.currentResult?.evaluation?.top_moves?.length) {
+    const allArrows = state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold);
+    const idx = Math.min(state.pvPreviewLineIndex, state.currentResult.evaluation.top_moves.length - 1);
+    const previewMove = state.currentResult.evaluation.top_moves[idx].move;
+    const previewFrom = previewMove.slice(0, 2);
+    const previewTo = previewMove.slice(2, 4);
+    const match = allArrows.find(a => a.from === previewFrom && a.to === previewTo);
+    if (match) return [{ ...match, opacity: 1, width: Math.max(match.width, 5) }];
+    return [];
+  }
+
   const moveArrows = state.arrowsVisible
     ? state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold)
     : [];
@@ -145,9 +158,9 @@ function drawLossLabel(
   const fontSize = Math.max(7, Math.round(squareW * 0.28));
   const r = fontSize * 1.3;
 
-  // Position: top-right corner of square, inset by radius
-  const cx = board.x + (file + 1) * squareW - r - 1;
-  const cy = board.y + (7 - rank) * squareH + r + 1;
+  // Position: center of square
+  const cx = board.x + (file + 0.5) * squareW;
+  const cy = board.y + (7 - rank + 0.5) * squareH;
 
   ctx.save();
   const color = lossToColor(lossCp);
@@ -357,6 +370,16 @@ export function renderArrows(state: OverlayState): void {
       drawLossLabel(ctx, targetArrows[0].from, move.loss_cp, virtualBoard, state.displayFlipped);
     }
   }
+
+  // Draw cp loss label during preview mode on the highlighted arrow
+  if (state.pvPreviewLineIndex !== null && state.currentResult?.evaluation?.top_moves?.length) {
+    const idx = Math.min(state.pvPreviewLineIndex, state.currentResult.evaluation.top_moves.length - 1);
+    const move = state.currentResult.evaluation.top_moves[idx];
+    if (move.loss_cp >= 5) {
+      const from = move.move.slice(0, 2);
+      drawLossLabel(ctx, from, move.loss_cp, virtualBoard, state.displayFlipped);
+    }
+  }
 }
 
 /** Draw arrows and eval bar on the full-screen overlay canvas */
@@ -414,7 +437,7 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.strokeRect(bx, by, bw, bh);
   }
 
-  if (state.arrowsVisible || state.lineVisible) {
+  if (state.arrowsVisible || state.lineVisible || state.pvPreviewLineIndex !== null) {
     const targetArrows = getActiveArrows(state);
     const animated = updateAnimatedArrows(targetArrows, videoArrowState, () => renderVideoOverlay(state));
     // Draw with animated opacity
@@ -435,6 +458,16 @@ export function renderVideoOverlay(state: OverlayState): void {
         if (firstArrow) {
           drawLossLabel(ctx, firstArrow.from, move.loss_cp, boardRect, state.displayFlipped);
         }
+      }
+    }
+
+    // Draw cp loss label during preview mode on the highlighted arrow
+    if (state.pvPreviewLineIndex !== null && result.evaluation?.top_moves?.length) {
+      const idx = Math.min(state.pvPreviewLineIndex, result.evaluation.top_moves.length - 1);
+      const move = result.evaluation.top_moves[idx];
+      if (move.loss_cp >= 5) {
+        const from = move.move.slice(0, 2);
+        drawLossLabel(ctx, from, move.loss_cp, boardRect, state.displayFlipped);
       }
     }
   } else {

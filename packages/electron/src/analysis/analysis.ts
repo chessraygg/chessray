@@ -15,7 +15,7 @@ import type {
   OrientationSource,
 } from '@chessray/core';
 
-import { EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH, EVAL_MULTI_PV, cacheGet, cachePut } from './eval-cache.js';
+import { EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH, multiPvForDepth, setMultiPvMax, setMultiPvRamp, cacheGet, cachePut } from './eval-cache.js';
 import { sampleBoardPixels, boardUnchanged } from './change-detect.js';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
 import { initAndStartCapture, stopCapture } from './frame-capture.js';
@@ -32,6 +32,8 @@ declare global {
       getSources: () => Promise<Array<{ id: string; name: string; thumbnailDataUrl: string; display_id: string }>>;
       selectSource: (id: string) => void;
       onSetMaxDepth: (cb: (depth: number) => void) => void;
+      onSetMultiPvMax: (cb: (n: number) => void) => void;
+      onSetMultiPvRamp: (cb: (n: number) => void) => void;
       onSetChangeDetect: (cb: (enabled: boolean) => void) => void;
     };
   }
@@ -314,7 +316,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
         (async () => {
           for (let depth = nextDepth; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
             if (signal.aborted) break;
-            const result = await engine!.runDepth(fullFen, depth, EVAL_MULTI_PV, signal);
+            const result = await engine!.runDepth(fullFen, depth, multiPvForDepth(depth), signal);
             if (!result) break;
             if (!result.top_moves[0]?.pv?.length) {
               debugLog(`Engine returned empty PV at depth ${depth} — reinitializing`);
@@ -339,7 +341,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     }
 
     t = Date.now();
-    const firstResult = await engine.runDepth(fullFen, EVAL_START_DEPTH, EVAL_MULTI_PV, signal);
+    const firstResult = await engine.runDepth(fullFen, EVAL_START_DEPTH, multiPvForDepth(EVAL_START_DEPTH), signal);
     const tEval = Date.now() - t;
 
     // Detect broken eval (no PV = engine in bad state)
@@ -371,7 +373,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       (async () => {
         for (let depth = EVAL_START_DEPTH + EVAL_DEPTH_STEP; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
           if (signal.aborted) break;
-          const result = await engine!.runDepth(fullFen, depth, EVAL_MULTI_PV, signal);
+          const result = await engine!.runDepth(fullFen, depth, multiPvForDepth(depth), signal);
           if (!result) break;
           // Detect broken eval during deepening
           if (!result.top_moves[0]?.pv?.length) {
@@ -412,6 +414,16 @@ window.chessRay.onStopCapture(() => {
 window.chessRay.onSetMaxDepth((depth: number) => {
   debugLog(`Max depth changed to ${depth}`);
   EVAL_MAX_DEPTH = depth;
+});
+
+window.chessRay.onSetMultiPvMax((n: number) => {
+  debugLog(`MultiPV max changed to ${n}`);
+  setMultiPvMax(n);
+});
+
+window.chessRay.onSetMultiPvRamp((n: number) => {
+  debugLog(`MultiPV ramp changed to ${n} steps/line`);
+  setMultiPvRamp(n);
 });
 
 let changeDetectEnabled = true;

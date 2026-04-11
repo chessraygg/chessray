@@ -137,10 +137,14 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
     }
   }
 
-  // The gap must be significant relative to the top score.
-  // Real highlights: gap is 50%+ of top score (e.g., 300→15 = gap 285).
-  // No highlights: gap is tiny relative to top score (e.g., 50→48 = gap 2).
-  if (maxGap < scores[0].dist * 0.3) return { highlighted: [], patches };
+  // The gap must be significant: either relative to the top score OR as a
+  // large fraction of the score just above the gap. The relative-to-top check
+  // fails when an outlier inflates the top score (e.g., a piece corner scores
+  // 600+ while real highlights score ~200, giving a 30% threshold of 180+).
+  const scoreAboveGap = scores[cutIdx - 1].dist;
+  const gapIsSignificant = maxGap >= scores[0].dist * 0.3 ||
+    maxGap >= scoreAboveGap * 0.5;
+  if (!gapIsSignificant) return { highlighted: [], patches };
 
   const primary = scores.slice(0, cutIdx).map(s => s.idx);
 
@@ -175,7 +179,7 @@ function isLegalPieceMove(piece: string, fromRank: number, fromFile: number, toR
     case 'b': return dr === df && dr > 0;
     case 'q': return dr === 0 || df === 0 || (dr === df && dr > 0);
     case 'n': return (dr === 1 && df === 2) || (dr === 2 && df === 1);
-    case 'k': return dr <= 1 && df <= 1 && (dr + df > 0);
+    case 'k': return (dr <= 1 && df <= 1 && (dr + df > 0)) || (dr === 0 && df === 2); // includes castling
     case 'p': {
       if (df > 1 || dr < 1 || dr > 2) return false;
       if (flipped == null) return true; // no orientation info, accept either direction
