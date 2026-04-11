@@ -1,6 +1,6 @@
 import type { EvalResult, ArrowDescriptor } from '@chessray/core';
 
-export const EVAL_START_DEPTH = 12;
+export const EVAL_START_DEPTH = 16;
 export const EVAL_DEPTH_STEP = 4;
 export const EVAL_MAX_DEPTH = 28;
 export const EVAL_MULTI_PV_START = 2;
