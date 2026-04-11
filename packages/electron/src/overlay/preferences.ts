@@ -20,6 +20,7 @@ export interface Prefs {
   pvGrowDelaySec: number;
   vboardOverlayVisible: boolean;
   compactMode: boolean;
+  targetFps: number;
   changeDetect: boolean;
   pvWhiteColor: string;
   pvBlackColor: string;
@@ -38,6 +39,7 @@ export const DEFAULT_PREFS: Prefs = {
   pvGrowDelaySec: 3,
   vboardOverlayVisible: true,
   compactMode: false,
+  targetFps: 2,
   changeDetect: true,
   pvWhiteColor: '#60a5fa',
   pvBlackColor: '#f9a8d4',

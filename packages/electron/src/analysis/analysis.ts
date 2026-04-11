@@ -18,7 +18,7 @@ import type {
 import { EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH, multiPvForDepth, setMultiPvMax, setMultiPvRamp, cacheGet, cachePut } from './eval-cache.js';
 import { sampleBoardPixels, boardUnchanged } from './change-detect.js';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
-import { initAndStartCapture, stopCapture } from './frame-capture.js';
+import { initAndStartCapture, stopCapture, setTargetFps } from './frame-capture.js';
 
 declare global {
   interface Window {
@@ -35,6 +35,7 @@ declare global {
       onSetMultiPvMax: (cb: (n: number) => void) => void;
       onSetMultiPvRamp: (cb: (n: number) => void) => void;
       onSetChangeDetect: (cb: (enabled: boolean) => void) => void;
+      onSetTargetFps: (cb: (fps: number) => void) => void;
     };
   }
 }
@@ -497,6 +498,11 @@ let changeDetectEnabled = true;
 window.chessRay.onSetChangeDetect((enabled: boolean) => {
   debugLog(`Change detection ${enabled ? 'enabled' : 'disabled'}`);
   changeDetectEnabled = enabled;
+});
+
+window.chessRay.onSetTargetFps((fps: number) => {
+  debugLog(`Target FPS changed to ${fps}`);
+  setTargetFps(fps);
 });
 
 // Signal to main that all IPC listeners are registered

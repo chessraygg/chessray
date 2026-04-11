@@ -24,6 +24,7 @@ declare global {
       setMultiPvMax: (n: number) => void;
       setMultiPvRamp: (n: number) => void;
       setChangeDetect: (enabled: boolean) => void;
+      setTargetFps: (fps: number) => void;
       onResetPanelPosition: (cb: () => void) => void;
       minimizeApp: () => void;
       closeApp: () => void;
@@ -884,6 +885,22 @@ function initOverlay(): void {
     changeDetectCheckbox.addEventListener('change', () => {
       savePrefs({ changeDetect: changeDetectCheckbox.checked });
       window.chessRay.setChangeDetect(changeDetectCheckbox.checked);
+    });
+  }
+
+  // ── Frame rate slider ──
+  const fpsSlider = document.getElementById('cv-target-fps') as HTMLInputElement | null;
+  const fpsVal = document.getElementById('cv-target-fps-val');
+  if (fpsSlider && fpsVal) {
+    const fps = prefs.targetFps;
+    fpsSlider.value = String(fps);
+    fpsVal.textContent = String(fps);
+    window.chessRay.setTargetFps(fps);
+    fpsSlider.addEventListener('input', () => {
+      const v = parseInt(fpsSlider.value, 10);
+      fpsVal.textContent = String(v);
+      savePrefs({ targetFps: v });
+      window.chessRay.setTargetFps(v);
     });
   }
 

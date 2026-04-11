@@ -1,6 +1,42 @@
 import { initEngine, initRecognizer, getOnnxSession } from './engine-init.js';
 
-export const TARGET_FPS = 2;
+export let TARGET_FPS = 2;
+
+let captureOnFrame: ((imageData: ImageData) => Promise<void>) | null = null;
+let captureCtx: CanvasRenderingContext2D | null = null;
+let captureCanvas: HTMLCanvasElement | null = null;
+let captureVideo: HTMLVideoElement | null = null;
+let captureResetState: (() => void) | null = null;
+
+export function setTargetFps(fps: number): void {
+  TARGET_FPS = Math.max(1, Math.min(10, fps));
+  // Restart the capture interval at the new rate
+  if (captureInterval && captureOnFrame && captureCtx && captureCanvas && captureVideo) {
+    clearInterval(captureInterval);
+    let isProcessing = false;
+    const ctx = captureCtx;
+    const canvas = captureCanvas;
+    const video = captureVideo;
+    const onFrame = captureOnFrame;
+    const resetState = captureResetState;
+    captureInterval = setInterval(async () => {
+      if (isProcessing) return;
+      if (video.videoWidth > 0 && (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight)) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        resetState?.();
+      }
+      isProcessing = true;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      try {
+        await onFrame(imageData);
+      } finally {
+        isProcessing = false;
+      }
+    }, 1000 / TARGET_FPS);
+  }
+}
 
 let mediaStream: MediaStream | null = null;
 let captureInterval: ReturnType<typeof setInterval> | null = null;
@@ -156,6 +192,13 @@ export async function initAndStartCapture(
     }
 
     debugLog(`Starting frame capture at ${TARGET_FPS}fps, canvas=${canvas.width}x${canvas.height}`);
+
+    // Store references for setTargetFps to restart the interval
+    captureOnFrame = onFrame;
+    captureCtx = ctx;
+    captureCanvas = canvas;
+    captureVideo = video;
+    captureResetState = resetState;
 
     let isProcessing = false;
 

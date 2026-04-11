@@ -68,6 +68,12 @@ const api = {
   onSetChangeDetect: (cb: (enabled: boolean) => void) =>
     ipcRenderer.on('set-change-detect', (_e, enabled: boolean) => cb(enabled)),
 
+  // Frame rate
+  setTargetFps: (fps: number) =>
+    ipcRenderer.send('set-target-fps', fps),
+  onSetTargetFps: (cb: (fps: number) => void) =>
+    ipcRenderer.on('set-target-fps', (_e, fps: number) => cb(fps)),
+
   // Panel reset
   onResetPanelPosition: (cb: () => void) =>
     ipcRenderer.on('reset-panel-position', () => cb()),

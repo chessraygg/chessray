@@ -115,6 +115,11 @@
               <span id="cv-pv-depth-val">10</span>
             </div>
             <div class="pv-depth-row">
+              <label data-tip="Frame capture rate (frames per second)">FPS</label>
+              <input type="range" id="cv-target-fps" min="1" max="5" value="2" step="1">
+              <span id="cv-target-fps-val">2</span>
+            </div>
+            <div class="pv-depth-row">
               <label data-tip="Seconds between adding each new line arrow (starts at 2, grows to max)">Grow</label>
               <input type="range" id="cv-pv-grow-delay" min="1" max="10" value="3" step="1">
               <span id="cv-pv-grow-delay-val">3</span><span style="font-size:8px;color:var(--text-faint)">s</span>
