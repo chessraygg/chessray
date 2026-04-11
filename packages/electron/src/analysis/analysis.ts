@@ -7,7 +7,7 @@
 
 import {
   detectBoard, cropPixels, recognizeBoard,
-  computeArrows, compareFen, guessTurn, buildFullFen,
+  computeArrows, compareFen, guessTurn, buildFullFen, detectSequentialMove,
 } from '@chessray/core';
 import { Chess } from 'chess.js';
 import type {
@@ -51,6 +51,8 @@ let lastOrientationSource: OrientationSource | undefined;
 let lastHighlightedSquares: number[] = [];
 let lastHighlightTurn: 'w' | 'b' | null = null;
 let lastArrows: ArrowDescriptor[] = [];
+let lastFullFen: string | null = null;
+let lastPlayedMove: PipelineResult['played_move'] = null;
 let cachedBbox: BoardBBox | null = null;
 let frameCount = 0;
 let EVAL_MAX_DEPTH = DEFAULT_MAX_DEPTH;
@@ -73,6 +75,8 @@ function resetPipelineState(): void {
   prevPositionFen = null;
   lastEval = null;
   lastArrows = [];
+  lastFullFen = null;
+  lastPlayedMove = null;
   lastBoardSample = null;
   lastRecognitionResult = null;
   cachedBbox = null;
@@ -205,6 +209,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       game_over: opts.game_over,
       flipped: isFlipped,
       orientation_source: orientationSource,
+      played_move: lastPlayedMove,
       board_image_url: boardImageUrl,
       frame_dimensions: { width: pixels.width, height: pixels.height },
       total_elapsed_ms: Date.now() - startTime,
@@ -268,6 +273,9 @@ async function processFrame(imageData: ImageData): Promise<void> {
     debugLog(`Turn: highlight=${highlightTurn} guess=${guessTurn(prevPositionFen, positionFen)} final=${turn} hl=[${highlightedSquares}]`);
     const fullFen = buildFullFen(positionFen, turn);
 
+    // Detect sequential move before updating lastFullFen
+    // (detection needs the PREVIOUS fullFen)
+
     // Detect checkmate/stalemate — skip engine if game is over
     let gameOver: 'checkmate' | 'stalemate' | undefined;
     try {
@@ -282,8 +290,32 @@ async function processFrame(imageData: ImageData): Promise<void> {
       return;
     }
 
+    // Detect if this position is one legal move from the previous
+    lastPlayedMove = null;
+    if (lastFullFen && lastEval) {
+      const seqMove = detectSequentialMove(lastFullFen, positionFen);
+      if (seqMove) {
+        // Look up loss in previous eval's top moves
+        const prevBest = lastEval.top_moves[0];
+        const matchingMove = lastEval.top_moves.find(m => m.move === seqMove.uci);
+        if (prevBest && matchingMove) {
+          lastPlayedMove = {
+            from: seqMove.uci.slice(0, 2),
+            to: seqMove.uci.slice(2, 4),
+            uci: seqMove.uci,
+            san: seqMove.san,
+            loss_cp: matchingMove.loss_cp,
+          };
+          debugLog(`Sequential move: ${seqMove.san} (${seqMove.uci}) loss=${matchingMove.loss_cp}cp`);
+        } else if (prevBest) {
+          debugLog(`Sequential move: ${seqMove.san} (${seqMove.uci}) — not in top moves, skipping arrow`);
+        }
+      }
+    }
+
     prevPositionFen = positionFen;
     lastPositionFen = positionFen;
+    lastFullFen = fullFen;
     // Clear stale eval so dedup frames don't show old position's eval
     lastEval = null;
     lastArrows = [];

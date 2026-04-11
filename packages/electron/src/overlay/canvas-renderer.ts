@@ -346,9 +346,24 @@ export function renderArrows(state: OverlayState): void {
     return;
   }
 
+  // Draw played move arrow (behind engine arrows)
+  if (state.currentResult?.played_move) {
+    const pm = state.currentResult.played_move;
+    const pmArrow: ArrowDescriptor = {
+      from: pm.from, to: pm.to,
+      color: lossToColor(pm.loss_cp),
+      width: 3, opacity: 0.5,
+      loss_cp: pm.loss_cp,
+    };
+    drawArrow(ctx, pmArrow, virtualBoard, 1, state.displayFlipped);
+    if (pm.loss_cp >= 5) {
+      drawLossLabel(ctx, pm.from, pm.loss_cp, virtualBoard, state.displayFlipped);
+    }
+  }
+
   const targetArrows = getActiveArrows(state);
 
-  if (targetArrows.length === 0) {
+  if (targetArrows.length === 0 && !state.currentResult?.played_move) {
     vboardArrowState.animated = [];
     if (vboardArrowState.timer) { clearInterval(vboardArrowState.timer); vboardArrowState.timer = 0; }
     return;
@@ -436,6 +451,22 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.strokeStyle = 'rgba(255, 0, 255, 0.7)';
     ctx.lineWidth = 2;
     ctx.strokeRect(bx, by, bw, bh);
+  }
+
+  // Draw played move arrow (behind engine arrows)
+  if (result.played_move) {
+    const pm = result.played_move;
+    const pmArrow: ArrowDescriptor = {
+      from: pm.from, to: pm.to,
+      color: lossToColor(pm.loss_cp),
+      width: 3, opacity: 0.5,
+      loss_cp: pm.loss_cp,
+    };
+    const arrowScale = (bw + bh) / 2 / 192;
+    drawArrow(ctx, pmArrow, boardRect, arrowScale, state.displayFlipped);
+    if (pm.loss_cp >= 5) {
+      drawLossLabel(ctx, pm.from, pm.loss_cp, boardRect, state.displayFlipped);
+    }
   }
 
   if (state.arrowsVisible || state.lineVisible || state.pvPreviewLineIndex !== null) {

@@ -121,6 +121,38 @@ export function guessTurn(prevFen: string | null, currFen: string): 'w' | 'b' {
 }
 
 /**
+ * Detect if currPositionFen is reachable from prevFullFen in exactly one legal move.
+ * Returns the move in UCI and SAN notation, or null if not sequential.
+ */
+export function detectSequentialMove(
+  prevFullFen: string,
+  currPositionFen: string,
+): { uci: string; san: string } | null {
+  let chess: Chess;
+  try {
+    chess = new Chess(prevFullFen);
+  } catch {
+    return null;
+  }
+
+  const currPosition = currPositionFen.split(' ')[0];
+  const moves = chess.moves({ verbose: true });
+
+  for (const move of moves) {
+    chess.move(move);
+    if (chess.fen().split(' ')[0] === currPosition) {
+      const from = move.from;
+      const to = move.to;
+      const promo = move.promotion ? move.promotion : '';
+      return { uci: `${from}${to}${promo}`, san: move.san };
+    }
+    chess.undo();
+  }
+
+  return null;
+}
+
+/**
  * Build a full FEN string from a position string and optional metadata.
  */
 export function buildFullFen(
