@@ -159,6 +159,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     t = Date.now();
     const boardSample = sampleBoardPixels(cropped.data, cropped.width, cropped.height);
     const visuallyUnchanged = changeDetectEnabled && lastBoardSample && boardUnchanged(lastBoardSample, boardSample);
+    const prevBoardSample = lastBoardSample;
     lastBoardSample = boardSample;
     const tChangeDetect = Date.now() - t;
 
@@ -187,6 +188,9 @@ async function processFrame(imageData: ImageData): Promise<void> {
         // Skip mid-animation frames — piece is still sliding, FEN is inconsistent
         if (boardResult.midAnimation) {
           debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms recog=${Date.now() - t}ms [mid-animation, skipped] total=${Date.now() - startTime}ms`);
+          // Restore previous board sample so next frame's change detection
+          // compares against the last good frame, not the mid-animation one
+          lastBoardSample = prevBoardSample;
           // Reuse previous result
           recognition = lastRecognitionResult;
           rawFen = lastRawFen;
