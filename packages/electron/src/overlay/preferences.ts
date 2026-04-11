@@ -8,6 +8,7 @@ export interface Prefs {
   lineVisible: boolean;
   pvDepth: number;
   lossThreshold: number;
+  playedLossThreshold: number;
   maxDepth: number;
   multiPvMax: number;
   multiPvRamp: number;
@@ -42,6 +43,7 @@ export const DEFAULT_PREFS: Prefs = {
   pvBlackColor: '#f9a8d4',
   pvDepth: 10,
   lossThreshold: 0,
+  playedLossThreshold: 50,
   maxDepth: 28,
   multiPvMax: 5,
   multiPvRamp: 1,

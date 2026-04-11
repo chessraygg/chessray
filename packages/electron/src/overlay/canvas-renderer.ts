@@ -19,6 +19,7 @@ export interface OverlayState {
   sourceVisible: boolean;
   selectedLineIndex: number;
   lossThreshold: number;
+  playedLossThreshold: number;
   autoMode: boolean;
   vboardOverlayVisible: boolean;
   pvPreviewLineIndex: number | null;
@@ -356,7 +357,7 @@ export function renderArrows(state: OverlayState): void {
       loss_cp: pm.loss_cp,
     };
     drawArrow(ctx, pmArrow, virtualBoard, 1, state.displayFlipped);
-    if (pm.loss_cp >= 5) {
+    if (pm.loss_cp >= state.playedLossThreshold) {
       drawLossLabel(ctx, pm.from, pm.loss_cp, virtualBoard, state.displayFlipped);
     }
   }
@@ -464,7 +465,7 @@ export function renderVideoOverlay(state: OverlayState): void {
     };
     const arrowScale = (bw + bh) / 2 / 192;
     drawArrow(ctx, pmArrow, boardRect, arrowScale, state.displayFlipped);
-    if (pm.loss_cp >= 5) {
+    if (pm.loss_cp >= state.playedLossThreshold) {
       drawLossLabel(ctx, pm.from, pm.loss_cp, boardRect, state.displayFlipped);
     }
   }

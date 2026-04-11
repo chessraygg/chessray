@@ -57,6 +57,7 @@ const state: OverlayState = {
   sourceVisible: true,
   selectedLineIndex: 0,
   lossThreshold: 50,
+  playedLossThreshold: 50,
   autoMode: false,
   vboardOverlayVisible: true,
   pvPreviewLineIndex: null,
@@ -797,6 +798,22 @@ function initOverlay(): void {
       state.lossThreshold = parseInt(lossSlider.value, 10);
       lossVal.textContent = String(state.lossThreshold);
       savePrefs({ lossThreshold: state.lossThreshold });
+      renderArrows(state);
+      renderVideoOverlay(state);
+    });
+  }
+
+  // ── Played move loss label threshold slider ──
+  const playedLossSlider = document.getElementById('cv-played-loss-threshold') as HTMLInputElement | null;
+  const playedLossVal = document.getElementById('cv-played-loss-threshold-val');
+  state.playedLossThreshold = prefs.playedLossThreshold;
+  if (playedLossSlider && playedLossVal) {
+    playedLossSlider.value = String(state.playedLossThreshold);
+    playedLossVal.textContent = String(state.playedLossThreshold);
+    playedLossSlider.addEventListener('input', () => {
+      state.playedLossThreshold = parseInt(playedLossSlider.value, 10);
+      playedLossVal.textContent = String(state.playedLossThreshold);
+      savePrefs({ playedLossThreshold: state.playedLossThreshold });
       renderArrows(state);
       renderVideoOverlay(state);
     });
