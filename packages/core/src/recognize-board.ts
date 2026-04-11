@@ -84,10 +84,10 @@ export async function recognizeBoard(
   const tDisambiguate = Date.now() - t;
 
   // Step 4: Refine orientation using pawn move direction from highlights.
-  // If a pawn moved, its direction is an authoritative orientation signal
-  // that can correct piece_count errors in sparse positions.
+  // Only needed for sparse positions (<20 pieces) where piece_count heuristic
+  // can be wrong. With 20+ pieces, piece_count is reliable.
   t = Date.now();
-  if (highlightedSquares.length === 2) {
+  if (pieceCount < 20 && highlightedSquares.length === 2) {
     const fenRows = rawFen.split('/');
     const fenBoard: (string | null)[] = new Array(64).fill(null);
     for (let r = 0; r < 8; r++) {
