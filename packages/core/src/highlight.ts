@@ -1,20 +1,9 @@
 import type { PixelBuffer } from './pixel-utils.js';
 
-export interface CornerPatch {
-  /** Patch position and size (relative to cropped board) */
-  x: number; y: number; w: number; h: number;
-  /** Sampled RGB color */
-  color: [number, number, number];
-  /** Whether this corner was chosen as the median representative */
-  isMedian: boolean;
-}
-
 export interface HighlightResult {
   highlighted: number[];
-  /** All 4 corner patches per square (256 total), with sampled colors */
-  patches: CornerPatch[];
   scores?: Array<{ idx: number; dist: number }>;
-  /** Per-square representative color (median of 4 corners), indexed 0-63 */
+  /** Per-square representative color (border frame median), indexed 0-63 */
   colors?: Array<[number, number, number]>;
   /** Median colors for light and dark squares */
   medians?: { light: [number, number, number]; dark: [number, number, number] };
@@ -24,53 +13,36 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   const { data, width, height } = pixels;
   const sqW = width / 8;
   const sqH = height / 8;
-  const pw = Math.max(2, Math.floor(sqW * 0.1));
-  const ph = Math.max(2, Math.floor(sqH * 0.1));
-
-  function samplePatch(px0: number, py0: number): [number, number, number] {
-    let r = 0, g = 0, b = 0, n = 0;
-    for (let py = py0; py < py0 + ph; py++) {
-      for (let px = px0; px < px0 + pw; px++) {
-        const cx = Math.min(Math.max(px, 0), width - 1);
-        const cy = Math.min(Math.max(py, 0), height - 1);
-        const i = (cy * width + cx) * 4;
-        r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
-      }
-    }
-    return [r / n, g / n, b / n];
-  }
 
   // Inset from square edges to avoid grid lines, anti-aliasing, and coordinate labels.
-  // Use larger inset for big squares (annotations are further from corners) and
-  // smaller inset for small squares (to avoid hitting piece graphics).
   const insetPct = sqW > 100 ? 0.15 : 0.08;
   const insetX = Math.max(2, Math.floor(sqW * insetPct));
   const insetY = Math.max(2, Math.floor(sqH * insetPct));
 
   const colors: Array<[number, number, number]> = [];
-  const patches: CornerPatch[] = [];
 
-  // Per-channel median of pixels in a border frame around the square.
-  // Inset from the edge to avoid grid lines/anti-aliasing, and exclude
-  // the center where pieces sit. The border frame captures bare board
-  // background reliably even when a piece or annotation is present.
-  const frameInner = Math.max(3, Math.floor(Math.min(sqW, sqH) * 0.25));
+  // Per-channel median of pixels in the padding strip around each square.
+  // The strip runs from a minimal edge inset (to skip grid lines) up to the
+  // main inset boundary. This thin frame captures bare board background
+  // without being contaminated by piece graphics in the center.
+  const edgeInset = Math.max(2, Math.floor(Math.min(sqW, sqH) * 0.03));
   function squareFrameMedianColor(sqX0: number, sqY0: number, sqX1: number, sqY1: number): [number, number, number] {
-    const x0 = sqX0 + insetX;
-    const y0 = sqY0 + insetY;
-    const x1 = sqX1 - insetX;
-    const y1 = sqY1 - insetY;
-    // Inner boundary: exclude center
-    const ix0 = x0 + frameInner;
-    const iy0 = y0 + frameInner;
-    const ix1 = x1 - frameInner;
-    const iy1 = y1 - frameInner;
+    // Outer boundary: just past grid lines
+    const x0 = sqX0 + edgeInset;
+    const y0 = sqY0 + edgeInset;
+    const x1 = sqX1 - edgeInset;
+    const y1 = sqY1 - edgeInset;
+    // Inner boundary: the existing inset (where piece area begins)
+    const ix0 = sqX0 + insetX;
+    const iy0 = sqY0 + insetY;
+    const ix1 = sqX1 - insetX;
+    const iy1 = sqY1 - insetY;
     const rs: number[] = [];
     const gs: number[] = [];
     const bs: number[] = [];
     for (let py = y0; py < y1; py++) {
       for (let px = x0; px < x1; px++) {
-        // Skip inner rectangle (piece area)
+        // Only include pixels in the padding strip (outside inner boundary)
         if (px >= ix0 && px < ix1 && py >= iy0 && py < iy1) continue;
         const cx = Math.min(Math.max(px, 0), width - 1);
         const cy = Math.min(Math.max(py, 0), height - 1);
@@ -94,25 +66,7 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
       const sqX1 = Math.floor((file + 1) * sqW);
       const sqY1 = Math.floor((rank + 1) * sqH);
 
-      // Representative color: per-channel median of border frame pixels
       colors.push(squareFrameMedianColor(sqX0, sqY0, sqX1, sqY1));
-
-      // Sample 4 corners for scoring (MIN of corners detects full-square highlights)
-      const corners: Array<[number, number]> = [
-        [sqX0 + insetX, sqY0 + insetY],
-        [sqX1 - insetX - pw, sqY0 + insetY],
-        [sqX0 + insetX, sqY1 - insetY - ph],
-        [sqX1 - insetX - pw, sqY1 - insetY - ph],
-      ];
-      const cornerColors = corners.map(([cx, cy]) => samplePatch(cx, cy));
-
-      for (let ci = 0; ci < 4; ci++) {
-        patches.push({
-          x: corners[ci][0], y: corners[ci][1], w: pw, h: ph,
-          color: cornerColors[ci],
-          isMedian: false,
-        });
-      }
     }
   }
 
@@ -152,26 +106,15 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
     return euclidean * (1 + channelStd / 10);
   }
 
-  // For each square, compute highlight scores at 4 inset corners and take the
-  // MINIMUM. Move highlights cover the entire square (all 4 corners show the
-  // highlight color → min is high), while annotations only affect 1-2 corners
-  // (other corners show normal background → min is low).
-  // Reuse corner colors already sampled above.
+  // Score each square by comparing its border frame median color to the
+  // expected parity median. Highlights shift the background color uniformly;
+  // the border frame median is robust to pieces and annotations.
   const scores: Array<{ idx: number; dist: number }> = [];
   for (let i = 0; i < 64; i++) {
     const rank = Math.floor(i / 8);
     const file = i % 8;
     const expected = (rank + file) % 2 === 0 ? lightMedian : darkMedian;
-
-    const cornerScores: number[] = [];
-    for (let ci = 0; ci < 4; ci++) {
-      const patch = patches[i * 4 + ci];
-      cornerScores.push(highlightScore(patch.color, expected));
-    }
-    // Use the minimum score across corners. Highlights cover the entire square
-    // (all corners show highlight color → min is high), while annotations only
-    // affect 1-2 corners (other corners normal → min is low).
-    scores.push({ idx: i, dist: Math.min(...cornerScores) });
+    scores.push({ idx: i, dist: highlightScore(colors[i], expected) });
   }
   scores.sort((a, b) => b.dist - a.dist);
 
@@ -180,7 +123,7 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   // Non-standard board themes (blue/ice) produce uniformly high scores with no clear gap.
 
   const minAbsolute = 18;
-  if (scores[0].dist < minAbsolute) return { highlighted: [], patches, scores, colors, medians: { light: lightMedian, dark: darkMedian } };
+  if (scores[0].dist < minAbsolute) return { highlighted: [], scores, colors, medians: { light: lightMedian, dark: darkMedian } };
 
   // Find the biggest gap in the top 8 scores.
   // Start from index 2 (highlights usually come in pairs) but also consider
@@ -211,7 +154,7 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   const scoreAboveGap = scores[cutIdx - 1].dist;
   const gapIsSignificant = maxGap >= scores[0].dist * 0.3 ||
     maxGap >= scoreAboveGap * 0.35;
-  if (!gapIsSignificant) return { highlighted: [], patches, scores, colors, medians: { light: lightMedian, dark: darkMedian } };
+  if (!gapIsSignificant) return { highlighted: [], scores, colors, medians: { light: lightMedian, dark: darkMedian } };
 
   const primary = scores.slice(0, cutIdx).map(s => s.idx);
 
@@ -226,7 +169,7 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   }
   const highlighted = scores.slice(0, extendedCount).map(s => s.idx);
 
-  return { highlighted, patches, scores, colors, medians: { light: lightMedian, dark: darkMedian } };
+  return { highlighted, scores, colors, medians: { light: lightMedian, dark: darkMedian } };
 }
 
 /**

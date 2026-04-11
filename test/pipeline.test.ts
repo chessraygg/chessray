@@ -100,51 +100,32 @@ describe('end-to-end detection pipeline', () => {
         for (let x = bbox.x; x <= bbox.x + bbox.width; x++) setPixel(x, gy, 0, 200, 0);
       }
 
-      // Draw the border frame that's sampled for each square (magenta outline)
+      // Draw the padding strip frame that's sampled for each square (magenta outline)
       const insetPctDbg = sqW > 100 ? 0.15 : 0.08;
       const insetXDbg = Math.max(2, Math.floor(sqW * insetPctDbg));
       const insetYDbg = Math.max(2, Math.floor(sqH * insetPctDbg));
-      const frameInnerDbg = Math.max(3, Math.floor(Math.min(sqW, sqH) * 0.25));
+      const edgeInsetDbg = Math.max(1, Math.floor(Math.min(sqW, sqH) * 0.02));
       for (let rank2 = 0; rank2 < 8; rank2++) {
         for (let file2 = 0; file2 < 8; file2++) {
-          const sx0 = bbox.x + Math.floor(file2 * sqW) + insetXDbg;
-          const sy0 = bbox.y + Math.floor(rank2 * sqH) + insetYDbg;
-          const sx1 = bbox.x + Math.floor((file2 + 1) * sqW) - insetXDbg;
-          const sy1 = bbox.y + Math.floor((rank2 + 1) * sqH) - insetYDbg;
-          // Outer border of frame
-          for (let px = sx0; px < sx1; px++) { setPixel(px, sy0, 255, 0, 255); setPixel(px, sy1 - 1, 255, 0, 255); }
-          for (let py = sy0; py < sy1; py++) { setPixel(sx0, py, 255, 0, 255); setPixel(sx1 - 1, py, 255, 0, 255); }
-          // Inner border of frame (where center exclusion starts)
-          const ix0 = sx0 + frameInnerDbg;
-          const iy0 = sy0 + frameInnerDbg;
-          const ix1 = sx1 - frameInnerDbg;
-          const iy1 = sy1 - frameInnerDbg;
-          if (ix0 < ix1 && iy0 < iy1) {
-            for (let px = ix0; px < ix1; px++) { setPixel(px, iy0, 255, 0, 255); setPixel(px, iy1 - 1, 255, 0, 255); }
-            for (let py = iy0; py < iy1; py++) { setPixel(ix0, py, 255, 0, 255); setPixel(ix1 - 1, py, 255, 0, 255); }
-          }
+          // Outer border (just past grid lines)
+          const ox0 = bbox.x + Math.floor(file2 * sqW) + edgeInsetDbg;
+          const oy0 = bbox.y + Math.floor(rank2 * sqH) + edgeInsetDbg;
+          const ox1 = bbox.x + Math.floor((file2 + 1) * sqW) - edgeInsetDbg;
+          const oy1 = bbox.y + Math.floor((rank2 + 1) * sqH) - edgeInsetDbg;
+          for (let px = ox0; px < ox1; px++) { setPixel(px, oy0, 255, 0, 255); setPixel(px, oy1 - 1, 255, 0, 255); }
+          for (let py = oy0; py < oy1; py++) { setPixel(ox0, py, 255, 0, 255); setPixel(ox1 - 1, py, 255, 0, 255); }
+          // Inner border (where inset/piece area begins)
+          const ix0 = bbox.x + Math.floor(file2 * sqW) + insetXDbg;
+          const iy0 = bbox.y + Math.floor(rank2 * sqH) + insetYDbg;
+          const ix1 = bbox.x + Math.floor((file2 + 1) * sqW) - insetXDbg;
+          const iy1 = bbox.y + Math.floor((rank2 + 1) * sqH) - insetYDbg;
+          for (let px = ix0; px < ix1; px++) { setPixel(px, iy0, 255, 0, 255); setPixel(px, iy1 - 1, 255, 0, 255); }
+          for (let py = iy0; py < iy1; py++) { setPixel(ix0, py, 255, 0, 255); setPixel(ix1 - 1, py, 255, 0, 255); }
         }
       }
 
-      // Draw highlight patches with their sampled colors
+      // Draw border frame median color in center of each square (white border)
       const hlResult = detectHighlightedSquares(cropped);
-      for (const patch of hlResult.patches) {
-        const [pr, pg, pb] = patch.color.map(v => Math.round(v));
-        for (let py = patch.y; py < patch.y + patch.h; py++)
-          for (let px = patch.x; px < patch.x + patch.w; px++)
-            setPixel(bbox.x + px, bbox.y + py, pr, pg, pb);
-        // Black border on corner patches
-        for (let px = patch.x - 1; px <= patch.x + patch.w; px++) {
-          setPixel(bbox.x + px, bbox.y + patch.y - 1, 0, 0, 0);
-          setPixel(bbox.x + px, bbox.y + patch.y + patch.h, 0, 0, 0);
-        }
-        for (let py = patch.y - 1; py <= patch.y + patch.h; py++) {
-          setPixel(bbox.x + patch.x - 1, bbox.y + py, 0, 0, 0);
-          setPixel(bbox.x + patch.x + patch.w, bbox.y + py, 0, 0, 0);
-        }
-      }
-
-      // Draw median color patch in center of each square (white border)
       if (hlResult.colors) {
         const patchW = Math.max(2, Math.floor(sqW * 0.1));
         const patchH = Math.max(2, Math.floor(sqH * 0.1));
