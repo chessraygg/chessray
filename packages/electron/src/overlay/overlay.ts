@@ -970,7 +970,7 @@ function initOverlay(): void {
     compactMode = on;
     userPanel?.classList.toggle('compact', on);
     compactBtn?.classList.toggle('active', on);
-    if (compactMovesEl) compactMovesEl.classList.toggle('hidden', !on);
+    // compact-moves is always visible now
     savePrefs({ compactMode: on });
     if (on) updateCompactMoves();
   }
@@ -980,7 +980,7 @@ function initOverlay(): void {
   collapseBtn?.addEventListener('click', () => { collapsed = !collapsed; setCollapsed(collapsed); });
 
   function updateCompactMoves(): void {
-    if (!compactMode || !compactMovesEl) return;
+    if (!compactMovesEl) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) {
       compactMovesEl.innerHTML = '';
