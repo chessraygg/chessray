@@ -292,25 +292,40 @@ async function processFrame(imageData: ImageData): Promise<void> {
 
     // Detect if this position is one legal move from the previous
     lastPlayedMove = null;
+    let prevBestScore: number | null = null;
     if (lastFullFen && lastEval) {
       const seqMove = detectSequentialMove(lastFullFen, positionFen);
       if (seqMove) {
-        // Look up loss in previous eval's top moves
         const prevBest = lastEval.top_moves[0];
+        prevBestScore = prevBest?.score_cp ?? null;
         const matchingMove = lastEval.top_moves.find(m => m.move === seqMove.uci);
-        if (prevBest && matchingMove) {
-          lastPlayedMove = {
-            from: seqMove.uci.slice(0, 2),
-            to: seqMove.uci.slice(2, 4),
-            uci: seqMove.uci,
-            san: seqMove.san,
-            loss_cp: matchingMove.loss_cp,
-          };
-          debugLog(`Sequential move: ${seqMove.san} (${seqMove.uci}) loss=${matchingMove.loss_cp}cp`);
-        } else if (prevBest) {
-          debugLog(`Sequential move: ${seqMove.san} (${seqMove.uci}) — not in top moves, skipping arrow`);
+        const lossCp = matchingMove ? matchingMove.loss_cp : null;
+        lastPlayedMove = {
+          from: seqMove.uci.slice(0, 2),
+          to: seqMove.uci.slice(2, 4),
+          uci: seqMove.uci,
+          san: seqMove.san,
+          loss_cp: lossCp ?? 0,
+        };
+        if (lossCp !== null) {
+          debugLog(`Sequential move: ${seqMove.san} (${seqMove.uci}) loss=${lossCp}cp`);
+        } else {
+          debugLog(`Sequential move: ${seqMove.san} (${seqMove.uci}) — not in top ${lastEval.top_moves.length}, loss pending`);
         }
       }
+    }
+
+    // Track whether loss was already known from previous top moves
+    const playedMoveLossKnown = lastPlayedMove ? lastPlayedMove.loss_cp !== 0 : true;
+
+    // Update played move loss once the new eval comes in (for moves not in previous top N)
+    function updatePlayedMoveLoss(evalResult: EvalResult): void {
+      if (!lastPlayedMove || prevBestScore === null || playedMoveLossKnown) return;
+      // loss = prevBest + currBest (both from side-to-move perspective)
+      const currBest = evalResult.top_moves[0]?.score_cp ?? 0;
+      const loss = Math.max(0, prevBestScore + currBest);
+      lastPlayedMove = { ...lastPlayedMove, loss_cp: loss };
+      debugLog(`Played move loss updated: ${lastPlayedMove.san} loss=${loss}cp (prev=${prevBestScore} curr=${currBest})`);
     }
 
     prevPositionFen = positionFen;
@@ -329,6 +344,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     // Check eval cache — return cached result instantly, then continue deepening
     const cached = cacheGet(fullFen);
     if (cached) {
+      updatePlayedMoveLoss(cached.evaluation);
       lastEval = cached.evaluation;
       lastArrows = cached.arrows;
       const cachedDepth = cached.evaluation.depth;
@@ -385,6 +401,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     }
 
     if (firstResult) {
+      updatePlayedMoveLoss(firstResult);
       const arrows = computeArrows(firstResult.top_moves);
       lastEval = firstResult;
       lastArrows = arrows;
