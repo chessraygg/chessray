@@ -351,17 +351,19 @@ async function processFrame(imageData: ImageData): Promise<void> {
     }
     const tSeqMove = Date.now() - t;
 
-    // Track whether loss was already known from previous top moves
-    const playedMoveLossKnown = lastPlayedMove ? lastPlayedMove.loss_cp !== 0 : true;
+    // Whether loss was already known from previous top moves (accurate, no update needed)
+    const playedMoveLossFromTopMoves = lastPlayedMove ?
+      lastEval?.top_moves.some(m => m.move === lastPlayedMove!.uci) ?? false : false;
 
-    // Update played move loss once the new eval comes in (for moves not in previous top N)
+    // Update played move loss from eval scores (for moves not in previous top N).
+    // Called at each depth to refine the loss as the eval deepens.
     function updatePlayedMoveLoss(evalResult: EvalResult): void {
-      if (!lastPlayedMove || prevBestScore === null || playedMoveLossKnown) return;
+      if (!lastPlayedMove || prevBestScore === null || playedMoveLossFromTopMoves) return;
       // loss = prevBest + currBest (both from side-to-move perspective)
       const currBest = evalResult.top_moves[0]?.score_cp ?? 0;
       const loss = Math.max(0, prevBestScore + currBest);
       lastPlayedMove = { ...lastPlayedMove, loss_cp: loss };
-      debugLog(`Played move loss updated: ${lastPlayedMove.san} loss=${loss}cp (prev=${prevBestScore} curr=${currBest})`);
+      debugLog(`Played move loss updated: ${lastPlayedMove.san} loss=${loss}cp (prev=${prevBestScore} curr=${currBest} d=${evalResult.depth})`);
     }
 
     prevPositionFen = positionFen;
@@ -407,11 +409,12 @@ async function processFrame(imageData: ImageData): Promise<void> {
               await reinitEngine();
               break;
             }
+            updatePlayedMoveLoss(result);
             const arrows = computeArrows(result.top_moves);
             lastEval = result;
             lastArrows = arrows;
             cachePut(fullFen, { evaluation: result, arrows });
-            debugLog(`Eval depth ${result.depth}/${EVAL_MAX_DEPTH} in ${result.elapsed_ms}ms pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
+            debugLog(`Eval depth ${result.depth}/${EVAL_MAX_DEPTH} in ${result.elapsed_ms}ms score=${result.top_moves[0]?.score_cp}cp pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
             sendResult(makeResult({
               evaluation: result,
               arrows,
@@ -466,11 +469,12 @@ async function processFrame(imageData: ImageData): Promise<void> {
             await reinitEngine();
             break;
           }
+          updatePlayedMoveLoss(result);
           const arrows = computeArrows(result.top_moves);
           lastEval = result;
           lastArrows = arrows;
           cachePut(fullFen, { evaluation: result, arrows });
-          debugLog(`Eval depth ${result.depth}/${EVAL_MAX_DEPTH} in ${result.elapsed_ms}ms pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
+          debugLog(`Eval depth ${result.depth}/${EVAL_MAX_DEPTH} in ${result.elapsed_ms}ms score=${result.top_moves[0]?.score_cp}cp pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
           sendResult(makeResult({
             evaluation: result,
             arrows,
