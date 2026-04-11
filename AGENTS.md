@@ -31,14 +31,16 @@ Platform-specific code is isolated in `packages/electron/src/main/platform.ts` v
 - **Keep it simple.** Don't over-engineer or add speculative features. No premature optimization.
 - **Research first.** Before implementing detection/CV algorithms, search for established approaches. Don't invent custom solutions when proven ones exist.
 - **Use libraries, don't reimplement.** If a battle-tested library exists, use it. One function call beats 200 lines of buggy reimplementation.
-- **Never change test expectations without discussion.** Tests define the spec. If the implementation can't pass, fix the implementation — never weaken the test.
+- **Never change test expectations without discussion.** Tests define the spec — they describe what the correct output is, not what the implementation currently produces. If the implementation can't pass, fix the implementation — never weaken the test. No rationalizing ("the model outputs X so the test should expect X"). If you can't fix the implementation, leave the test failing and say so.
 
 ## Commands
 
 - `npm test` — run board detection tests (Vitest)
+- `npm test -- -t "<filter>"` — run a single test case by name (e.g. `npm test -- -t "agadmator"`)
 - `npm run build` — build the Electron app
 - `npm run setup` — download vendor assets (Stockfish, ONNX Runtime)
 - `npm run install-app -w packages/electron` — build and install locally
 - `npm run gen-expected` — regenerate expected-output images for highlight test cases
 - `npm run gen-expected -- <filter>` — regenerate only cases matching filter (e.g. `caruana-american3`)
+- `npx tsx scripts/detect-screenshot.ts <filename>` — detect board from a screenshot in `test/screenshots/` and output a draft `PipelineTestCase` entry
 - `./app.sh {start|stop|restart|log|forge-log|status}` — manage the Electron app in dev mode
