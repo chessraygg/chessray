@@ -116,7 +116,10 @@ function initOverlay(): void {
   function applyScale(): void {
     if (!userPanel) return;
     userPanel.style.transform = `scale(${panelScale})`;
-    userPanel.style.transformOrigin = 'top left';
+    userPanel.style.transformOrigin = 'top right';
+    // Limit panel height so scaled content doesn't exceed viewport
+    const maxH = Math.floor((window.innerHeight - 20) / panelScale);
+    userPanel.style.maxHeight = `${maxH}px`;
     state.panelScale = panelScale;
     // Update zoom UI if it exists (called before zoom controls are wired)
     const lbl = document.getElementById('cv-zoom-label');
@@ -126,6 +129,7 @@ function initOverlay(): void {
     if (sld) sld.value = String(pct);
   }
   applyScale();
+  window.addEventListener('resize', applyScale);
 
   if (userPanel) {
     userPanel.addEventListener('wheel', (e: WheelEvent) => {

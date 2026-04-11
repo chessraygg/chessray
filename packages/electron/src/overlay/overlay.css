@@ -44,7 +44,8 @@ canvas#video-overlay {
   border-radius: var(--radius);
   padding: 10px;
   pointer-events: auto;
-  overflow: visible;
+  overflow-y: auto;
+  overflow-x: hidden;
   cursor: grab;
 }
 
