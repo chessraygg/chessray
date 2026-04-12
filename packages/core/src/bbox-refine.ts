@@ -32,28 +32,33 @@ export function refineBbox(pixels: PixelBuffer, rough: BoardBBox): BoardBBox {
   const scanY0 = inset;
   const scanY1 = rh - inset;
 
-  // Column projection: sum of horizontal gradients per column
+  // Use count-based signal: count how many pixels exceed a gradient threshold.
+  // Grid lines span the full board width/height and produce high counts.
+  // Piece edges are localized and produce low counts even if individually strong.
+  const gradThreshold = 12;
+
+  // Column projection: count of rows with horizontal gradient > threshold
   const colSignal = new Float64Array(rw);
   for (let cx = Math.max(1, scanX0); cx < scanX1; cx++) {
-    let sum = 0;
+    let count = 0;
     for (let ry = scanY0; ry < scanY1; ry++) {
       const px = rough.x + cx;
       const py = rough.y + ry;
-      sum += Math.abs(lum(px, py) - lum(px - 1, py));
+      if (Math.abs(lum(px, py) - lum(px - 1, py)) > gradThreshold) count++;
     }
-    colSignal[cx] = sum;
+    colSignal[cx] = count;
   }
 
-  // Row projection: sum of vertical gradients per row
+  // Row projection: count of columns with vertical gradient > threshold
   const rowSignal = new Float64Array(rh);
   for (let ry = Math.max(1, scanY0); ry < scanY1; ry++) {
-    let sum = 0;
+    let count = 0;
     for (let cx = scanX0; cx < scanX1; cx++) {
       const px = rough.x + cx;
       const py = rough.y + ry;
-      sum += Math.abs(lum(px, py) - lum(px, py - 1));
+      if (Math.abs(lum(px, py) - lum(px, py - 1)) > gradThreshold) count++;
     }
-    rowSignal[ry] = sum;
+    rowSignal[ry] = count;
   }
 
   // Find the best evenly-spaced 7-peak fit for each signal
@@ -75,13 +80,13 @@ export function refineBbox(pixels: PixelBuffer, rough: BoardBBox): BoardBBox {
   const ry = Math.round(top);
   const w = Math.round(right - left);
   const h = Math.round(bottom - top);
-  const size = Math.min(Math.max(w, h), rough.width, rough.height);
+  const size = Math.max(w, h);
 
   return {
-    x: Math.min(rx, rough.x + rough.width - size),
-    y: Math.min(ry, rough.y + rough.height - size),
-    width: size,
-    height: size,
+    x: Math.max(0, Math.min(rx, pixels.width - size)),
+    y: Math.max(0, Math.min(ry, pixels.height - size)),
+    width: Math.min(size, pixels.width),
+    height: Math.min(size, pixels.height),
   };
 }
 
