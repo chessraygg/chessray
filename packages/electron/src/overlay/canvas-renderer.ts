@@ -20,7 +20,6 @@ export interface OverlayState {
   selectedLineIndex: number;
   lossThreshold: number;
   playedLossThreshold: number;
-  pvOnBoard: boolean;
   autoMode: boolean;
   vboardOverlayVisible: boolean;
   pvPreviewLineIndex: number | null;

@@ -9,7 +9,6 @@ export interface Prefs {
   pvDepth: number;
   lossThreshold: number;
   playedLossThreshold: number;
-  pvOnBoard: boolean;
   maxDepth: number;
   multiPvMax: number;
   multiPvRamp: number;
@@ -47,7 +46,6 @@ export const DEFAULT_PREFS: Prefs = {
   pvDepth: 10,
   lossThreshold: 0,
   playedLossThreshold: 50,
-  pvOnBoard: false,
   maxDepth: 28,
   multiPvMax: 5,
   multiPvRamp: 1,
