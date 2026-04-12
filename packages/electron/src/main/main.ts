@@ -438,8 +438,8 @@ ipcMain.on('toggle-lichess', (_e, fen: string, color: string) => {
   const fenPath = fen.replace(/ /g, '_');
   const side = color === 'black' ? 'black' : 'white';
   lichessWindow = new BrowserWindow({
-    width: 550,
-    height: 650,
+    width: 750,
+    height: 700,
     alwaysOnTop: true,
     title: 'Lichess Analysis',
     autoHideMenuBar: true,
