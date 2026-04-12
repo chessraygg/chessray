@@ -173,6 +173,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     let tRecog = 0;
     let brTiming: { pieces_ms: number; orientation_ms: number; highlights_ms: number; disambiguate_ms: number; pawnRefine_ms: number; turn_ms: number; total_ms: number } | null = null;
     let detectionStatus: string | undefined;
+    const prevHighlightedSquares = [...lastHighlightedSquares];
 
     if (visuallyUnchanged && lastRecognitionResult) {
       recognition = lastRecognitionResult;
@@ -299,6 +300,26 @@ async function processFrame(imageData: ImageData): Promise<void> {
     }
     if (evalTurnMismatch) {
       debugLog(`Turn corrected by highlight: eval had '${lastEval!.fen.split(' ')[1]}' but highlight says '${highlightTurn}' — re-evaluating`);
+    }
+
+    // Detect intermediate frames: FEN changed but highlights didn't.
+    // This means a piece is mid-transition — the old highlights are stale
+    // and the new move hasn't landed yet. Skip and reuse previous result.
+    if (lastPositionFen && !compareFen(lastPositionFen, positionFen) &&
+        highlightedSquares.length === 2 && prevHighlightedSquares.length === 2 &&
+        highlightedSquares[0] === prevHighlightedSquares[0] &&
+        highlightedSquares[1] === prevHighlightedSquares[1]) {
+      detectionStatus = 'Intermediate frame — highlights unchanged';
+      debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [intermediate, skipped] total=${Date.now() - startTime}ms`);
+      // Restore board sample so next frame compares against last good frame
+      lastBoardSample = prevBoardSample;
+      sendResult(makeResult({
+        evaluation: lastEval,
+        arrows: lastArrows,
+        eval_depth: lastEval?.depth,
+        eval_max_depth: lastEval && lastEval.depth < EVAL_MAX_DEPTH ? EVAL_MAX_DEPTH : undefined,
+      }));
+      return;
     }
 
     const whiteKings = (positionFen.match(/K/g) || []).length;
