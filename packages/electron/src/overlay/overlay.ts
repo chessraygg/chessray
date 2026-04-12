@@ -1108,8 +1108,8 @@ function initOverlay(): void {
   document.getElementById('cv-lichess-btn')?.addEventListener('click', () => {
     const fen = state.currentResult?.evaluation?.fen ?? state.currentResult?.recognition?.fen;
     if (fen) {
-      const encoded = encodeURIComponent(fen);
-      window.chessRay.openExternal(`https://lichess.org/analysis/${encoded}`);
+      const path = fen.replace(/ /g, '_');
+      window.chessRay.openExternal(`https://lichess.org/analysis/${path}`);
     }
   });
 }
