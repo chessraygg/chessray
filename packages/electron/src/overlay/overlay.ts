@@ -37,6 +37,7 @@ declare global {
 
 // ── Module-level state ──
 let lichessOpen = false;
+let lichessSync = true;
 let lastLichessFen: string | null = null;
 
 let userPanel: HTMLDivElement | null = null;
@@ -1108,8 +1109,10 @@ function initOverlay(): void {
   const closeBtn = document.getElementById('cv-close-btn');
   closeBtn?.addEventListener('click', () => window.chessRay.closeApp());
 
-  // Lichess analysis button — toggle floating Lichess window
+  // Lichess analysis — toggle floating window + sync control
   const lichessBtn = document.getElementById('cv-lichess-btn');
+  const lichessSyncCheckbox = document.getElementById('cv-lichess-sync') as HTMLInputElement | null;
+
   lichessBtn?.addEventListener('click', () => {
     const fen = state.currentResult?.evaluation?.fen ?? state.currentResult?.recognition?.fen;
     if (fen) {
@@ -1117,6 +1120,19 @@ function initOverlay(): void {
       lichessBtn.classList.toggle('active', lichessOpen);
       const color = state.displayFlipped ? 'black' : 'white';
       window.chessRay.toggleLichess(fen, color);
+    }
+  });
+
+  lichessSyncCheckbox?.addEventListener('change', () => {
+    lichessSync = lichessSyncCheckbox.checked;
+    // If re-enabling sync, immediately update to current position
+    if (lichessSync && lichessOpen) {
+      const fen = state.currentResult?.evaluation?.fen ?? state.currentResult?.recognition?.fen;
+      if (fen) {
+        lastLichessFen = fen;
+        const color = state.displayFlipped ? 'black' : 'white';
+        window.chessRay.updateLichess(fen, color);
+      }
     }
   });
 }
@@ -1201,8 +1217,8 @@ function processPendingResult(): void {
   renderArrows(state);
   renderVideoOverlay(state);
 
-  // Auto-update Lichess window when position changes
-  if (lichessOpen) {
+  // Auto-update Lichess window when position changes (if sync enabled)
+  if (lichessOpen && lichessSync) {
     const fen = result.evaluation?.fen ?? result.recognition?.fen;
     if (fen && fen !== lastLichessFen) {
       lastLichessFen = fen;

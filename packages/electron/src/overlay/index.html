@@ -95,6 +95,17 @@
           </div>
         </div>
 
+        <!-- Lichess -->
+        <div class="panel-section" id="sec-lichess">
+          <div class="section-header" data-section="lichess">Lichess</div>
+          <div class="section-body">
+            <div class="lichess-controls">
+              <button class="toggle-btn" id="cv-lichess-btn" data-tip="Open floating Lichess analysis board">&#9816; Analysis board</button>
+              <label class="lichess-sync-label"><input type="checkbox" id="cv-lichess-sync" checked><span>Auto-sync position</span></label>
+            </div>
+          </div>
+        </div>
+
         <!-- Settings -->
         <div class="panel-section" id="sec-settings">
           <div class="section-header" data-section="settings">Settings</div>
@@ -164,10 +175,7 @@
               <button class="toggle" id="cv-border-btn">Box</button>
             </div>
             <img id="cv-debug-img" src="" alt="Board capture">
-            <div class="fen-row">
-              <div class="fen" id="cv-debug-fen">Waiting...</div>
-              <button class="lichess-btn" id="cv-lichess-btn" data-tip="Analyze on Lichess">&#9816;</button>
-            </div>
+            <div class="fen" id="cv-debug-fen">Waiting...</div>
             <div class="debug-orient" id="cv-orientation-info"></div>
             <div class="meta" id="cv-debug-info"></div>
             <div class="detection-status" id="cv-detection-status" style="display:none"></div>
