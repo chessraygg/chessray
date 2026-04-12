@@ -407,4 +407,15 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
       { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
     ],
   },
+  {
+    file: 'test-carlsen-freestyle2.png',
+    white_pawns: 'down',
+    highlighted: ['b1', 'a2'],
+    turn: 'b',
+    bbox: { x: 744, y: 65, width: 669, height: 669 },
+    squareSize: 84,
+    expectedFen: '1RB1KB2/1PPN1P1P/4P1R1/2Q3P1/1P4pp/3qn3/1bppppb1/1r2k1r1',
+    orientation_source: 'piece_count',
+    expected_labels: null,
+  },
 ];
