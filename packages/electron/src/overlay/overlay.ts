@@ -1129,7 +1129,7 @@ function initOverlay(): void {
     if (lichessSync && lichessOpen) {
       const fen = state.currentResult?.evaluation?.fen ?? state.currentResult?.recognition?.fen;
       if (fen) {
-        lastLichessFen = fen;
+        lastLichessFen = fen.split(' ')[0];
         const color = state.displayFlipped ? 'black' : 'white';
         window.chessRay.updateLichess(fen, color);
       }
@@ -1217,11 +1217,14 @@ function processPendingResult(): void {
   renderArrows(state);
   renderVideoOverlay(state);
 
-  // Auto-update Lichess window when position changes (if sync enabled)
+  // Auto-update Lichess window when position changes (if sync enabled).
+  // Compare position-only part of FEN to avoid reloading on eval depth changes
+  // or recognition→eval FEN format transitions.
   if (lichessOpen && lichessSync) {
     const fen = result.evaluation?.fen ?? result.recognition?.fen;
-    if (fen && fen !== lastLichessFen) {
-      lastLichessFen = fen;
+    const positionOnly = fen?.split(' ')[0];
+    if (fen && positionOnly && positionOnly !== lastLichessFen) {
+      lastLichessFen = positionOnly;
       const color = state.displayFlipped ? 'black' : 'white';
       window.chessRay.updateLichess(fen, color);
     }
