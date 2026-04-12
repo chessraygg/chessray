@@ -25,6 +25,12 @@ export interface BoardRecognitionResult {
   orientationSource: OrientationSource;
   /** True when highlights indicate a move but the piece hasn't landed yet (mid-animation) */
   midAnimation: boolean;
+  /** Per-square border-frame median color (indexed 0-63, raw image orientation) */
+  highlightColors: Array<[number, number, number]>;
+  /** Per-square highlight scores sorted descending */
+  highlightScores: Array<{ idx: number; dist: number }>;
+  /** Median colors for light and dark squares */
+  highlightMedians: { light: [number, number, number]; dark: [number, number, number] };
   /** Per-step timing breakdown (ms) */
   timing: {
     pieces_ms: number;
@@ -164,6 +170,9 @@ export async function recognizeBoard(
     turn,
     midAnimation,
     orientationSource: orientation.source,
+    highlightColors: hlResult.colors ?? [],
+    highlightScores: hlResult.scores ?? [],
+    highlightMedians: hlResult.medians ?? { light: [0, 0, 0], dark: [0, 0, 0] },
     timing: {
       pieces_ms: tPieces,
       orientation_ms: tOrientation,

@@ -10,6 +10,7 @@ export * from './recognize-board.js';
 export * from './label-detect.js';
 export * from './recognition-interface.js';
 export * from './recognition-yolo.js';
+export * from './pipeline.js';
 export * from './stockfish.js';
 export * from './stockfish-uci-parser.js';
 export * from './move-notation.js';
