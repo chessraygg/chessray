@@ -429,13 +429,14 @@ ipcMain.on('open-external', (_e, url: string) => {
   }
 });
 
-ipcMain.on('toggle-lichess', (_e, fen: string) => {
+ipcMain.on('toggle-lichess', (_e, fen: string, color: string) => {
   if (lichessWindow && !lichessWindow.isDestroyed()) {
     lichessWindow.close();
     lichessWindow = null;
     return;
   }
   const fenPath = fen.replace(/ /g, '_');
+  const side = color === 'black' ? 'black' : 'white';
   lichessWindow = new BrowserWindow({
     width: 550,
     height: 650,
@@ -447,14 +448,15 @@ ipcMain.on('toggle-lichess', (_e, fen: string) => {
       sandbox: true,
     },
   });
-  lichessWindow.loadURL(`https://lichess.org/analysis/${fenPath}`);
+  lichessWindow.loadURL(`https://lichess.org/analysis/${fenPath}?color=${side}`);
   lichessWindow.on('closed', () => { lichessWindow = null; });
 });
 
-ipcMain.on('update-lichess', (_e, fen: string) => {
+ipcMain.on('update-lichess', (_e, fen: string, color: string) => {
   if (!lichessWindow || lichessWindow.isDestroyed()) return;
   const fenPath = fen.replace(/ /g, '_');
-  lichessWindow.loadURL(`https://lichess.org/analysis/${fenPath}`);
+  const side = color === 'black' ? 'black' : 'white';
+  lichessWindow.loadURL(`https://lichess.org/analysis/${fenPath}?color=${side}`);
 });
 
 ipcMain.on('set-max-depth', (_e, depth: number) => {

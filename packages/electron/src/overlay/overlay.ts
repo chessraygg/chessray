@@ -29,8 +29,8 @@ declare global {
       minimizeApp: () => void;
       closeApp: () => void;
       openExternal: (url: string) => void;
-      toggleLichess: (fen: string) => void;
-      updateLichess: (fen: string) => void;
+      toggleLichess: (fen: string, color: string) => void;
+      updateLichess: (fen: string, color: string) => void;
     };
   }
 }
@@ -1115,7 +1115,8 @@ function initOverlay(): void {
     if (fen) {
       lichessOpen = !lichessOpen;
       lichessBtn.classList.toggle('active', lichessOpen);
-      window.chessRay.toggleLichess(fen);
+      const color = state.displayFlipped ? 'black' : 'white';
+      window.chessRay.toggleLichess(fen, color);
     }
   });
 }
@@ -1205,7 +1206,8 @@ function processPendingResult(): void {
     const fen = result.evaluation?.fen ?? result.recognition?.fen;
     if (fen && fen !== lastLichessFen) {
       lastLichessFen = fen;
-      window.chessRay.updateLichess(fen);
+      const color = state.displayFlipped ? 'black' : 'white';
+      window.chessRay.updateLichess(fen, color);
     }
   }
 }
