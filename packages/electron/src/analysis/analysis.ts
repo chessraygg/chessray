@@ -225,12 +225,13 @@ async function processFrame(imageData: ImageData): Promise<void> {
 
     }
 
-    const makeResult = (opts: { evaluation?: EvalResult | null; arrows?: ArrowDescriptor[]; eval_depth?: number; eval_max_depth?: number; game_over?: 'checkmate' | 'stalemate' }): PipelineResult => ({
+    const makeResult = (opts: { evaluation?: EvalResult | null; arrows?: ArrowDescriptor[]; eval_depth?: number; eval_max_depth?: number; game_over?: 'checkmate' | 'stalemate'; stale_eval?: boolean }): PipelineResult => ({
       board_detection: { found: true, bbox: activeBbox!, confidence: detectionConf },
       recognition,
       evaluation: opts.evaluation ?? null,
       eval_depth: opts.eval_depth,
       eval_max_depth: opts.eval_max_depth,
+      stale_eval: opts.stale_eval,
       arrows: opts.arrows ?? [],
       highlighted_squares: highlightedSquares,
       turn: highlightTurn ?? undefined,
@@ -399,7 +400,9 @@ async function processFrame(imageData: ImageData): Promise<void> {
     prevPositionFen = positionFen;
     lastPositionFen = positionFen;
     lastFullFen = fullFen;
-    // Clear stale eval so dedup frames don't show old position's eval
+    // Keep previous eval temporarily so the eval bar doesn't flash off.
+    // Background eval will overwrite it when the first depth completes.
+    const staleEval = lastEval;
     lastEval = null;
     lastArrows = [];
 
@@ -459,9 +462,9 @@ async function processFrame(imageData: ImageData): Promise<void> {
       return;
     }
 
-    // Send result immediately with position but no eval — don't block on engine
+    // Send result immediately with stale eval (keeps eval bar visible until new eval arrives)
     debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms [new pos] total=${Date.now() - startTime}ms`);
-    sendResult(makeResult({ eval_max_depth: EVAL_MAX_DEPTH }));
+    sendResult(makeResult({ evaluation: staleEval, eval_max_depth: EVAL_MAX_DEPTH, stale_eval: true }));
 
     // Run all eval depths in background (non-blocking).
     // Check signal.aborted after each depth AND before updating state to avoid

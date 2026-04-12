@@ -60,6 +60,7 @@ export interface PipelineResult {
   evaluation: EvalResult | null;
   eval_depth?: number; // current completed depth
   eval_max_depth?: number; // target max depth (shows "calculating..." if eval_depth < eval_max_depth)
+  stale_eval?: boolean; // true when eval is from previous position (kept for visual continuity)
   arrows: ArrowDescriptor[];
   highlighted_squares?: number[]; // indices of highlighted squares (0-63, corrected orientation)
   flipped?: boolean; // true = board is flipped (white at top in video)

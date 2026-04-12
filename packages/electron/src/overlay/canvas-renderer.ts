@@ -621,8 +621,12 @@ export function renderVideoOverlay(state: OverlayState): void {
     }
   }
 
-  // Eval bar
+  // Eval bar (semi-transparent when showing stale eval from previous position)
   if (state.evalBarVisible && result.evaluation?.top_moves?.length) {
+    const isStale = !!result.stale_eval;
+    ctx.save();
+    if (isStale) ctx.globalAlpha = 0.35;
+
     const sideScore = result.evaluation.top_moves[0].score_cp;
     const turn = result.evaluation.fen?.split(' ')[1] || 'w';
     const bestScore = turn === 'b' ? -sideScore : sideScore;
@@ -650,6 +654,7 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.strokeStyle = '#555';
     ctx.lineWidth = 1;
     ctx.strokeRect(barX, by, barW, bh);
+    ctx.restore();
   }
 
   // Game over overlay on the actual board
