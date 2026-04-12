@@ -40,6 +40,8 @@ let lichessOpen = false;
 let lichessSync = true;
 let lastLichessFen: string | null = null;
 
+let boardContainer: HTMLElement | null = null;
+let boardContainerParent: HTMLElement | null = null;
 let userPanel: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
 let debugFen: HTMLDivElement | null = null;
@@ -65,12 +67,78 @@ const state: OverlayState = {
   selectedLineIndex: 0,
   lossThreshold: 50,
   playedLossThreshold: 50,
+  pvOnBoard: false,
   autoMode: false,
   vboardOverlayVisible: true,
   pvPreviewLineIndex: null,
   panelScale: 1,
   displayInfo: null,
 };
+
+/**
+ * Position the board-container on top of the actual detected board when
+ * pvOnBoard is enabled and PV is playing. Revert to panel when disabled.
+ */
+function updateBoardContainerPosition(): void {
+  if (!boardContainer || !boardContainerParent) return;
+  const pvPlaying = (window as any).__chessrayPvPlaying;
+  const result = state.currentResult;
+
+  if (state.pvOnBoard && pvPlaying && result?.board_detection?.found && result.board_detection.bbox && result.frame_dimensions) {
+    const dpr = state.displayInfo?.scaleFactor ?? window.devicePixelRatio;
+    const overlayY = state.displayInfo?.overlayBounds?.y ?? 0;
+    const displayY = state.displayInfo?.displayBounds?.y ?? 0;
+    const overlayYOffset = overlayY - displayY;
+    const bbox = result.board_detection.bbox;
+    const bx = bbox.x / dpr;
+    const by = bbox.y / dpr - overlayYOffset;
+    const bw = bbox.width / dpr;
+    const bh = bbox.height / dpr;
+
+    // Move to body as fixed overlay
+    if (boardContainer.parentElement !== document.body) {
+      document.body.appendChild(boardContainer);
+    }
+    boardContainer.style.position = 'fixed';
+    boardContainer.style.left = `${bx}px`;
+    boardContainer.style.top = `${by}px`;
+    boardContainer.style.width = `${bw}px`;
+    boardContainer.style.zIndex = '50';
+    boardContainer.style.transform = 'none';
+    // Scale the grid and canvas to match actual board size
+    const grid = document.getElementById('cv-debug-grid');
+    if (grid) {
+      grid.style.transform = `scale(${bw / 200})`;
+      grid.style.transformOrigin = 'top left';
+    }
+    const arrowCanvas = document.getElementById('cv-arrow-canvas') as HTMLCanvasElement | null;
+    if (arrowCanvas) {
+      arrowCanvas.style.width = `${bw}px`;
+      arrowCanvas.style.height = `${bh}px`;
+    }
+  } else {
+    // Return to panel
+    if (boardContainer.parentElement !== boardContainerParent) {
+      boardContainerParent.insertBefore(boardContainer, boardContainerParent.firstChild);
+    }
+    boardContainer.style.position = 'relative';
+    boardContainer.style.left = '';
+    boardContainer.style.top = '';
+    boardContainer.style.width = '200px';
+    boardContainer.style.zIndex = '';
+    boardContainer.style.transform = '';
+    const grid = document.getElementById('cv-debug-grid');
+    if (grid) {
+      grid.style.transform = '';
+      grid.style.transformOrigin = '';
+    }
+    const arrowCanvas = document.getElementById('cv-arrow-canvas') as HTMLCanvasElement | null;
+    if (arrowCanvas) {
+      arrowCanvas.style.width = '';
+      arrowCanvas.style.height = '';
+    }
+  }
+}
 
 // ── Init ──
 
@@ -85,6 +153,8 @@ function initOverlay(): void {
 
   state.videoCanvas = document.getElementById('video-overlay') as HTMLCanvasElement;
   userPanel = document.getElementById('user-panel') as HTMLDivElement;
+  boardContainer = document.querySelector('.board-container') as HTMLElement;
+  boardContainerParent = boardContainer?.parentElement ?? null;
   debugImg = document.getElementById('cv-debug-img') as HTMLImageElement;
   debugFen = document.getElementById('cv-debug-fen') as HTMLDivElement;
   debugInfo = document.getElementById('cv-debug-info') as HTMLDivElement;
@@ -277,6 +347,7 @@ function initOverlay(): void {
   // Virtual board overlay toggle
   const vboardBtn = document.getElementById('cv-vboard-btn');
   state.vboardOverlayVisible = prefs.vboardOverlayVisible;
+  state.pvOnBoard = prefs.pvOnBoard;
   if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
 
   if (vboardBtn) {
@@ -330,6 +401,7 @@ function initOverlay(): void {
   const dispLines = document.getElementById('cv-disp-lines') as HTMLInputElement | null;
   const dispArrows = document.getElementById('cv-disp-arrows') as HTMLInputElement | null;
   const dispAuto = document.getElementById('cv-disp-auto') as HTMLInputElement | null;
+  const dispPvOnBoard = document.getElementById('cv-disp-pv-on-board') as HTMLInputElement | null;
 
   function syncDisplayToggles(): void {
     if (dispOverlay) dispOverlay.checked = state.overlayVisible;
@@ -338,6 +410,7 @@ function initOverlay(): void {
     if (dispLines) dispLines.checked = state.lineVisible;
     if (dispArrows) dispArrows.checked = state.arrowsVisible;
     if (dispAuto) dispAuto.checked = state.autoMode;
+    if (dispPvOnBoard) dispPvOnBoard.checked = state.pvOnBoard;
   }
 
   // Wire checkboxes to click the corresponding top bar button (use getElementById
@@ -348,6 +421,11 @@ function initOverlay(): void {
   dispLines?.addEventListener('change', () => document.getElementById('cv-line-btn')?.click());
   dispArrows?.addEventListener('change', () => document.getElementById('cv-arrows-btn')?.click());
   dispAuto?.addEventListener('change', () => document.getElementById('cv-auto-btn')?.click());
+  dispPvOnBoard?.addEventListener('change', () => {
+    state.pvOnBoard = dispPvOnBoard.checked;
+    savePrefs({ pvOnBoard: state.pvOnBoard });
+    updateBoardContainerPosition();
+  });
 
   function syncModeButtons(): void {
     arrowsBtn?.classList.toggle('active', state.arrowsVisible);
@@ -442,6 +520,7 @@ function initOverlay(): void {
 
     // Exit analysis view for the interlude
     (window as any).__chessrayPvPlaying = false;
+    updateBoardContainerPosition();
     document.getElementById('cv-debug-grid')?.classList.remove('analysis');
     document.querySelectorAll('.piece-anim').forEach(el => el.remove());
 
@@ -484,8 +563,8 @@ function initOverlay(): void {
       if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
       state.pvDisplayDepth = 0;
 
-      // Reset virtual board if visible
-      if (state.vboardOverlayVisible) {
+      // Reset virtual board if visible (or pvOnBoard)
+      if (state.vboardOverlayVisible || state.pvOnBoard) {
         const grid = document.getElementById('cv-debug-grid');
         if (grid) renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, []);
         if (state.canvas) {
@@ -505,8 +584,8 @@ function initOverlay(): void {
     // Update actual board overlay (shows arrows 1..step)
     renderVideoOverlay(state);
 
-    // Skip virtual board animation if vboard overlay is hidden
-    if (!state.vboardOverlayVisible) return;
+    // Skip virtual board animation if vboard overlay is hidden AND pvOnBoard is off
+    if (!state.vboardOverlayVisible && !state.pvOnBoard) return;
 
     // Animate piece movement on virtual board
     const uci = pvCyclePv[step - 1];
@@ -679,9 +758,10 @@ function initOverlay(): void {
       pvCyclePreviewTimer = null;
       state.pvPreviewLineIndex = null;
       (window as any).__chessrayPvPlaying = true;
-      if (state.vboardOverlayVisible) {
+      if (state.vboardOverlayVisible || state.pvOnBoard) {
         document.getElementById('cv-debug-grid')?.classList.add('analysis');
       }
+      updateBoardContainerPosition();
 
       // First step immediately, then continue on interval
       pvCycleStep();
@@ -733,6 +813,7 @@ function initOverlay(): void {
     }
     const wasPlaying = (window as any).__chessrayPvPlaying;
     (window as any).__chessrayPvPlaying = false;
+    updateBoardContainerPosition();
     const grid = document.getElementById('cv-debug-grid');
     grid?.classList.remove('analysis');
     document.querySelectorAll('.piece-anim').forEach(el => el.remove());
@@ -1216,6 +1297,7 @@ function processPendingResult(): void {
   state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
   renderVideoOverlay(state);
+  updateBoardContainerPosition();
 
   // Auto-update Lichess window when position changes (if sync enabled).
   // Compare position-only part of FEN to avoid reloading on eval depth changes
