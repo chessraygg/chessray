@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, protocol, screen, session, systemPreferences } from 'electron';
+import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, protocol, screen, session, shell, systemPreferences } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { platform } from './platform.js';
@@ -420,6 +420,12 @@ ipcMain.on('minimize-app', () => {
 
 ipcMain.on('close-app', () => {
   app.quit();
+});
+
+ipcMain.on('open-external', (_e, url: string) => {
+  if (typeof url === 'string' && url.startsWith('https://')) {
+    shell.openExternal(url);
+  }
 });
 
 ipcMain.on('set-max-depth', (_e, depth: number) => {

@@ -538,7 +538,13 @@ canvas#video-overlay {
 .move-score { font-weight: 600; margin-right: 2px; }
 
 
+.fen-row {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+}
 .fen {
+  flex: 1;
   padding: 3px 6px;
   background: var(--bg-inset);
   border-radius: var(--radius-sm);
@@ -546,6 +552,17 @@ canvas#video-overlay {
   font: 9px/1.4 var(--mono);
   color: var(--text-muted);
 }
+.lichess-btn {
+  padding: 0 6px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.lichess-btn:hover { background: var(--bg-hover); color: var(--text); }
 
 .debug-orient {
   font: 9px/1.2 var(--sans);

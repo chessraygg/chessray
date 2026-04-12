@@ -28,6 +28,7 @@ declare global {
       onResetPanelPosition: (cb: () => void) => void;
       minimizeApp: () => void;
       closeApp: () => void;
+      openExternal: (url: string) => void;
     };
   }
 }
@@ -1102,6 +1103,15 @@ function initOverlay(): void {
   // ── Window controls ──
   const closeBtn = document.getElementById('cv-close-btn');
   closeBtn?.addEventListener('click', () => window.chessRay.closeApp());
+
+  // Lichess analysis button
+  document.getElementById('cv-lichess-btn')?.addEventListener('click', () => {
+    const fen = state.currentResult?.evaluation?.fen ?? state.currentResult?.recognition?.fen;
+    if (fen) {
+      const encoded = encodeURIComponent(fen);
+      window.chessRay.openExternal(`https://lichess.org/analysis/${encoded}`);
+    }
+  });
 }
 
 initOverlay();

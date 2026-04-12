@@ -83,6 +83,8 @@ const api = {
     ipcRenderer.send('minimize-app'),
   closeApp: () =>
     ipcRenderer.send('close-app'),
+  openExternal: (url: string) =>
+    ipcRenderer.send('open-external', url),
 };
 
 contextBridge.exposeInMainWorld('chessRay', api);
