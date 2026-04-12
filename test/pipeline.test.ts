@@ -159,7 +159,7 @@ describe('end-to-end detection pipeline', () => {
       }
 
       // Verify orientation
-      const expectedFlipped = tc.white_pawns === 'down';
+      const expectedFlipped = tc.orientation === 'white top';
       expect(result.flipped).toBe(expectedFlipped);
 
       // Verify corrected FEN

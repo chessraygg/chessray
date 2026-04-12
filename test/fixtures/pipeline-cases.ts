@@ -12,8 +12,8 @@ export interface LabelExpectation {
 export interface PipelineTestCase {
   /** Screenshot filename in test/screenshots/ */
   file: string;
-  /** Which direction white pawns move: 'up' (normal) or 'down' (flipped) */
-  white_pawns: 'up' | 'down';
+  /** Board orientation: 'white bottom' (normal) or 'white top' (flipped) */
+  orientation: 'white bottom' | 'white top';
   /** Highlighted squares in correct chess notation (e.g. ['c1', 'f4']). Null for starting positions with no highlights. */
   highlighted: [string, string] | null;
   /** Whose turn it is after this move. Null if turn can't be determined from highlights (starting positions). */
@@ -33,7 +33,7 @@ export interface PipelineTestCase {
 export const PIPELINE_CASES: PipelineTestCase[] = [
   {
     file: 'test-oro-aronian.png',
-    white_pawns: 'down',
+    orientation: 'white top',
     highlighted: ['c1', 'f4'],
     turn: 'b',
     bbox: { x: 728, y: 135, width: 537, height: 537 },
@@ -46,7 +46,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-oro-aronian2.png',
-    white_pawns: 'down',
+    orientation: 'white top',
     highlighted: ['b5', 'b4'],
     turn: 'w',
     bbox: { x: 704, y: 15, width: 537, height: 537 },
@@ -59,7 +59,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-carlsen-titled.png',
-    white_pawns: 'down',
+    orientation: 'white top',
     highlighted: ['c2', 'c6'],
     turn: 'b',
     bbox: { x: 62, y: 208, width: 1013, height: 1013 },
@@ -70,7 +70,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-caruana-american.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['h4', 'h5'],
     turn: 'b',
     bbox: { x: 88, y: 144, width: 1123, height: 1123 },
@@ -83,7 +83,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-caruana-american2.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['c1', 'd2'],
     turn: 'b',
     bbox: { x: 92, y: 166, width: 1072, height: 1072 },
@@ -96,7 +96,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-caruana-american3.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['d3', 'd4'],
     turn: 'b',
     bbox: { x: 67, y: 88, width: 775, height: 775 },
@@ -109,7 +109,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-caruana-american4.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['c8', 'a8'],
     turn: 'w',
     bbox: { x: 67, y: 80, width: 775, height: 775 },
@@ -122,7 +122,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-candidates-nakamura.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['b3', 'c3'],
     turn: 'b',
     bbox: { x: 166, y: 152, width: 437, height: 437 },
@@ -135,7 +135,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-candidates-nakamura2.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['c5', 'b6'],
     turn: 'w',
     bbox: { x: 183, y: 150, width: 484, height: 484 },
@@ -148,7 +148,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-carlsen-titled2.png',
-    white_pawns: 'down',
+    orientation: 'white top',
     highlighted: ['g5', 'g6'],
     turn: 'b',
     bbox: { x: 47, y: 115, width: 699, height: 699 },
@@ -159,7 +159,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-carlsen-titled3.png',
-    white_pawns: 'down',
+    orientation: 'white top',
     highlighted: ['g5', 'g4'],
     turn: 'b',
     bbox: { x: 47, y: 73, width: 699, height: 699 },
@@ -170,7 +170,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-carlsen-titled4.png',
-    white_pawns: 'down',
+    orientation: 'white top',
     highlighted: ['b8', 'd7'],
     turn: 'w',
     bbox: { x: 47, y: 84, width: 699, height: 699 },
@@ -181,7 +181,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-carlsen-titled5.png',
-    white_pawns: 'down',
+    orientation: 'white top',
     highlighted: ['a6', 'c7'],
     turn: 'b',
     bbox: { x: 101, y: 105, width: 644, height: 644 },
@@ -192,7 +192,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-carlsen-titled6.png',
-    white_pawns: 'down',
+    orientation: 'white top',
     highlighted: ['h4', 'h5'],
     turn: 'b',
     bbox: { x: 11, y: 33, width: 953, height: 953 },
@@ -203,7 +203,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-candidates-nakamura3.png',
-    white_pawns: 'down',
+    orientation: 'white top',
     highlighted: ['h6', 'h7'],
     turn: 'w',
     bbox: { x: 642, y: 42, width: 709, height: 709 },
@@ -216,7 +216,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-eric-rosen.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['b7', 'b5'],
     turn: 'w',
     bbox: { x: 480, y: 91, width: 692, height: 692 },
@@ -229,7 +229,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-eric-rosen2.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['b4', 'a5'],
     turn: 'b',
     bbox: { x: 480, y: 112, width: 692, height: 692 },
@@ -242,7 +242,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-eric-rosen3.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['b1', 'a1'],
     turn: 'b',
     bbox: { x: 480, y: 108, width: 692, height: 692 },
@@ -255,7 +255,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-grenke-nepo.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['f8', 'h6'],
     turn: 'w',
     bbox: { x: 108, y: 133, width: 543, height: 543 },
@@ -266,7 +266,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-grenke-aronian.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['f6', 'f5'],
     turn: 'w',
     bbox: { x: 112, y: 130, width: 543, height: 543 },
@@ -277,7 +277,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-carlsen-titled7.png',
-    white_pawns: 'down',
+    orientation: 'white top',
     highlighted: ['f1', 'g2'],
     turn: 'b',
     bbox: { x: 20, y: 89, width: 1052, height: 1052 },
@@ -288,7 +288,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-grenke-kamsky.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['c5', 'd6'],
     turn: 'b',
     bbox: { x: 89, y: 252, width: 595, height: 595 },
@@ -299,7 +299,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-grenke-dominguez.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['f6', 'g7'],
     turn: 'w',
     bbox: { x: 64, y: 199, width: 431, height: 431 },
@@ -310,7 +310,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-freestyle-starting.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: null,
     turn: null,
     bbox: { x: 280, y: 402, width: 455, height: 455 },
@@ -321,7 +321,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-grenke-carlsen-keymer.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['b8', 'f8'],
     turn: 'b',
     bbox: { x: 51, y: 68, width: 587, height: 587 },
@@ -332,7 +332,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-carlsen-titled8.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['e8', 'c8'],
     turn: 'w',
     bbox: { x: 31, y: 53, width: 699, height: 699 },
@@ -343,7 +343,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-agadmator-carlsen-svidler.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['f3', 'g5'],
     turn: 'b',
     bbox: { x: 148, y: 119, width: 640, height: 640 },
@@ -356,7 +356,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-agadmator-carlsen-svidler2.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['g4', 'f6'],
     turn: 'b',
     bbox: { x: 225, y: 116, width: 640, height: 640 },
@@ -370,7 +370,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-agadmator-carlsen-svidler3.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['f8', 'e7'],
     turn: 'w',
     bbox: { x: 178, y: 128, width: 640, height: 640 },
@@ -383,7 +383,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-agadmator-carlsen-svidler4.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['c3', 'e2'],
     turn: 'b',
     bbox: { x: 155, y: 160, width: 640, height: 640 },
@@ -396,7 +396,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-agadmator-carlsen-svidler5.png',
-    white_pawns: 'up',
+    orientation: 'white bottom',
     highlighted: ['e7', 'd8'],
     turn: 'w',
     bbox: { x: 182, y: 146, width: 640, height: 640 },
@@ -409,7 +409,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
   },
   {
     file: 'test-carlsen-freestyle2.png',
-    white_pawns: 'down',
+    orientation: 'white top',
     highlighted: ['b1', 'b3'],
     turn: 'b',
     bbox: { x: 744, y: 81, width: 663, height: 663 },
