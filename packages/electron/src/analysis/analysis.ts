@@ -429,16 +429,18 @@ async function processFrame(imageData: ImageData): Promise<void> {
         // Align to the depth stepping sequence
         let nextDepth = EVAL_START_DEPTH;
         while (nextDepth <= cachedDepth) nextDepth += EVAL_DEPTH_STEP;
+        const cachedEvalPositionFen = positionFen;
         (async () => {
           for (let depth = nextDepth; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
             if (signal.aborted) break;
             const result = await engine!.runDepth(fullFen, depth, multiPvForDepth(depth), signal);
-            if (!result) break;
+            if (!result || signal.aborted) break;
             if (!result.top_moves[0]?.pv?.length) {
               debugLog(`Engine returned empty PV at depth ${depth} — reinitializing`);
               await reinitEngine();
               break;
             }
+            if (lastPositionFen !== cachedEvalPositionFen) break;
             updatePlayedMoveLoss(result);
             const arrows = computeArrows(result.top_moves);
             lastEval = result;
@@ -461,17 +463,22 @@ async function processFrame(imageData: ImageData): Promise<void> {
     debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms [new pos] total=${Date.now() - startTime}ms`);
     sendResult(makeResult({ eval_max_depth: EVAL_MAX_DEPTH }));
 
-    // Run all eval depths in background (non-blocking)
+    // Run all eval depths in background (non-blocking).
+    // Check signal.aborted after each depth AND before updating state to avoid
+    // writing stale results from a previous position's eval.
+    const evalPositionFen = positionFen;
     (async () => {
       for (let depth = EVAL_START_DEPTH; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
         if (signal.aborted) break;
         const result = await engine!.runDepth(fullFen, depth, multiPvForDepth(depth), signal);
-        if (!result) break;
+        if (!result || signal.aborted) break;
         if (!result.top_moves[0]?.pv?.length) {
           debugLog(`Engine returned empty PV at depth ${depth} — reinitializing`);
           await reinitEngine();
           break;
         }
+        // Verify position hasn't changed since we started this eval
+        if (lastPositionFen !== evalPositionFen) break;
         updatePlayedMoveLoss(result);
         const arrows = computeArrows(result.top_moves);
         lastEval = result;
