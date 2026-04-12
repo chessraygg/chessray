@@ -366,7 +366,7 @@ for (const tc of PIPELINE_CASES) {
   const boardX = png.width + gap;
   const boardY = 0;
   const hlSet = new Set(tc.highlighted);
-  drawVirtualBoard(out, boardX, boardY, boardDisplaySize, tc.expectedFen, hlSet, tc.white_pawns);
+  drawVirtualBoard(out, boardX, boardY, boardDisplaySize, tc.expectedFen, hlSet, tc.orientation === 'white bottom' ? 'up' : 'down');
 
   // Draw all annotation labels below the virtual board
   const labelX = boardX + 4;
@@ -384,7 +384,7 @@ for (const tc of PIPELINE_CASES) {
   line(`FILE: ${tc.file}`, dimGray);
 
   // Orientation: white pawns up/down
-  line(tc.white_pawns === 'up' ? 'WHITE BOTTOM' : 'WHITE TOP');
+  line(tc.orientation === 'white bottom' ? 'WHITE BOTTOM' : 'WHITE TOP');
 
   // Turn
   line(`TURN: ${tc.turn === 'w' ? 'WHITE' : tc.turn === 'b' ? 'BLACK' : 'UNKNOWN'}`);
@@ -393,7 +393,7 @@ for (const tc of PIPELINE_CASES) {
   line(tc.highlighted ? `MOVE: ${tc.highlighted[0]}.${tc.highlighted[1]}` : 'MOVE: NONE');
 
   // Castling rights (infer from corrected FEN)
-  const correctedFen = tc.white_pawns === 'down' ? flipFen(tc.expectedFen) : tc.expectedFen;
+  const correctedFen = tc.orientation === 'white top' ? flipFen(tc.expectedFen) : tc.expectedFen;
   const fullFen = buildFullFen(correctedFen, tc.turn);
   const castling = fullFen.split(' ')[2] || '-';
   const describeSide = (short: boolean, long: boolean) => {

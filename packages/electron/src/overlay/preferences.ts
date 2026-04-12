@@ -18,6 +18,7 @@ export interface Prefs {
   autoMode: boolean;
   autoDelaySec: number;
   pvGrowDelaySec: number;
+  showMovesDelaySec: number;
   vboardOverlayVisible: boolean;
   compactMode: boolean;
   targetFps: number;
@@ -37,6 +38,7 @@ export const DEFAULT_PREFS: Prefs = {
   autoMode: false,
   autoDelaySec: 5,
   pvGrowDelaySec: 3,
+  showMovesDelaySec: 0,
   vboardOverlayVisible: true,
   compactMode: false,
   targetFps: 2,

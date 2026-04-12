@@ -136,6 +136,11 @@
               <span id="cv-pv-grow-delay-val">3</span><span style="font-size:8px;color:var(--text-faint)">s</span>
             </div>
             <div class="pv-depth-row">
+              <label data-tip="Seconds to wait after position stabilizes before showing moves (0 = instant)">Wait</label>
+              <input type="range" id="cv-show-moves-delay" min="0" max="10" value="0" step="1">
+              <span id="cv-show-moves-delay-val">0</span><span style="font-size:8px;color:var(--text-faint)">s</span>
+            </div>
+            <div class="pv-depth-row">
               <label data-tip="Line arrow colors for white and black moves">Colors</label>
               <input type="color" id="cv-pv-white-color" value="#60a5fa" class="color-pick">
               <input type="color" id="cv-pv-black-color" value="#f9a8d4" class="color-pick">

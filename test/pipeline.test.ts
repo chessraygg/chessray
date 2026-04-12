@@ -3,7 +3,7 @@ import * as ort from 'onnxruntime-node';
 import fs from 'fs';
 import path from 'path';
 import { PNG } from 'pngjs';
-import { detectBoard, cropPixels, detectHighlightedSquares, indexToSquare, flipFen, recognizeBoard, YoloPieceRecognizer, detectLabels } from '@chessray/core';
+import { runDetectionPipeline, indexToSquare, flipFen, YoloPieceRecognizer } from '@chessray/core';
 import type { BoardBBox } from '@chessray/core';
 import { PIPELINE_CASES } from './fixtures/pipeline-cases.js';
 
@@ -34,14 +34,13 @@ describe('end-to-end detection pipeline', () => {
 
   for (const tc of PIPELINE_CASES) {
     it(`${tc.file}: ${tc.highlighted ? `${tc.highlighted[0]}→${tc.highlighted[1]}` : 'no highlights'}, ${tc.turn ?? 'unknown'} to move`, async () => {
-      const t0 = Date.now();
       const { data, width, height } = loadPng(tc.file);
 
-      const board = await detectBoard(session, ort, data, width, height);
-      expect(board.found).toBe(true);
+      const result = await runDetectionPipeline(session, ort, recognizer, data, width, height);
+      expect(result.found).toBe(true);
 
       // Verify board bbox coordinates (within 5px tolerance for refinement variance)
-      const bbox = board.bbox!;
+      const bbox = result.bbox!;
       const tol = 5;
       expect(bbox.x).toBeGreaterThanOrEqual(tc.bbox.x - tol);
       expect(bbox.x).toBeLessThanOrEqual(tc.bbox.x + tol);
@@ -53,12 +52,7 @@ describe('end-to-end detection pipeline', () => {
       expect(bbox.height).toBeLessThanOrEqual(tc.bbox.height + tol);
 
       // Verify grid square size
-      const actualSquareSize = Math.round(bbox.width / 8);
-      expect(actualSquareSize).toBe(tc.squareSize);
-
-      // Run the full recognition pipeline (same code path as production)
-      const cropped = cropPixels({ data, width, height }, bbox);
-      const result = await recognizeBoard(cropped, recognizer);
+      expect(result.squareSize).toBe(tc.squareSize);
 
       const squares = result.highlightedSquares.map(indexToChess);
       console.log(`${tc.file}: highlights=${squares}, flipped=${result.flipped}, turn=${result.turn}, source=${result.orientationSource}`);
@@ -66,7 +60,7 @@ describe('end-to-end detection pipeline', () => {
       // --- Save annotated debug image (before assertions so it's always generated) ---
       const out = new PNG({ width, height });
       out.data = Buffer.from(data);
-      const rough = board.roughBbox!;
+      const rough = result.roughBbox!;
       const sqW = bbox.width / 8;
       const sqH = bbox.height / 8;
 
@@ -125,8 +119,7 @@ describe('end-to-end detection pipeline', () => {
       }
 
       // Draw border frame median color in center of each square (white border)
-      const hlResult = detectHighlightedSquares(cropped);
-      if (hlResult.colors) {
+      if (result.highlightColors.length > 0) {
         const patchW = Math.max(2, Math.floor(sqW * 0.1));
         const patchH = Math.max(2, Math.floor(sqH * 0.1));
         for (let i = 0; i < 64; i++) {
@@ -134,7 +127,7 @@ describe('end-to-end detection pipeline', () => {
           const f2 = i % 8;
           const cx = bbox.x + Math.floor((f2 + 0.5) * sqW) - Math.floor(patchW / 2);
           const cy = bbox.y + Math.floor((r2 + 0.5) * sqH) - Math.floor(patchH / 2);
-          const [mr, mg, mb] = hlResult.colors[i].map(v => Math.round(v));
+          const [mr, mg, mb] = result.highlightColors[i].map(v => Math.round(v));
           for (let py = cy; py < cy + patchH; py++)
             for (let px = cx; px < cx + patchW; px++)
               setPixel(px, py, mr, mg, mb);
@@ -166,7 +159,7 @@ describe('end-to-end detection pipeline', () => {
       }
 
       // Verify orientation
-      const expectedFlipped = tc.white_pawns === 'down';
+      const expectedFlipped = tc.orientation === 'white top';
       expect(result.flipped).toBe(expectedFlipped);
 
       // Verify corrected FEN
@@ -189,19 +182,13 @@ describe('end-to-end detection pipeline', () => {
       console.log(`  fullFen=${result.fullFen}`);
 
       // Verify label detection
-      if (tc.expected_labels !== undefined) {
-        const labelResult = await detectLabels(cropped);
-        if (tc.expected_labels === null) {
-          // No labels expected — detectLabels should return null
-          expect(labelResult).toBeNull();
-          console.log('  labels: none (correct)');
-        } else {
-          // Labels expected — verify detection
-          expect(labelResult).not.toBeNull();
-          console.log(`  labels: flipped=${labelResult!.flipped}`);
-          // Run per-strip verification for specific characters
-          // (detectLabels returns overall result; chars are verified via the expected config)
-        }
+      if (tc.expected_labels === null) {
+        expect(result.labels).toBeNull();
+        console.log('  labels: none (correct)');
+      } else {
+        expect(result.labels).not.toBeNull();
+        expect(result.labels!.strips).toEqual(tc.expected_labels);
+        console.log(`  labels: ${JSON.stringify(result.labels!.strips)}`);
       }
 
     }, 120000);

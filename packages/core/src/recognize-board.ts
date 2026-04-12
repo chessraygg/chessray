@@ -4,7 +4,7 @@ import { detectHighlightedSquares, disambiguateHighlights, turnFromHighlight } f
 import { detectBoardFlipped, type OrientationSource } from './orientation.js';
 import { flipFen, buildFullFen, fenSimilarity } from './fen.js';
 import type { OrientationResult } from './image-utils.js';
-import { detectLabels } from './label-detect.js';
+import { detectLabels, type LabelDetectionResult } from './label-detect.js';
 
 export interface BoardRecognitionResult {
   /** FEN as read from raw image (before orientation correction) */
@@ -25,6 +25,14 @@ export interface BoardRecognitionResult {
   orientationSource: OrientationSource;
   /** True when highlights indicate a move but the piece hasn't landed yet (mid-animation) */
   midAnimation: boolean;
+  /** Label detection result (null when skipped due to sufficient piece count or no labels found) */
+  labels: LabelDetectionResult | null;
+  /** Per-square border-frame median color (indexed 0-63, raw image orientation) */
+  highlightColors: Array<[number, number, number]>;
+  /** Per-square highlight scores sorted descending */
+  highlightScores: Array<{ idx: number; dist: number }>;
+  /** Median colors for light and dark squares */
+  highlightMedians: { light: [number, number, number]; dark: [number, number, number] };
   /** Per-step timing breakdown (ms) */
   timing: {
     pieces_ms: number;
@@ -63,13 +71,14 @@ export async function recognizeBoard(
   const pieceCount = rawFen.replace(/[0-8/]/g, '').length;
   const pieceCountReliable = pieceCount >= 20;
   let orientation: OrientationResult;
+  let labelResult: OrientationResult | null = null;
   const similarity = cachedOrientation ? fenSimilarity(cachedOrientation.prevFen, rawFen) : 0;
   if (cachedOrientation && similarity > 0.5) {
     orientation = cachedOrientation.orientation;
   } else if (pieceCountReliable) {
     orientation = detectBoardFlipped(rawFen);
   } else {
-    const labelResult = await detectLabels(cropped);
+    labelResult = await detectLabels(cropped);
     orientation = labelResult ?? detectBoardFlipped(rawFen);
   }
   const tOrientation = Date.now() - t;
@@ -164,6 +173,10 @@ export async function recognizeBoard(
     turn,
     midAnimation,
     orientationSource: orientation.source,
+    labels: labelResult,
+    highlightColors: hlResult.colors ?? [],
+    highlightScores: hlResult.scores ?? [],
+    highlightMedians: hlResult.medians ?? { light: [0, 0, 0], dark: [0, 0, 0] },
     timing: {
       pieces_ms: tPieces,
       orientation_ms: tOrientation,

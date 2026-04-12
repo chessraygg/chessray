@@ -66,7 +66,7 @@ async function main() {
   const result = await recognizeBoard(cropped, recognizer);
 
   const squares = result.highlightedSquares.map(indexToChess);
-  const whitePawns = result.flipped ? 'down' : 'up';
+  const orientation = result.flipped ? 'white top' : 'white bottom';
 
   // Corrected FEN (standard orientation)
   const correctedFen = result.flipped ? flipFen(result.rawFen) : result.rawFen;
@@ -76,7 +76,7 @@ async function main() {
   console.log(`squareSize: ${squareSize}`);
   console.log(`highlighted indices: [${result.highlightedSquares.join(', ')}]`);
   console.log(`highlighted squares: [${squares.map(s => `'${s}'`).join(', ')}]`);
-  console.log(`white_pawns: '${whitePawns}'`);
+  console.log(`orientation: '${orientation}'`);
   console.log(`turn: '${result.turn}'`);
   console.log(`orientation_source: '${result.orientationSource}'`);
   console.log(`rawFen (image orientation): '${result.rawFen}'`);
@@ -91,7 +91,7 @@ async function main() {
   console.log(`\n--- Draft for pipeline-cases.ts (review before committing) ---\n`);
   console.log(`  {
     file: '${file}',
-    white_pawns: '${whitePawns}',
+    orientation: '${orientation}',
     highlighted: ${highlightStr},
     turn: ${turnStr},
     bbox: { x: ${bbox.x}, y: ${bbox.y}, width: ${bbox.width}, height: ${bbox.height} },

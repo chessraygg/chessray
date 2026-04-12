@@ -54,3 +54,19 @@ export function pieceSvg(piece: string, size: number): string {
   // Inject width/height attributes into the opening <svg> tag.
   return svg.replace('<svg ', `<svg width="${size}" height="${size}" `);
 }
+
+// ── Canvas-ready piece Image cache ──
+
+export const pieceImages = new Map<string, HTMLImageElement>();
+
+export function preloadPieceImages(): Promise<void> {
+  return Promise.all(
+    'KQRBNPkqrbnp'.split('').map(p => new Promise<void>(resolve => {
+      const svg = pieceSvg(p, 90);
+      const img = new Image();
+      img.onload = () => { pieceImages.set(p, img); resolve(); };
+      img.onerror = () => resolve();
+      img.src = 'data:image/svg+xml;base64,' + btoa(svg);
+    })),
+  ).then(() => {});
+}
