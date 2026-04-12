@@ -457,63 +457,35 @@ async function processFrame(imageData: ImageData): Promise<void> {
       return;
     }
 
-    t = Date.now();
-    const firstResult = await engine.runDepth(fullFen, EVAL_START_DEPTH, multiPvForDepth(EVAL_START_DEPTH), signal);
-    const tEval = Date.now() - t;
+    // Send result immediately with position but no eval — don't block on engine
+    debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms [new pos] total=${Date.now() - startTime}ms`);
+    sendResult(makeResult({ eval_max_depth: EVAL_MAX_DEPTH }));
 
-    // Detect broken eval (no PV = engine in bad state)
-    if (firstResult && !firstResult.top_moves[0]?.pv?.length) {
-      debugLog(`Engine returned empty PV — reinitializing`);
-      await reinitEngine();
-      sendResult(makeResult({ evaluation: lastEval, arrows: lastArrows }));
-      return;
-    }
-
-    if (firstResult) {
-      updatePlayedMoveLoss(firstResult);
-      const arrows = computeArrows(firstResult.top_moves);
-      lastEval = firstResult;
-      lastArrows = arrows;
-      cachePut(fullFen, { evaluation: firstResult, arrows });
-      debugLog(`Eval depth ${firstResult.depth}/${EVAL_MAX_DEPTH} in ${firstResult.elapsed_ms}ms pv=${firstResult.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
-      sendResult(makeResult({
-        evaluation: firstResult,
-        arrows,
-        eval_depth: firstResult.depth,
-        eval_max_depth: EVAL_MAX_DEPTH,
-      }));
-    }
-
-    debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms eval=${tEval}ms d=${firstResult?.depth ?? 'abort'}/${EVAL_MAX_DEPTH} [new pos] total=${Date.now() - startTime}ms`);
-
-    // Continue deepening in background
-    if (firstResult && EVAL_START_DEPTH + EVAL_DEPTH_STEP <= EVAL_MAX_DEPTH) {
-      (async () => {
-        for (let depth = EVAL_START_DEPTH + EVAL_DEPTH_STEP; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
-          if (signal.aborted) break;
-          const result = await engine!.runDepth(fullFen, depth, multiPvForDepth(depth), signal);
-          if (!result) break;
-          // Detect broken eval during deepening
-          if (!result.top_moves[0]?.pv?.length) {
-            debugLog(`Engine returned empty PV at depth ${depth} — reinitializing`);
-            await reinitEngine();
-            break;
-          }
-          updatePlayedMoveLoss(result);
-          const arrows = computeArrows(result.top_moves);
-          lastEval = result;
-          lastArrows = arrows;
-          cachePut(fullFen, { evaluation: result, arrows });
-          debugLog(`Eval depth ${result.depth}/${EVAL_MAX_DEPTH} in ${result.elapsed_ms}ms score=${result.top_moves[0]?.score_cp}cp pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
-          sendResult(makeResult({
-            evaluation: result,
-            arrows,
-            eval_depth: result.depth,
-            eval_max_depth: result.depth < EVAL_MAX_DEPTH ? EVAL_MAX_DEPTH : undefined,
-          }));
+    // Run all eval depths in background (non-blocking)
+    (async () => {
+      for (let depth = EVAL_START_DEPTH; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
+        if (signal.aborted) break;
+        const result = await engine!.runDepth(fullFen, depth, multiPvForDepth(depth), signal);
+        if (!result) break;
+        if (!result.top_moves[0]?.pv?.length) {
+          debugLog(`Engine returned empty PV at depth ${depth} — reinitializing`);
+          await reinitEngine();
+          break;
         }
-      })();
-    }
+        updatePlayedMoveLoss(result);
+        const arrows = computeArrows(result.top_moves);
+        lastEval = result;
+        lastArrows = arrows;
+        cachePut(fullFen, { evaluation: result, arrows });
+        debugLog(`Eval depth ${result.depth}/${EVAL_MAX_DEPTH} in ${result.elapsed_ms}ms score=${result.top_moves[0]?.score_cp}cp pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
+        sendResult(makeResult({
+          evaluation: result,
+          arrows,
+          eval_depth: result.depth,
+          eval_max_depth: result.depth < EVAL_MAX_DEPTH ? EVAL_MAX_DEPTH : undefined,
+        }));
+      }
+    })();
 
   } catch (err) {
     debugLog(`Frame processing error: ${err}`);
