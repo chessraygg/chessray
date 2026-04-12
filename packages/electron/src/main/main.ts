@@ -26,6 +26,7 @@ protocol.registerSchemesAsPrivileged([{
 
 let analysisWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
+let lichessWindow: BrowserWindow | null = null;
 
 // Vendor files live at repo root: ../../vendor relative to this package
 // In dev: __dirname is packages/electron/.vite/build, vendor is at repo root
@@ -426,6 +427,34 @@ ipcMain.on('open-external', (_e, url: string) => {
   if (typeof url === 'string' && url.startsWith('https://')) {
     shell.openExternal(url);
   }
+});
+
+ipcMain.on('toggle-lichess', (_e, fen: string) => {
+  if (lichessWindow && !lichessWindow.isDestroyed()) {
+    lichessWindow.close();
+    lichessWindow = null;
+    return;
+  }
+  const fenPath = fen.replace(/ /g, '_');
+  lichessWindow = new BrowserWindow({
+    width: 550,
+    height: 650,
+    alwaysOnTop: true,
+    title: 'Lichess Analysis',
+    autoHideMenuBar: true,
+    webPreferences: {
+      contextIsolation: true,
+      sandbox: true,
+    },
+  });
+  lichessWindow.loadURL(`https://lichess.org/analysis/${fenPath}`);
+  lichessWindow.on('closed', () => { lichessWindow = null; });
+});
+
+ipcMain.on('update-lichess', (_e, fen: string) => {
+  if (!lichessWindow || lichessWindow.isDestroyed()) return;
+  const fenPath = fen.replace(/ /g, '_');
+  lichessWindow.loadURL(`https://lichess.org/analysis/${fenPath}`);
 });
 
 ipcMain.on('set-max-depth', (_e, depth: number) => {

@@ -85,6 +85,10 @@ const api = {
     ipcRenderer.send('close-app'),
   openExternal: (url: string) =>
     ipcRenderer.send('open-external', url),
+  toggleLichess: (fen: string) =>
+    ipcRenderer.send('toggle-lichess', fen),
+  updateLichess: (fen: string) =>
+    ipcRenderer.send('update-lichess', fen),
 };
 
 contextBridge.exposeInMainWorld('chessRay', api);

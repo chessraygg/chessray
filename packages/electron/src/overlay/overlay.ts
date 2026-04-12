@@ -29,11 +29,15 @@ declare global {
       minimizeApp: () => void;
       closeApp: () => void;
       openExternal: (url: string) => void;
+      toggleLichess: (fen: string) => void;
+      updateLichess: (fen: string) => void;
     };
   }
 }
 
 // ── Module-level state ──
+let lichessOpen = false;
+let lastLichessFen: string | null = null;
 
 let userPanel: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
@@ -1104,12 +1108,14 @@ function initOverlay(): void {
   const closeBtn = document.getElementById('cv-close-btn');
   closeBtn?.addEventListener('click', () => window.chessRay.closeApp());
 
-  // Lichess analysis button
-  document.getElementById('cv-lichess-btn')?.addEventListener('click', () => {
+  // Lichess analysis button — toggle floating Lichess window
+  const lichessBtn = document.getElementById('cv-lichess-btn');
+  lichessBtn?.addEventListener('click', () => {
     const fen = state.currentResult?.evaluation?.fen ?? state.currentResult?.recognition?.fen;
     if (fen) {
-      const path = fen.replace(/ /g, '_');
-      window.chessRay.openExternal(`https://lichess.org/analysis/${path}`);
+      lichessOpen = !lichessOpen;
+      lichessBtn.classList.toggle('active', lichessOpen);
+      window.chessRay.toggleLichess(fen);
     }
   });
 }
@@ -1193,6 +1199,15 @@ function processPendingResult(): void {
   state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
   renderVideoOverlay(state);
+
+  // Auto-update Lichess window when position changes
+  if (lichessOpen) {
+    const fen = result.evaluation?.fen ?? result.recognition?.fen;
+    if (fen && fen !== lastLichessFen) {
+      lastLichessFen = fen;
+      window.chessRay.updateLichess(fen);
+    }
+  }
 }
 
 window.chessRay.onFrameResult((result) => {
