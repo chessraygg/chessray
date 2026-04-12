@@ -7,7 +7,7 @@
 
 import {
   detectBoard, cropPixels, recognizeBoard,
-  computeArrows, compareFen, guessTurn, buildFullFen, detectSequentialMove,
+  computeArrows, compareFen, guessTurn, buildFullFen, detectSequentialMove, isStartingPosition,
 } from '@chessray/core';
 import { Chess } from 'chess.js';
 import type {
@@ -136,6 +136,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
         recognition: null,
         evaluation: null,
         arrows: [],
+        detection_status: 'No board detected',
         total_elapsed_ms: Date.now() - startTime,
       });
       return;
@@ -171,6 +172,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     let highlightTurn: 'w' | 'b' | null = null;
     let tRecog = 0;
     let brTiming: { pieces_ms: number; orientation_ms: number; highlights_ms: number; disambiguate_ms: number; pawnRefine_ms: number; turn_ms: number; total_ms: number } | null = null;
+    let detectionStatus: string | undefined;
 
     if (visuallyUnchanged && lastRecognitionResult) {
       recognition = lastRecognitionResult;
@@ -187,6 +189,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
 
         // Skip mid-animation frames — piece is still sliding, FEN is inconsistent
         if (boardResult.midAnimation) {
+          detectionStatus = 'Mid-animation — piece sliding';
           debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms recog=${Date.now() - t}ms [mid-animation, skipped] total=${Date.now() - startTime}ms`);
           // Restore previous board sample so next frame's change detection
           // compares against the last good frame, not the mid-animation one
@@ -235,6 +238,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       flipped: isFlipped,
       orientation_source: orientationSource,
       played_move: lastPlayedMove,
+      detection_status: detectionStatus,
       board_image_url: boardImageUrl,
       frame_dimensions: { width: pixels.width, height: pixels.height },
       total_elapsed_ms: Date.now() - startTime,
@@ -251,15 +255,38 @@ async function processFrame(imageData: ImageData): Promise<void> {
     }
 
     if (!recognition || recognition.confidence < 0.3) {
+      detectionStatus = `Low confidence: ${recognition ? (recognition.confidence * 100).toFixed(0) + '%' : 'no recognition'}`;
       debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [low conf] total=${Date.now() - startTime}ms`);
       sendResult(makeResult({}));
       return;
     }
 
     const positionFen = recognition.fen;
+
+    // Require highlights unless it's a starting position.
+    // Without highlights, we may have captured a mid-move frame where the
+    // piece is sliding and the highlight hasn't appeared yet.
+    if (highlightedSquares.length === 0 && !isStartingPosition(positionFen)) {
+      detectionStatus = 'No highlights — waiting for move to complete';
+      debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [no highlights] total=${Date.now() - startTime}ms`);
+      // Keep showing previous result if available
+      if (lastPositionFen && lastEval) {
+        sendResult(makeResult({
+          evaluation: lastEval,
+          arrows: lastArrows,
+          eval_depth: lastEval.depth,
+          eval_max_depth: lastEval.depth < EVAL_MAX_DEPTH ? EVAL_MAX_DEPTH : undefined,
+        }));
+      } else {
+        sendResult(makeResult({}));
+      }
+      return;
+    }
+
     // Dedup: same position AND turn hasn't been corrected by highlight detection
     const evalTurnMismatch = highlightTurn && lastEval?.fen?.split(' ')[1] && lastEval.fen.split(' ')[1] !== highlightTurn;
     if (lastPositionFen && compareFen(lastPositionFen, positionFen) && !evalTurnMismatch) {
+      detectionStatus = 'Position unchanged';
       debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [dedup] total=${Date.now() - startTime}ms`);
       sendResult(makeResult({
         evaluation: lastEval,
@@ -276,6 +303,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     const whiteKings = (positionFen.match(/K/g) || []).length;
     const blackKings = (positionFen.match(/k/g) || []).length;
     if (whiteKings !== 1 || blackKings !== 1) {
+      detectionStatus = `Invalid: ${whiteKings}K ${blackKings}k`;
       sendResult(makeResult({}));
       return;
     }
@@ -283,6 +311,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     // Validate FEN structure to avoid crashing Stockfish WASM
     const fenRanks = positionFen.split('/');
     if (fenRanks.length !== 8) {
+      detectionStatus = 'Invalid FEN structure';
       sendResult(makeResult({}));
       return;
     }
@@ -290,6 +319,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     const rank1 = fenRanks[7];
     const rank8 = fenRanks[0];
     if (/[pP]/.test(rank1) || /[pP]/.test(rank8)) {
+      detectionStatus = 'Pawns on rank 1/8 — invalid';
       debugLog(`Skipping eval: pawns on rank 1/8 in FEN ${positionFen}`);
       sendResult(makeResult({}));
       return;

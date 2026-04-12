@@ -73,6 +73,7 @@ export interface PipelineResult {
     san: string;     // SAN notation for display
     loss_cp: number; // centipawn loss vs best move from previous eval
   } | null;
+  detection_status?: string; // human-readable detection status for debug display
   board_image_url?: string; // data URL of the cropped board for debug display
   frame_dimensions?: { width: number; height: number }; // capture frame size for coordinate mapping
   total_elapsed_ms: number;

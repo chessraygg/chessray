@@ -113,6 +113,30 @@ export function fenSimilarity(a: string, b: string): number {
  */
 const STARTING_POSITION = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
 
+/**
+ * Check if a position-only FEN is a starting position (classical or freestyle).
+ * Starting positions have all pieces on ranks 1-2 and 7-8, with ranks 3-6 empty.
+ */
+export function isStartingPosition(fen: string): boolean {
+  const rows = fen.split(' ')[0].split('/');
+  if (rows.length !== 8) return false;
+  // Ranks 3-6 (rows[2]-rows[5]) must be empty (all digits)
+  for (let i = 2; i <= 5; i++) {
+    if (rows[i] !== '8' && rows[i] !== String(rows[i].length)) {
+      // Check if row contains only digits summing to 8
+      let sum = 0;
+      for (const ch of rows[i]) {
+        if (ch >= '1' && ch <= '8') sum += parseInt(ch);
+        else return false; // has a piece
+      }
+      if (sum !== 8) return false;
+    }
+  }
+  // Ranks 1-2 and 7-8 must have pieces (not all empty)
+  const hasPieces = (row: string) => /[a-zA-Z]/.test(row);
+  return hasPieces(rows[0]) && hasPieces(rows[1]) && hasPieces(rows[6]) && hasPieces(rows[7]);
+}
+
 export function guessTurn(prevFen: string | null, currFen: string): 'w' | 'b' {
   const posOnly = currFen.split(' ')[0];
   if (posOnly === STARTING_POSITION) return 'w';
