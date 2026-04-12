@@ -6,7 +6,7 @@
 import type { PipelineResult } from '@chessray/core';
 import { applyUciMoves, uciToSan, lossToColor } from '@chessray/core';
 import { loadPrefs, savePrefs } from './preferences.js';
-import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, drawArrow } from './canvas-renderer.js';
+import { type OverlayState, type PvBoardState, renderArrows, renderVideoOverlay, clearVideoOverlay, drawArrow, preloadPieceImages } from './canvas-renderer.js';
 import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid } from './debug-panel.js';
 import { pieceSvg } from './piece-svg.js';
 
@@ -68,6 +68,7 @@ const state: OverlayState = {
   autoMode: false,
   vboardOverlayVisible: true,
   pvPreviewLineIndex: null,
+  pvBoardState: null,
   panelScale: 1,
   displayInfo: null,
 };
@@ -75,6 +76,8 @@ const state: OverlayState = {
 // ── Init ──
 
 function initOverlay(): void {
+  preloadPieceImages();
+
   const prefs = loadPrefs();
   state.overlayVisible = prefs.overlayVisible;
   state.borderVisible = prefs.borderVisible;
@@ -463,6 +466,8 @@ function initOverlay(): void {
     }, autoDelaySec * 1000);
   }
 
+  let pvBoardAnimGen = 0; // generation counter for actual board animation cancellation
+
   function pvCycleStep(): void {
     // Validate that our cached PV still matches the live eval — restart if stale
     const liveResult = state.currentResult;
@@ -484,6 +489,10 @@ function initOverlay(): void {
       if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
       state.pvDisplayDepth = 0;
 
+      // Clear actual board overlay
+      state.pvBoardState = null;
+      renderVideoOverlay(state);
+
       // Reset virtual board if visible
       if (state.vboardOverlayVisible) {
         const grid = document.getElementById('cv-debug-grid');
@@ -502,13 +511,8 @@ function initOverlay(): void {
     state.pvDisplayDepth++;
     const step = state.pvDisplayDepth;
 
-    // Update actual board overlay (shows arrows 1..step)
-    renderVideoOverlay(state);
+    // ── Shared computation for both actual and virtual board ──
 
-    // Skip virtual board animation if vboard overlay is hidden
-    if (!state.vboardOverlayVisible) return;
-
-    // Animate piece movement on virtual board
     const uci = pvCyclePv[step - 1];
     const fromSq = uci.slice(0, 2);
     const toSq = uci.slice(2, 4);
@@ -523,10 +527,6 @@ function initOverlay(): void {
     const afterPos = applyUciMoves(pvCycleBaseFen, pvCyclePv, step);
     if (!afterPos) { pvCycleStop(); return; }
 
-    const grid = document.getElementById('cv-debug-grid');
-    const container = grid?.parentElement;
-    if (!grid || !container) { pvCycleStop(); return; }
-
     // Figure out which piece is moving (from the before position)
     const beforeRows = beforePos.fen.split('/');
     const fromFile = fromSq.charCodeAt(0) - 97;
@@ -540,12 +540,11 @@ function initOverlay(): void {
       }
     }
 
-    // Render board BEFORE the move with source square emptied (piece "picked up")
-    // and highlight on source square
     const fromIdx = fromRank * 8 + fromFile;
     const toFileN = toSq.charCodeAt(0) - 97;
     const toRankN = 8 - parseInt(toSq[1]);
     const toIdx = toRankN * 8 + toFileN;
+
     // Build a FEN with the moving piece removed from source
     const pickedUpFen = beforePos.fen.split('/').map((row, rank) => {
       if (rank !== fromRank) return row;
@@ -566,6 +565,60 @@ function initOverlay(): void {
       // Compress consecutive 1s
       return result.replace(/1+/g, m => String(m.length));
     }).join('/');
+
+    const turn = pvCycleBaseFen.split(' ')[1] || 'w';
+    const isWhite = (step % 2 === 1) === (turn === 'w');
+
+    // ── Actual board overlay animation ──
+
+    pvBoardAnimGen++;
+    const thisGen = pvBoardAnimGen;
+    state.pvBoardState = {
+      fen: pickedUpFen,
+      flipped: pvCycleFlipped,
+      highlight: [fromIdx, toIdx],
+      anim: movingPiece ? {
+        piece: movingPiece, fromSq, toSq, isWhite, step,
+        progress: 0,
+        afterFen: afterPos.fen,
+        afterHighlight: afterPos.highlight,
+      } : null,
+    };
+    renderVideoOverlay(state);
+
+    if (movingPiece) {
+      const TRANSITION_MS = 350;
+      const startTime = performance.now();
+      function easeInOut(t: number): number { return t * t * (3 - 2 * t); }
+
+      function tickActualBoard(): void {
+        if (thisGen !== pvBoardAnimGen || !(window as any).__chessrayPvPlaying || !state.pvBoardState?.anim) return;
+        const elapsed = performance.now() - startTime;
+        const progress = easeInOut(Math.min(1, elapsed / TRANSITION_MS));
+        state.pvBoardState.anim.progress = progress;
+        renderVideoOverlay(state);
+
+        if (progress < 1) {
+          requestAnimationFrame(tickActualBoard);
+        } else {
+          // Animation complete — show final position
+          state.pvBoardState.fen = state.pvBoardState.anim.afterFen;
+          state.pvBoardState.highlight = state.pvBoardState.anim.afterHighlight;
+          state.pvBoardState.anim = null;
+          renderVideoOverlay(state);
+        }
+      }
+      requestAnimationFrame(tickActualBoard);
+    }
+
+    // ── Virtual board animation (skip if hidden) ──
+
+    if (!state.vboardOverlayVisible) return;
+
+    const grid = document.getElementById('cv-debug-grid');
+    const container = grid?.parentElement;
+    if (!grid || !container) { pvCycleStop(); return; }
+
     renderBoardGrid(grid, pickedUpFen, pvCycleFlipped, [fromIdx, toIdx]);
 
     // Compute pixel positions for source and destination squares
@@ -609,26 +662,22 @@ function initOverlay(): void {
       }
     }, 500);
 
-    // Animate arrow following piece movement (time-based, no DOM reads)
+    // Animate arrow following piece movement on virtual board canvas
     if (state.canvas) {
-      const turn = pvCycleBaseFen.split(' ')[1] || 'w';
-      const isWhite = (step % 2 === 1) === (turn === 'w');
       const moveArrow = {
         from: fromSq, to: toSq,
         color: isWhite ? '#e5e5e5' : '#1a1a1a',
         width: 3, opacity: 0.8, loss_cp: 0,
         label: String(step),
       };
-      const TRANSITION_MS = 350; // matches CSS transition duration
-      const startTime = performance.now();
-
-      // ease-in-out approximation: 3t² - 2t³
-      function easeInOut(t: number): number { return t * t * (3 - 2 * t); }
+      const VB_TRANSITION_MS = 350;
+      const vbStartTime = performance.now();
 
       function tickArrow(): void {
         if (!state.canvas || !(window as any).__chessrayPvPlaying) return;
-        const elapsed = performance.now() - startTime;
-        const progress = easeInOut(Math.min(1, elapsed / TRANSITION_MS));
+        const elapsed = performance.now() - vbStartTime;
+        const raw = Math.min(1, elapsed / VB_TRANSITION_MS);
+        const progress = raw * raw * (3 - 2 * raw);
 
         const size = 200;
         const dpr = window.devicePixelRatio || 1;
@@ -733,6 +782,8 @@ function initOverlay(): void {
     }
     const wasPlaying = (window as any).__chessrayPvPlaying;
     (window as any).__chessrayPvPlaying = false;
+    // Clear actual board overlay
+    state.pvBoardState = null;
     const grid = document.getElementById('cv-debug-grid');
     grid?.classList.remove('analysis');
     document.querySelectorAll('.piece-anim').forEach(el => el.remove());
@@ -743,6 +794,7 @@ function initOverlay(): void {
     if (wasPlaying) {
       state.pvDisplayDepth = state.pvDepth; // restore full depth
       renderArrows(state);
+      renderVideoOverlay(state);
     }
   }
 

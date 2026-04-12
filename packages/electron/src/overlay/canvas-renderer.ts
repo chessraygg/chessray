@@ -1,5 +1,22 @@
 import type { ArrowDescriptor, PipelineResult } from '@chessray/core';
 import { computeCurveOffsets, computePvArrows, lossToColor } from '@chessray/core';
+import { pieceSvg } from './piece-svg.js';
+
+export interface PvBoardState {
+  fen: string;           // Current board FEN (piece placement only)
+  flipped: boolean;
+  highlight: number[];   // Highlighted square indices (in non-flipped coordinate space)
+  anim: {
+    piece: string;       // FEN char being animated (e.g. 'N', 'p')
+    fromSq: string;      // UCI source square (e.g. 'e2')
+    toSq: string;        // UCI destination square (e.g. 'e4')
+    isWhite: boolean;    // White's move (for arrow color)
+    step: number;        // Step number (for arrow label)
+    progress: number;    // 0→1 animation progress (ease-in-out applied)
+    afterFen: string;    // Position after this move completes
+    afterHighlight: number[];
+  } | null;
+}
 
 export interface OverlayState {
   videoCanvas: HTMLCanvasElement | null;
@@ -23,6 +40,7 @@ export interface OverlayState {
   autoMode: boolean;
   vboardOverlayVisible: boolean;
   pvPreviewLineIndex: number | null;
+  pvBoardState: PvBoardState | null;
   panelScale: number;
   displayInfo: {
     size: { width: number; height: number };
@@ -110,6 +128,106 @@ function updateAnimatedArrows(
   }
 
   return animState.animated;
+}
+
+// ── Piece image cache for canvas rendering ──
+
+const ANALYSIS_LIGHT = '#cdd5de';
+const ANALYSIS_DARK = '#7e8ea3';
+const ANALYSIS_LIGHT_HL = '#a8c4f0';
+const ANALYSIS_DARK_HL = '#6a8fc4';
+
+const pieceImages = new Map<string, HTMLImageElement>();
+
+export function preloadPieceImages(): Promise<void> {
+  return Promise.all(
+    'KQRBNPkqrbnp'.split('').map(p => new Promise<void>(resolve => {
+      const svg = pieceSvg(p, 90);
+      const img = new Image();
+      img.onload = () => { pieceImages.set(p, img); resolve(); };
+      img.onerror = () => resolve();
+      img.src = 'data:image/svg+xml;base64,' + btoa(svg);
+    })),
+  ).then(() => {});
+}
+
+/** Draw analysis board (background + pieces + animated piece + arrow) on the video overlay canvas */
+function drawAnalysisBoard(
+  ctx: CanvasRenderingContext2D,
+  boardRect: { x: number; y: number; width: number; height: number },
+  pvBoard: PvBoardState,
+): void {
+  const sqW = boardRect.width / 8;
+  const sqH = boardRect.height / 8;
+  const hlSet = new Set(pvBoard.flipped ? pvBoard.highlight.map(i => 63 - i) : pvBoard.highlight);
+
+  // Draw colored squares
+  for (let rank = 0; rank < 8; rank++) {
+    for (let file = 0; file < 8; file++) {
+      const idx = rank * 8 + file;
+      const isLight = (rank + file) % 2 === 0;
+      const isHl = hlSet.has(idx);
+      ctx.fillStyle = isLight
+        ? (isHl ? ANALYSIS_LIGHT_HL : ANALYSIS_LIGHT)
+        : (isHl ? ANALYSIS_DARK_HL : ANALYSIS_DARK);
+      ctx.fillRect(boardRect.x + file * sqW, boardRect.y + rank * sqH, sqW, sqH);
+    }
+  }
+
+  // Parse FEN and draw pieces
+  let fenRows = pvBoard.fen.split('/');
+  if (pvBoard.flipped) {
+    fenRows = fenRows.reverse().map(r => r.split('').reverse().join(''));
+  }
+  const pieceSize = Math.min(sqW, sqH) * 0.88;
+
+  for (let rank = 0; rank < fenRows.length; rank++) {
+    let file = 0;
+    for (const ch of fenRows[rank]) {
+      if (ch >= '1' && ch <= '8') {
+        file += parseInt(ch);
+      } else {
+        const img = pieceImages.get(ch);
+        if (img) {
+          ctx.drawImage(img,
+            boardRect.x + file * sqW + (sqW - pieceSize) / 2,
+            boardRect.y + rank * sqH + (sqH - pieceSize) / 2,
+            pieceSize, pieceSize);
+        }
+        file++;
+      }
+    }
+  }
+
+  // Draw animated piece and single-step arrow
+  if (pvBoard.anim) {
+    const a = pvBoard.anim;
+    let srcFile = a.fromSq.charCodeAt(0) - 97;
+    let srcRank = 8 - parseInt(a.fromSq[1]);
+    let dstFile = a.toSq.charCodeAt(0) - 97;
+    let dstRank = 8 - parseInt(a.toSq[1]);
+    if (pvBoard.flipped) {
+      srcFile = 7 - srcFile; srcRank = 7 - srcRank;
+      dstFile = 7 - dstFile; dstRank = 7 - dstRank;
+    }
+
+    const t = a.progress;
+    const px = boardRect.x + (srcFile + t * (dstFile - srcFile)) * sqW + (sqW - pieceSize) / 2;
+    const py = boardRect.y + (srcRank + t * (dstRank - srcRank)) * sqH + (sqH - pieceSize) / 2;
+    const img = pieceImages.get(a.piece);
+    if (img) {
+      ctx.drawImage(img, px, py, pieceSize, pieceSize);
+    }
+
+    // Animated arrow (same style as virtual board: no arrowhead, step label)
+    const arrowScale = (boardRect.width + boardRect.height) / 2 / 192;
+    drawArrow(ctx, {
+      from: a.fromSq, to: a.toSq,
+      color: a.isWhite ? '#e5e5e5' : '#1a1a1a',
+      width: 3, opacity: 0.8, loss_cp: 0,
+      label: String(a.step),
+    }, boardRect, arrowScale, pvBoard.flipped, 0, t, true);
+  }
 }
 
 /** Get the arrows to display based on current mode (top moves, PV line, or both) */
@@ -454,59 +572,67 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.strokeRect(bx, by, bw, bh);
   }
 
-  // Draw played move arrow (behind engine arrows)
-  if (result.played_move) {
-    const pm = result.played_move;
-    const pmArrow: ArrowDescriptor = {
-      from: pm.from, to: pm.to,
-      color: lossToColor(pm.loss_cp),
-      width: 3, opacity: 0.5,
-      loss_cp: pm.loss_cp,
-    };
-    const arrowScale = (bw + bh) / 2 / 192;
-    drawArrow(ctx, pmArrow, boardRect, arrowScale, state.displayFlipped);
-    if (pm.loss_cp >= state.playedLossThreshold) {
-      drawLossLabel(ctx, pm.from, pm.loss_cp, boardRect, state.displayFlipped);
-    }
-  }
-
-  if (state.arrowsVisible || state.lineVisible || state.pvPreviewLineIndex !== null) {
-    const targetArrows = getActiveArrows(state);
-    const animated = updateAnimatedArrows(targetArrows, videoArrowState, () => renderVideoOverlay(state));
-    // Draw with animated opacity
-    const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
-    const arrowScale = (bw + bh) / 2 / 192;
-
-    const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
-    for (let i = drawList.length - 1; i >= 0; i--) {
-      drawArrow(ctx, drawList[i].arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress);
-    }
-
-    // Draw cp loss label for the active PV line
-    if (state.lineVisible && state.pvDisplayDepth > 0 && result.evaluation?.top_moves?.length) {
-      const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
-      const move = result.evaluation.top_moves[idx];
-      if (move.loss_cp >= 5) {
-        const firstArrow = targetArrows[0];
-        if (firstArrow) {
-          drawLossLabel(ctx, firstArrow.from, move.loss_cp, boardRect, state.displayFlipped);
-        }
-      }
-    }
-
-    // Draw cp loss label during preview mode on the highlighted arrow
-    if (state.pvPreviewLineIndex !== null && result.evaluation?.top_moves?.length) {
-      const idx = Math.min(state.pvPreviewLineIndex, result.evaluation.top_moves.length - 1);
-      const move = result.evaluation.top_moves[idx];
-      if (move.loss_cp >= 5) {
-        const from = move.move.slice(0, 2);
-        drawLossLabel(ctx, from, move.loss_cp, boardRect, state.displayFlipped);
-      }
-    }
-  } else {
-    // Clear animation state when arrows are hidden
+  // During PV animation, draw analysis board (background + pieces + animated arrow)
+  if (state.pvBoardState) {
+    drawAnalysisBoard(ctx, boardRect, state.pvBoardState);
+    // Clear normal arrow animation state while analysis board is active
     videoArrowState.animated = [];
     if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
+  } else {
+    // Draw played move arrow (behind engine arrows)
+    if (result.played_move) {
+      const pm = result.played_move;
+      const pmArrow: ArrowDescriptor = {
+        from: pm.from, to: pm.to,
+        color: lossToColor(pm.loss_cp),
+        width: 3, opacity: 0.5,
+        loss_cp: pm.loss_cp,
+      };
+      const arrowScale = (bw + bh) / 2 / 192;
+      drawArrow(ctx, pmArrow, boardRect, arrowScale, state.displayFlipped);
+      if (pm.loss_cp >= state.playedLossThreshold) {
+        drawLossLabel(ctx, pm.from, pm.loss_cp, boardRect, state.displayFlipped);
+      }
+    }
+
+    if (state.arrowsVisible || state.lineVisible || state.pvPreviewLineIndex !== null) {
+      const targetArrows = getActiveArrows(state);
+      const animated = updateAnimatedArrows(targetArrows, videoArrowState, () => renderVideoOverlay(state));
+      // Draw with animated opacity
+      const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
+      const arrowScale = (bw + bh) / 2 / 192;
+
+      const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
+      for (let i = drawList.length - 1; i >= 0; i--) {
+        drawArrow(ctx, drawList[i].arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress);
+      }
+
+      // Draw cp loss label for the active PV line
+      if (state.lineVisible && state.pvDisplayDepth > 0 && result.evaluation?.top_moves?.length) {
+        const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
+        const move = result.evaluation.top_moves[idx];
+        if (move.loss_cp >= 5) {
+          const firstArrow = targetArrows[0];
+          if (firstArrow) {
+            drawLossLabel(ctx, firstArrow.from, move.loss_cp, boardRect, state.displayFlipped);
+          }
+        }
+      }
+
+      // Draw cp loss label during preview mode on the highlighted arrow
+      if (state.pvPreviewLineIndex !== null && result.evaluation?.top_moves?.length) {
+        const idx = Math.min(state.pvPreviewLineIndex, result.evaluation.top_moves.length - 1);
+        const move = result.evaluation.top_moves[idx];
+        if (move.loss_cp >= 5) {
+          const from = move.move.slice(0, 2);
+          drawLossLabel(ctx, from, move.loss_cp, boardRect, state.displayFlipped);
+        }
+      }
+    } else {
+      // Clear animation state when arrows are hidden
+      videoArrowState.animated = [];
+      if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
+    }
   }
 
   // Eval bar
