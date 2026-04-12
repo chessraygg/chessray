@@ -197,9 +197,12 @@ async function processFrame(imageData: ImageData): Promise<void> {
     lastBoardImageUrl = boardImageUrl;
     const tPreview = Date.now() - t;
 
-    // Update board sample from cropped image (more accurate than region sample)
+    // Update board sample using region sampling (same method as fast path)
     t = Date.now();
-    const boardSample = sampleBoardPixels(cropped.data, cropped.width, cropped.height);
+    const boardSample = sampleRegionPixels(
+      pixels.data, pixels.width,
+      activeBbox.x, activeBbox.y, activeBbox.width, activeBbox.height,
+    );
     const visuallyUnchanged = changeDetectEnabled && lastBoardSample && boardUnchanged(lastBoardSample, boardSample);
     prevBoardSample = lastBoardSample;
     lastBoardSample = boardSample;
