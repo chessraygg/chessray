@@ -61,11 +61,12 @@ export async function recognizeBoard(
   // changes significantly (new game, different stream).
   let t = Date.now();
   const pieceCount = rawFen.replace(/[0-8/]/g, '').length;
+  const pieceCountReliable = pieceCount >= 20;
   let orientation: OrientationResult;
   const similarity = cachedOrientation ? fenSimilarity(cachedOrientation.prevFen, rawFen) : 0;
   if (cachedOrientation && similarity > 0.5) {
     orientation = cachedOrientation.orientation;
-  } else if (pieceCount >= 20) {
+  } else if (pieceCountReliable) {
     orientation = detectBoardFlipped(rawFen);
   } else {
     const labelResult = await detectLabels(cropped);
@@ -84,11 +85,10 @@ export async function recognizeBoard(
   const tDisambiguate = Date.now() - t;
 
   // Step 4: Refine orientation using pawn move direction from highlights.
-  // Only needed when piece_count was used as the orientation source (sparse
-  // positions where it can be wrong). Skip when orientation came from labels
-  // or cache — those are already reliable.
+  // Only needed for sparse positions (<20 pieces) where piece_count is unreliable.
+  // With 20+ pieces, piece_count is reliable. Labels and cache are always reliable.
   t = Date.now();
-  if (orientation.source === 'piece_count' && highlightedSquares.length === 2) {
+  if (orientation.source === 'piece_count' && !pieceCountReliable && highlightedSquares.length === 2) {
     const fenRows = rawFen.split('/');
     const fenBoard: (string | null)[] = new Array(64).fill(null);
     for (let r = 0; r < 8; r++) {
