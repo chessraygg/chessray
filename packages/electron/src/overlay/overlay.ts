@@ -810,6 +810,21 @@ function initOverlay(): void {
     });
   }
 
+  // ── Show moves delay ──
+  const showMovesSlider = document.getElementById('cv-show-moves-delay') as HTMLInputElement | null;
+  const showMovesVal = document.getElementById('cv-show-moves-delay-val');
+  showMovesDelaySec = prefs.showMovesDelaySec;
+
+  if (showMovesSlider && showMovesVal) {
+    showMovesSlider.value = String(showMovesDelaySec);
+    showMovesVal.textContent = String(showMovesDelaySec);
+    showMovesSlider.addEventListener('input', () => {
+      showMovesDelaySec = parseInt(showMovesSlider.value, 10);
+      showMovesVal.textContent = String(showMovesDelaySec);
+      savePrefs({ showMovesDelaySec });
+    });
+  }
+
   // ── PV line colors ──
   const pvWhiteColorInput = document.getElementById('cv-pv-white-color') as HTMLInputElement | null;
   const pvBlackColorInput = document.getElementById('cv-pv-black-color') as HTMLInputElement | null;
@@ -1195,6 +1210,9 @@ let userLockedLine = -1; // -1 = cycle all, >= 0 = locked to that line
 let lastEvalFen: string | null = null;
 let lastRecogFen: string | null = null;
 let lastEvalDepth: number = 0;
+let showMovesDelaySec = 0;
+let movesHeld = false;
+let movesHeldTimer: ReturnType<typeof setTimeout> | null = null;
 
 function selectLine(index: number): void {
   state.selectedLineIndex = index;
@@ -1233,6 +1251,23 @@ function processPendingResult(): void {
   if (recogFen && recogFen !== lastRecogFen) {
     lastRecogFen = recogFen;
     (window as any).__chessrayPvPlayStop?.();
+
+    // Hold moves if showMovesDelay is configured
+    if (showMovesDelaySec > 0) {
+      movesHeld = true;
+      if (movesHeldTimer !== null) clearTimeout(movesHeldTimer);
+      movesHeldTimer = setTimeout(() => {
+        movesHeldTimer = null;
+        movesHeld = false;
+        // Position is stable — apply arrows from latest state and trigger normal flow
+        const r = state.currentResult;
+        state.currentArrows = r?.arrows?.length ? r.arrows : [];
+        renderArrows(state);
+        renderVideoOverlay(state);
+        (window as any).__chessrayResetAutoTimer?.();
+        if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
+      }, showMovesDelaySec * 1000);
+    }
   }
 
   // Reset to best line when position changes
@@ -1243,13 +1278,15 @@ function processPendingResult(): void {
     userLockedLine = -1;
     lastEvalFen = evalFen;
     lastEvalDepth = evalDepth;
-    (window as any).__chessrayResetAutoTimer?.();
-    // If line is already visible (non-auto mode), restart grow from 2
-    if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
+    if (!movesHeld) {
+      (window as any).__chessrayResetAutoTimer?.();
+      // If line is already visible (non-auto mode), restart grow from 2
+      if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
+    }
   } else if (evalDepth >= lastEvalDepth) {
     // Same position, same or deeper eval — continue grow if displayed moves still match
     lastEvalDepth = evalDepth;
-    if (state.lineVisible) (window as any).__chessrayPvGrowContinue?.();
+    if (!movesHeld && state.lineVisible) (window as any).__chessrayPvGrowContinue?.();
   }
 
   // Update arrows tooltip with actual multiPV count from engine
@@ -1261,7 +1298,7 @@ function processPendingResult(): void {
 
   updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine);
   (window as any).__chessrayUpdateCompactMoves?.();
-  state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
+  state.currentArrows = movesHeld ? [] : (result.arrows?.length > 0 ? result.arrows : []);
   renderArrows(state);
   renderVideoOverlay(state);
 
