@@ -1,6 +1,6 @@
 import type { ArrowDescriptor, PipelineResult } from '@chessray/core';
 import { computeCurveOffsets, computePvArrows, lossToColor } from '@chessray/core';
-import { pieceSvg } from './piece-svg.js';
+import { pieceImages } from './piece-svg.js';
 
 export interface PvBoardState {
   fen: string;           // Current board FEN (piece placement only)
@@ -136,20 +136,6 @@ const ANALYSIS_LIGHT = '#cdd5de';
 const ANALYSIS_DARK = '#7e8ea3';
 const ANALYSIS_LIGHT_HL = '#a8c4f0';
 const ANALYSIS_DARK_HL = '#6a8fc4';
-
-const pieceImages = new Map<string, HTMLImageElement>();
-
-export function preloadPieceImages(): Promise<void> {
-  return Promise.all(
-    'KQRBNPkqrbnp'.split('').map(p => new Promise<void>(resolve => {
-      const svg = pieceSvg(p, 90);
-      const img = new Image();
-      img.onload = () => { pieceImages.set(p, img); resolve(); };
-      img.onerror = () => resolve();
-      img.src = 'data:image/svg+xml;base64,' + btoa(svg);
-    })),
-  ).then(() => {});
-}
 
 /** Draw analysis board (background + pieces + animated piece + arrow) on the video overlay canvas */
 function drawAnalysisBoard(

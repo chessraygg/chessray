@@ -6,7 +6,8 @@
 import type { PipelineResult } from '@chessray/core';
 import { applyUciMoves, uciToSan, lossToColor } from '@chessray/core';
 import { loadPrefs, savePrefs } from './preferences.js';
-import { type OverlayState, type PvBoardState, renderArrows, renderVideoOverlay, clearVideoOverlay, drawArrow, preloadPieceImages } from './canvas-renderer.js';
+import { type OverlayState, type PvBoardState, renderArrows, renderVideoOverlay, clearVideoOverlay, drawArrow } from './canvas-renderer.js';
+import { preloadPieceImages } from './piece-svg.js';
 import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid } from './debug-panel.js';
 import { pieceSvg } from './piece-svg.js';
 
@@ -39,6 +40,9 @@ declare global {
 let lichessOpen = false;
 let lichessSync = true;
 let lastLichessFen: string | null = null;
+let showMovesDelaySec = 0;
+let movesHeld = false;
+let movesHeldTimer: ReturnType<typeof setTimeout> | null = null;
 
 let userPanel: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
@@ -466,8 +470,6 @@ function initOverlay(): void {
     }, autoDelaySec * 1000);
   }
 
-  let pvBoardAnimGen = 0; // generation counter for actual board animation cancellation
-
   function pvCycleStep(): void {
     // Validate that our cached PV still matches the live eval — restart if stale
     const liveResult = state.currentResult;
@@ -571,8 +573,6 @@ function initOverlay(): void {
 
     // ── Actual board overlay animation ──
 
-    pvBoardAnimGen++;
-    const thisGen = pvBoardAnimGen;
     state.pvBoardState = {
       fen: pickedUpFen,
       flipped: pvCycleFlipped,
@@ -592,7 +592,7 @@ function initOverlay(): void {
       function easeInOut(t: number): number { return t * t * (3 - 2 * t); }
 
       function tickActualBoard(): void {
-        if (thisGen !== pvBoardAnimGen || !(window as any).__chessrayPvPlaying || !state.pvBoardState?.anim) return;
+        if (!(window as any).__chessrayPvPlaying || !state.pvBoardState?.anim || state.pvBoardState.anim.step !== step) return;
         const elapsed = performance.now() - startTime;
         const progress = easeInOut(Math.min(1, elapsed / TRANSITION_MS));
         state.pvBoardState.anim.progress = progress;
@@ -1210,9 +1210,6 @@ let userLockedLine = -1; // -1 = cycle all, >= 0 = locked to that line
 let lastEvalFen: string | null = null;
 let lastRecogFen: string | null = null;
 let lastEvalDepth: number = 0;
-let showMovesDelaySec = 0;
-let movesHeld = false;
-let movesHeldTimer: ReturnType<typeof setTimeout> | null = null;
 
 function selectLine(index: number): void {
   state.selectedLineIndex = index;

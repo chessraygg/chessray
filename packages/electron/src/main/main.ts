@@ -119,6 +119,16 @@ function createOverlayWindow(): BrowserWindow {
     win.loadFile(path.join(__dirname, `../renderer/${OVERLAY_WINDOW_VITE_NAME}/index.html`));
   }
 
+  win.webContents.on('console-message', (_e, _level, message) => {
+    fs.appendFileSync(LOG, `[overlay-renderer] ${message}\n`);
+  });
+  win.webContents.on('did-fail-load', (_e, code, desc) => {
+    fs.appendFileSync(LOG, `[overlay-renderer] LOAD FAILED: ${code} ${desc}\n`);
+  });
+  win.webContents.on('render-process-gone', (_e, details) => {
+    fs.appendFileSync(LOG, `[overlay-renderer] CRASHED: ${JSON.stringify(details)}\n`);
+  });
+
   // Send display metrics so the overlay can map frame→screen coordinates.
   // Also re-send when the overlay moves/resizes (e.g. entering/leaving fullscreen).
   const sendDisplayInfo = () => {
