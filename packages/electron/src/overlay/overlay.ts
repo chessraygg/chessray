@@ -600,13 +600,9 @@ function initOverlay(): void {
 
         if (progress < 1) {
           requestAnimationFrame(tickActualBoard);
-        } else {
-          // Animation complete — show final position
-          state.pvBoardState.fen = state.pvBoardState.anim.afterFen;
-          state.pvBoardState.highlight = state.pvBoardState.anim.afterHighlight;
-          state.pvBoardState.anim = null;
-          renderVideoOverlay(state);
         }
+        // When progress = 1, stop the loop but keep anim at progress=1
+        // so the arrow label stays visible until the next step overwrites pvBoardState
       }
       requestAnimationFrame(tickActualBoard);
     }
