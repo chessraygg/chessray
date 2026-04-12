@@ -16,7 +16,7 @@ import type {
 } from '@chessray/core';
 
 import { EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH, multiPvForDepth, setMultiPvMax, setMultiPvRamp, cacheGet, cachePut } from './eval-cache.js';
-import { sampleBoardPixels, boardUnchanged } from './change-detect.js';
+import { sampleBoardPixels, sampleRegionPixels, boardUnchanged } from './change-detect.js';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
 import { initAndStartCapture, stopCapture, setTargetFps } from './frame-capture.js';
 
@@ -55,6 +55,7 @@ let lastArrows: ArrowDescriptor[] = [];
 let lastFullFen: string | null = null;
 let lastPlayedMove: PipelineResult['played_move'] = null;
 let cachedOrientation: { prevFen: string; orientation: { flipped: boolean; source: OrientationSource } } | null = null;
+let lastBoardImageUrl: string = '';
 let cachedBbox: BoardBBox | null = null;
 let frameCount = 0;
 let EVAL_MAX_DEPTH = DEFAULT_MAX_DEPTH;
@@ -80,6 +81,7 @@ function resetPipelineState(): void {
   lastFullFen = null;
   lastPlayedMove = null;
   cachedOrientation = null;
+  lastBoardImageUrl = '';
   lastBoardSample = null;
   lastRecognitionResult = null;
   cachedBbox = null;
@@ -112,12 +114,49 @@ async function processFrame(imageData: ImageData): Promise<void> {
     const engine = getEngine();
     const recognizer = getRecognizer();
 
+    // Fast path: if we have a cached bbox and the board region hasn't changed,
+    // skip both board detection and recognition entirely.
+    let tChangeDetect = 0;
+    let prevBoardSample = lastBoardSample;
+    if (cachedBbox && changeDetectEnabled && lastBoardSample && lastRecognitionResult) {
+      const t0 = Date.now();
+      const quickSample = sampleRegionPixels(
+        pixels.data, pixels.width,
+        cachedBbox.x, cachedBbox.y, cachedBbox.width, cachedBbox.height,
+      );
+      const unchanged = boardUnchanged(lastBoardSample, quickSample);
+      tChangeDetect = Date.now() - t0;
+      if (unchanged) {
+        frameCount++;
+        debugLog(`Timing: chgdet=${tChangeDetect}ms [unchanged, skip detect] total=${Date.now() - startTime}ms`);
+        sendResult({
+          board_detection: { found: true, bbox: cachedBbox, confidence: 1 },
+          recognition: lastRecognitionResult,
+          evaluation: lastEval,
+          eval_depth: lastEval?.depth,
+          eval_max_depth: lastEval && lastEval.depth < EVAL_MAX_DEPTH ? EVAL_MAX_DEPTH : undefined,
+          arrows: lastArrows,
+          highlighted_squares: lastHighlightedSquares,
+          turn: lastHighlightTurn ?? undefined,
+          flipped: lastIsFlipped,
+          orientation_source: lastOrientationSource,
+          played_move: lastPlayedMove,
+          board_image_url: lastBoardImageUrl,
+          frame_dimensions: { width: pixels.width, height: pixels.height },
+          total_elapsed_ms: Date.now() - startTime,
+        });
+        return;
+      }
+      // Board changed — update sample and continue with full pipeline
+      prevBoardSample = lastBoardSample;
+      lastBoardSample = quickSample;
+    }
+
     let activeBbox = cachedBbox;
     let detectionConf = 1;
     let tDetect = 0;
     {
       const t0 = Date.now();
-      // No panel exclusion needed — overlay is a separate window, not captured
       const detection = await detectBoard(onnxSession, ortModule, pixels.data, pixels.width, pixels.height);
       activeBbox = detection.bbox;
       detectionConf = detection.confidence;
@@ -155,14 +194,16 @@ async function processFrame(imageData: ImageData): Promise<void> {
     const previewImgData = new ImageData(cropped.data as unknown as Uint8ClampedArray<ArrayBuffer>, cropped.width, cropped.height);
     previewCtx!.putImageData(previewImgData, 0, 0);
     const boardImageUrl = previewCanvas.toDataURL('image/jpeg', 0.7);
+    lastBoardImageUrl = boardImageUrl;
     const tPreview = Date.now() - t;
 
+    // Update board sample from cropped image (more accurate than region sample)
     t = Date.now();
     const boardSample = sampleBoardPixels(cropped.data, cropped.width, cropped.height);
     const visuallyUnchanged = changeDetectEnabled && lastBoardSample && boardUnchanged(lastBoardSample, boardSample);
-    const prevBoardSample = lastBoardSample;
+    prevBoardSample = lastBoardSample;
     lastBoardSample = boardSample;
-    const tChangeDetect = Date.now() - t;
+    tChangeDetect = Date.now() - t;
 
     let recognition: RecognitionResult | null = null;
     let isFlipped = false;
