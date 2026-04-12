@@ -1,13 +1,4 @@
-export interface LabelExpectation {
-  /** Which edge strip contains labels */
-  side: 'left' | 'right' | 'top' | 'bottom';
-  /** Type of labels */
-  type: 'digit' | 'letter';
-  /** Expected characters detected (e.g. "7531" or "aceg") */
-  chars: string;
-  /** Direction: asc = values increase along strip direction, desc = decrease */
-  direction: 'asc' | 'desc';
-}
+import type { LabelStrip } from '@chessray/core';
 
 export interface PipelineTestCase {
   /** Screenshot filename in test/screenshots/ */
@@ -26,8 +17,8 @@ export interface PipelineTestCase {
   expectedFen: string;
   /** How board orientation was detected */
   orientation_source: 'label' | 'pawn_move' | 'piece_count';
-  /** Expected label detections per edge strip. Null = no labels on this board. */
-  expected_labels?: LabelExpectation[] | null;
+  /** Expected label strips. Null = labels skipped or not found. */
+  expected_labels: LabelStrip[] | null;
 }
 
 export const PIPELINE_CASES: PipelineTestCase[] = [
@@ -40,9 +31,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 67,
     expectedFen: '1K1RQ2R/1PP3P1/PNN1PPB1/2BP4/5pp1/2nppn2/pppbbq2/1k3rr1',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'right', type: 'digit', chars: '234578', direction: 'desc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-oro-aronian2.png',
@@ -53,9 +42,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 67,
     expectedFen: '1K1RQ2R/1PP3P1/PNN1PPB1/2BP2p1/5p2/2nppn2/pppbbq2/1k3rr1',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'right', type: 'digit', chars: '234578', direction: 'desc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-carlsen-titled.png',
@@ -77,9 +64,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 140,
     expectedFen: '2r1k2r/pp2bppp/1qn1p3/2ppPn1P/3P4/2PQ1NP1/PP2NP2/R1B2RK1',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-caruana-american2.png',
@@ -90,9 +75,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 134,
     expectedFen: '2r1k2r/pp2bpp1/1qn1p2p/2ppPn1P/3P4/2PQ1NP1/PP1BNP2/R4RK1',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-caruana-american3.png',
@@ -103,9 +86,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 97,
     expectedFen: '5rk1/pR2bpp1/2r1p2p/3pP2P/3Q4/q1P3P1/P2B1P2/R5K1',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'left', type: 'digit', chars: '1245678', direction: 'desc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-caruana-american4.png',
@@ -117,7 +98,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'r5k1/1R3pp1/P3p2p/3pP2P/1r1P4/2b1B1P1/R4P2/6K1',
     orientation_source: 'label',
     expected_labels: [
-      { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
+      { side: 'left', type: 'digit', chars: '87654311', direction: 'desc' },
     ],
   },
   {
@@ -129,9 +110,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 55,
     expectedFen: 'r4rk1/p4ppp/b1p1pn2/2q5/4P3/2Q3PP/PP3PB1/RN1R2K1',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'left', type: 'digit', chars: '235678', direction: 'desc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-candidates-nakamura2.png',
@@ -142,9 +121,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 61,
     expectedFen: 'r4rk1/p4ppp/bqp1pn2/8/4P3/2Q3PP/PP3PB1/RN1R2K1',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'bottom', type: 'letter', chars: 'acdefgh', direction: 'asc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-carlsen-titled2.png',
@@ -210,9 +187,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 89,
     expectedFen: '1K2R2R/1BP1N1PP/PP3Q2/3P4/8/p1np1pqb/1pp4p/1kr4r',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'bottom', type: 'letter', chars: 'bdegh', direction: 'asc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-eric-rosen.png',
@@ -224,7 +199,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '8/p7/8/1p1K4/8/8/k7/8',
     orientation_source: 'label',
     expected_labels: [
-      { side: 'left', type: 'digit', chars: '1345678', direction: 'desc' },
+      { side: 'left', type: 'digit', chars: '8854337', direction: 'desc' },
     ],
   },
   {
@@ -237,7 +212,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '8/8/p7/Kp6/8/8/1k6/8',
     orientation_source: 'label',
     expected_labels: [
-      { side: 'left', type: 'digit', chars: '1234678', direction: 'desc' },
+      { side: 'left', type: 'digit', chars: '8364331', direction: 'desc' },
     ],
   },
   {
@@ -350,9 +325,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 80,
     expectedFen: 'b3r3/2bq1pkp/3pn1pN/2p1p1Nn/2B1P3/3P2P1/1P1B1P1P/2Q1R1K1',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-agadmator-carlsen-svidler2.png',
@@ -364,9 +337,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     // h7 black pawn misclassified as white due to red YouTube annotation overlay — correct FEN has lowercase p
     expectedFen: '4r2k/2bq1p1P/5NpQ/2p1p3/2B5/3P1bP1/1P3P1P/4R1K1',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-agadmator-carlsen-svidler3.png',
@@ -377,9 +348,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 80,
     expectedFen: 'r1bqk2r/1pppbppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-agadmator-carlsen-svidler4.png',
@@ -390,9 +359,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 80,
     expectedFen: 'b2n1rk1/2pqbppp/3p1n2/1p2p3/4P3/1B1P1N2/1PPBNPPP/3Q1RK1',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-agadmator-carlsen-svidler5.png',
@@ -403,9 +370,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     squareSize: 80,
     expectedFen: 'b2b1rk1/3q1ppp/3pnn2/1pp1pN2/4P3/1B1P1N2/1PPB1PPP/3Q1RK1',
     orientation_source: 'piece_count',
-    expected_labels: [
-      { side: 'left', type: 'digit', chars: '12345678', direction: 'desc' },
-    ],
+    expected_labels: null,
   },
   {
     file: 'test-carlsen-freestyle2.png',

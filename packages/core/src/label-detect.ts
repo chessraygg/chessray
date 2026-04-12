@@ -16,6 +16,22 @@
 import type { PixelBuffer } from './pixel-utils.js';
 import type { OrientationResult } from './orientation.js';
 
+export interface LabelStrip {
+  /** Which edge strip contains labels */
+  side: 'left' | 'right' | 'top' | 'bottom';
+  /** Type of labels */
+  type: 'digit' | 'letter';
+  /** Recognized characters in position order */
+  chars: string;
+  /** Direction: 'asc' = values increase, 'desc' = values decrease */
+  direction: 'asc' | 'desc';
+}
+
+export interface LabelDetectionResult extends OrientationResult {
+  /** Detected label strips */
+  strips: LabelStrip[];
+}
+
 /** PP-OCRv5 recognition model constants */
 const MODEL_INPUT_HEIGHT = 48;
 const STRIP_PCT = 0.30;
@@ -148,7 +164,7 @@ async function recognizeSegment(
  *
  * Returns null if no labels are detected.
  */
-export async function detectLabels(pixels: PixelBuffer): Promise<OrientationResult | null> {
+export async function detectLabels(pixels: PixelBuffer): Promise<LabelDetectionResult | null> {
   const { width: bw, height: bh } = pixels;
   const sqW = Math.floor(bw / 8);
   const sqH = Math.floor(bh / 8);
@@ -161,6 +177,7 @@ export async function detectLabels(pixels: PixelBuffer): Promise<OrientationResu
   ];
 
   let best: { flipped: boolean; unique: number } | null = null;
+  const strips: LabelStrip[] = [];
 
   for (const edge of edges) {
     const filterChar = (c: string) =>
@@ -205,6 +222,9 @@ export async function detectLabels(pixels: PixelBuffer): Promise<OrientationResu
 
     if (direction !== null) {
       const mergedUnique = allChars.size;
+      // Determine asc/desc from the sequence direction relative to the edge type
+      const seqDirection = direction === (edge.type === 'digit') ? 'asc' : 'desc';
+      strips.push({ side: edge.side, type: edge.type, chars: orderedText, direction: seqDirection });
       if (!best || mergedUnique > best.unique) {
         best = { flipped: direction, unique: mergedUnique };
       }
@@ -214,7 +234,7 @@ export async function detectLabels(pixels: PixelBuffer): Promise<OrientationResu
   }
 
   if (!best) return null;
-  return { flipped: best.flipped, source: 'label' };
+  return { flipped: best.flipped, source: 'label', strips };
 }
 
 /**

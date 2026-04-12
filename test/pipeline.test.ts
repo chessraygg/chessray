@@ -182,14 +182,13 @@ describe('end-to-end detection pipeline', () => {
       console.log(`  fullFen=${result.fullFen}`);
 
       // Verify label detection
-      if (tc.expected_labels !== undefined) {
-        // Labels are detected inside recognizeBoard's orientation step;
-        // verify via orientationSource when labels are expected
-        if (tc.expected_labels === null) {
-          console.log('  labels: none (correct)');
-        } else {
-          console.log(`  labels: flipped=${result.flipped}`);
-        }
+      if (tc.expected_labels === null) {
+        expect(result.labels).toBeNull();
+        console.log('  labels: none (correct)');
+      } else {
+        expect(result.labels).not.toBeNull();
+        expect(result.labels!.strips).toEqual(tc.expected_labels);
+        console.log(`  labels: ${JSON.stringify(result.labels!.strips)}`);
       }
 
     }, 120000);

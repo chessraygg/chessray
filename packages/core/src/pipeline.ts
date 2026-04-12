@@ -52,6 +52,7 @@ export async function runDetectionPipeline(
       turn: null,
       orientationSource: 'piece_count',
       midAnimation: false,
+      labels: null,
       highlightColors: [],
       highlightScores: [],
       highlightMedians: { light: [0, 0, 0], dark: [0, 0, 0] },
