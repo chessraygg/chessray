@@ -66,6 +66,14 @@ export interface PipelineResult {
   turn?: 'w' | 'b'; // whose turn it is (from highlight detection)
   game_over?: 'checkmate' | 'stalemate'; // detected end-of-game state
   orientation_source?: 'label' | 'pawn_move' | 'piece_count'; // how orientation was detected
+  played_move?: {
+    from: string;    // algebraic square (source)
+    to: string;      // algebraic square (destination)
+    uci: string;     // full UCI string (includes promotion piece)
+    san: string;     // SAN notation for display
+    loss_cp: number; // centipawn loss vs best move from previous eval
+  } | null;
+  detection_status?: string; // human-readable detection status for debug display
   board_image_url?: string; // data URL of the cropped board for debug display
   frame_dimensions?: { width: number; height: number }; // capture frame size for coordinate mapping
   total_elapsed_ms: number;

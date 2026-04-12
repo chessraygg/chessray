@@ -2,48 +2,71 @@ import type { PixelBuffer } from './pixel-utils.js';
 
 export interface HighlightResult {
   highlighted: number[];
-  patches: Array<[number, number, number, number]>;
   scores?: Array<{ idx: number; dist: number }>;
+  /** Per-square representative color (border frame median), indexed 0-63 */
+  colors?: Array<[number, number, number]>;
+  /** Median colors for light and dark squares */
+  medians?: { light: [number, number, number]; dark: [number, number, number] };
 }
 
 export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   const { data, width, height } = pixels;
   const sqW = width / 8;
   const sqH = height / 8;
-  const pw = Math.max(2, Math.floor(sqW * 0.1));
-  const ph = Math.max(2, Math.floor(sqH * 0.1));
-
-  function samplePatch(px0: number, py0: number): [number, number, number] {
-    let r = 0, g = 0, b = 0, n = 0;
-    for (let py = py0; py < py0 + ph; py++) {
-      for (let px = px0; px < px0 + pw; px++) {
-        const cx = Math.min(Math.max(px, 0), width - 1);
-        const cy = Math.min(Math.max(py, 0), height - 1);
-        const i = (cy * width + cx) * 4;
-        r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
-      }
-    }
-    return [r / n, g / n, b / n];
-  }
 
   // Inset from square edges to avoid grid lines, anti-aliasing, and coordinate labels.
-  // Use larger inset for big squares (annotations are further from corners) and
-  // smaller inset for small squares (to avoid hitting piece graphics).
   const insetPct = sqW > 100 ? 0.15 : 0.08;
   const insetX = Math.max(2, Math.floor(sqW * insetPct));
   const insetY = Math.max(2, Math.floor(sqH * insetPct));
 
   const colors: Array<[number, number, number]> = [];
-  const patches: Array<[number, number, number, number]> = [];
+
+  // Per-channel median of pixels in the padding strip around each square.
+  // The strip runs from a minimal edge inset (to skip grid lines) up to the
+  // main inset boundary. This thin frame captures bare board background
+  // without being contaminated by piece graphics in the center.
+  const edgeInset = Math.max(2, Math.floor(Math.min(sqW, sqH) * 0.03));
+  function squareFrameMedianColor(sqX0: number, sqY0: number, sqX1: number, sqY1: number): [number, number, number] {
+    // Outer boundary: just past grid lines
+    const x0 = sqX0 + edgeInset;
+    const y0 = sqY0 + edgeInset;
+    const x1 = sqX1 - edgeInset;
+    const y1 = sqY1 - edgeInset;
+    // Inner boundary: the existing inset (where piece area begins)
+    const ix0 = sqX0 + insetX;
+    const iy0 = sqY0 + insetY;
+    const ix1 = sqX1 - insetX;
+    const iy1 = sqY1 - insetY;
+    const rs: number[] = [];
+    const gs: number[] = [];
+    const bs: number[] = [];
+    for (let py = y0; py < y1; py++) {
+      for (let px = x0; px < x1; px++) {
+        // Only include pixels in the padding strip (outside inner boundary)
+        if (px >= ix0 && px < ix1 && py >= iy0 && py < iy1) continue;
+        const cx = Math.min(Math.max(px, 0), width - 1);
+        const cy = Math.min(Math.max(py, 0), height - 1);
+        const i = (cy * width + cx) * 4;
+        rs.push(data[i]);
+        gs.push(data[i + 1]);
+        bs.push(data[i + 2]);
+      }
+    }
+    rs.sort((a, b) => a - b);
+    gs.sort((a, b) => a - b);
+    bs.sort((a, b) => a - b);
+    const mid = Math.floor(rs.length / 2);
+    return [rs[mid], gs[mid], bs[mid]];
+  }
 
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
-      const x0 = Math.floor(file * sqW);
-      const y0 = Math.floor(rank * sqH);
+      const sqX0 = Math.floor(file * sqW);
+      const sqY0 = Math.floor(rank * sqH);
+      const sqX1 = Math.floor((file + 1) * sqW);
+      const sqY1 = Math.floor((rank + 1) * sqH);
 
-      // Use top-left inset patch as the representative color for median computation
-      patches.push([x0 + insetX, y0 + insetY, pw, ph]);
-      colors.push(samplePatch(x0 + insetX, y0 + insetY));
+      colors.push(squareFrameMedianColor(sqX0, sqY0, sqX1, sqY1));
     }
   }
 
@@ -83,37 +106,15 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
     return euclidean * (1 + channelStd / 10);
   }
 
-  // For each square, compute highlight scores at 4 inset corners and take the
-  // MINIMUM. Move highlights cover the entire square (all 4 corners show the
-  // highlight color → min is high), while annotations only affect 1-2 corners
-  // (other corners show normal background → min is low).
+  // Score each square by comparing its border frame median color to the
+  // expected parity median. Highlights shift the background color uniformly;
+  // the border frame median is robust to pieces and annotations.
   const scores: Array<{ idx: number; dist: number }> = [];
   for (let i = 0; i < 64; i++) {
     const rank = Math.floor(i / 8);
     const file = i % 8;
     const expected = (rank + file) % 2 === 0 ? lightMedian : darkMedian;
-
-    const sqX0 = Math.floor(file * sqW);
-    const sqY0 = Math.floor(rank * sqH);
-    const sqX1 = Math.floor((file + 1) * sqW);
-    const sqY1 = Math.floor((rank + 1) * sqH);
-
-    const cornerPatches: Array<[number, number]> = [
-      [sqX0 + insetX, sqY0 + insetY],
-      [sqX1 - insetX - pw, sqY0 + insetY],
-      [sqX0 + insetX, sqY1 - insetY - ph],
-      [sqX1 - insetX - pw, sqY1 - insetY - ph],
-    ];
-
-    const cornerScores: number[] = [];
-    for (const [cx, cy] of cornerPatches) {
-      const c = samplePatch(cx, cy);
-      cornerScores.push(highlightScore(c, expected));
-    }
-    // Use the minimum score across corners. Highlights cover the entire square
-    // (all corners show highlight color → min is high), while annotations only
-    // affect 1-2 corners (other corners normal → min is low).
-    scores.push({ idx: i, dist: Math.min(...cornerScores) });
+    scores.push({ idx: i, dist: highlightScore(colors[i], expected) });
   }
   scores.sort((a, b) => b.dist - a.dist);
 
@@ -122,14 +123,23 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   // Non-standard board themes (blue/ice) produce uniformly high scores with no clear gap.
 
   const minAbsolute = 18;
-  if (scores[0].dist < minAbsolute) return { highlighted: [], patches };
+  if (scores[0].dist < minAbsolute) return { highlighted: [], scores, colors, medians: { light: lightMedian, dark: darkMedian } };
 
-  // Find the biggest gap in the top 8 scores, starting from index 2
-  // (highlights always come in pairs — source and destination).
+  // Find the biggest gap in the top 8 scores.
+  // Start from index 2 (highlights usually come in pairs) but also consider
+  // index 1: one highlight may score much higher than the other (e.g. the
+  // source square is empty while the destination has a piece absorbing the
+  // highlight color). In that case, emit just the strong highlight and let
+  // disambiguateHighlights search the score list for its partner.
   let maxGap = 0;
   let cutIdx = 2;
   const limit = Math.min(8, scores.length);
-  for (let i = 2; i < limit; i++) {
+  // Consider the gap at index 1 (single strong highlight) only when the
+  // top score is in plausible highlight range. Extreme outliers (500+)
+  // are usually annotations/overlays, not real move highlights — for those
+  // we want to look deeper into the score list, so start from index 2.
+  const startIdx = scores[0].dist < 300 ? 1 : 2;
+  for (let i = startIdx; i < limit; i++) {
     const gap = scores[i - 1].dist - scores[i].dist;
     if (gap > maxGap) {
       maxGap = gap;
@@ -143,8 +153,8 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   // 600+ while real highlights score ~200, giving a 30% threshold of 180+).
   const scoreAboveGap = scores[cutIdx - 1].dist;
   const gapIsSignificant = maxGap >= scores[0].dist * 0.3 ||
-    maxGap >= scoreAboveGap * 0.5;
-  if (!gapIsSignificant) return { highlighted: [], patches };
+    maxGap >= scoreAboveGap * 0.35;
+  if (!gapIsSignificant) return { highlighted: [], scores, colors, medians: { light: lightMedian, dark: darkMedian } };
 
   const primary = scores.slice(0, cutIdx).map(s => s.idx);
 
@@ -159,7 +169,7 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   }
   const highlighted = scores.slice(0, extendedCount).map(s => s.idx);
 
-  return { highlighted, patches, scores };
+  return { highlighted, scores, colors, medians: { light: lightMedian, dark: darkMedian } };
 }
 
 /**
@@ -210,8 +220,11 @@ export function disambiguateHighlights(
   candidates: number[],
   fen: string,
   scores?: Array<{ idx: number; dist: number }>,
+  colors?: Array<[number, number, number]>,
+  medians?: { light: [number, number, number]; dark: [number, number, number] },
+  flipped?: boolean,
 ): number[] {
-  if (candidates.length < 2) return candidates;
+  if (candidates.length === 0) return candidates;
 
   const rows = fen.split('/');
   const board: (string | null)[] = new Array(64).fill(null);
@@ -233,17 +246,26 @@ export function disambiguateHighlights(
   const withPiece = candidates.filter(idx => board[idx] !== null);
   const empty = candidates.filter(idx => board[idx] === null);
 
-  // Determine likely orientation from piece positions for pawn direction validation.
-  // Count white vs black pieces in bottom half of image.
-  let whiteBottom = 0, blackBottom = 0;
-  for (let rank = 0; rank < 8; rank++) {
-    for (const ch of rows[rank]) {
-      if (ch >= '1' && ch <= '8') continue;
-      const isWhite = ch === ch.toUpperCase();
-      if (rank >= 4) { if (isWhite) whiteBottom++; else blackBottom++; }
-    }
+  // Compute highlight "naturalness" for a square: how board-like is its color?
+  // Real highlights tint the board color uniformly (low channel-ratio variance).
+  // Annotations replace the board color entirely (high channel-ratio variance).
+  // Returns 0 (natural highlight) to 1+ (annotation-like). Board-agnostic.
+  function annotationPenalty(idx: number): number {
+    if (!colors || !medians) return 0;
+    const color = colors[idx];
+    const rank = Math.floor(idx / 8);
+    const file = idx % 8;
+    const expected = (rank + file) % 2 === 0 ? medians.light : medians.dark;
+    // Per-channel ratio of actual color to expected median
+    const ratios = [
+      expected[0] > 10 ? color[0] / expected[0] : 1,
+      expected[1] > 10 ? color[1] / expected[1] : 1,
+      expected[2] > 10 ? color[2] / expected[2] : 1,
+    ];
+    const mean = (ratios[0] + ratios[1] + ratios[2]) / 3;
+    const variance = ((ratios[0] - mean) ** 2 + (ratios[1] - mean) ** 2 + (ratios[2] - mean) ** 2) / 3;
+    return variance;
   }
-  const likelyFlipped = blackBottom > whiteBottom;
 
   // Try to find a valid (empty_source, piece_destination) pair.
   // The source must be empty (the piece left it) and the destination has the piece.
@@ -258,7 +280,7 @@ export function disambiguateHighlights(
       const srcRank = Math.floor(src / 8);
       const srcFile = src % 8;
       // Use piece_count orientation for pawn direction validation
-      if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, likelyFlipped)) {
+      if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, flipped)) {
         const srcScore = scoreMap.get(src) ?? 0;
         const destScore = scoreMap.get(dest) ?? 0;
         validPairs.push({ src, dest, combinedScore: srcScore + destScore });
@@ -269,6 +291,91 @@ export function disambiguateHighlights(
   if (validPairs.length > 0) {
     validPairs.sort((a, b) => b.combinedScore - a.combinedScore);
     return [validPairs[0].src, validPairs[0].dest];
+  }
+
+  // No valid pair among initial candidates. Expand: for each candidate piece,
+  // search the full score list for an empty square that forms a legal move.
+  // This handles annotations/overlays that create false-positive highlights
+  // while the real partner square scored below the initial threshold.
+  if (scores) {
+    const minScore = 18;
+    const expandedEmpty = scores
+      .filter(s => !candidates.includes(s.idx) && s.dist >= minScore && board[s.idx] === null);
+
+    for (const dest of withPiece) {
+      const piece = board[dest]!;
+      const destRank = Math.floor(dest / 8);
+      const destFile = dest % 8;
+
+      for (const s of expandedEmpty) {
+        const srcRank = Math.floor(s.idx / 8);
+        const srcFile = s.idx % 8;
+        if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, flipped)) {
+          const destScore = scoreMap.get(dest) ?? 0;
+          validPairs.push({ src: s.idx, dest, combinedScore: s.dist + destScore });
+        }
+      }
+    }
+
+    // Also try: candidate empty square + expanded piece destination
+    const expandedPiece = scores
+      .filter(s => !candidates.includes(s.idx) && s.dist >= minScore && board[s.idx] !== null);
+
+    for (const src of empty) {
+      const srcRank = Math.floor(src / 8);
+      const srcFile = src % 8;
+
+      for (const s of expandedPiece) {
+        const piece = board[s.idx]!;
+        const destRank = Math.floor(s.idx / 8);
+        const destFile = s.idx % 8;
+        if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, flipped)) {
+          const srcScore = scoreMap.get(src) ?? 0;
+          validPairs.push({ src, dest: s.idx, combinedScore: srcScore + s.dist });
+        }
+      }
+    }
+
+    // Also try: expanded empty × expanded piece (both outside initial candidates).
+    // Only when all candidates look like annotations (high channel-ratio variance),
+    // meaning the real highlight pair is likely entirely outside the candidate list.
+    const allCandidatesAnnotation = candidates.length >= 2 &&
+      candidates.every(idx => annotationPenalty(idx) > 0.08);
+    if (allCandidatesAnnotation) for (const srcEntry of expandedEmpty) {
+      const srcRank = Math.floor(srcEntry.idx / 8);
+      const srcFile = srcEntry.idx % 8;
+
+      for (const destEntry of expandedPiece) {
+        const piece = board[destEntry.idx]!;
+        const destRank = Math.floor(destEntry.idx / 8);
+        const destFile = destEntry.idx % 8;
+        if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, flipped)) {
+          validPairs.push({ src: srcEntry.idx, dest: destEntry.idx, combinedScore: srcEntry.dist + destEntry.dist });
+        }
+      }
+    }
+
+    if (validPairs.length > 0) {
+      // Rank by naturalness: prefer pairs without annotation-colored squares.
+      // A square is "annotation-like" when its channel-ratio variance is high
+      // (>0.08). Small variance differences between real highlights and normal
+      // squares are ignored — only penalize clearly foreign colors.
+      const annotationThreshold = 0.08;
+      validPairs.sort((a, b) => {
+        const penA = (annotationPenalty(a.src) > annotationThreshold ? 1 : 0) +
+                     (annotationPenalty(a.dest) > annotationThreshold ? 1 : 0);
+        const penB = (annotationPenalty(b.src) > annotationThreshold ? 1 : 0) +
+                     (annotationPenalty(b.dest) > annotationThreshold ? 1 : 0);
+        if (penA !== penB) return penA - penB;
+        const distA = Math.max(Math.abs(Math.floor(a.src / 8) - Math.floor(a.dest / 8)),
+                               Math.abs((a.src % 8) - (a.dest % 8)));
+        const distB = Math.max(Math.abs(Math.floor(b.src / 8) - Math.floor(b.dest / 8)),
+                               Math.abs((b.src % 8) - (b.dest % 8)));
+        if (distA !== distB) return distA - distB;
+        return b.combinedScore - a.combinedScore;
+      });
+      return [validPairs[0].src, validPairs[0].dest];
+    }
   }
 
   // Fallback: pick top 2 by score

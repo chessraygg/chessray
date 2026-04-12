@@ -49,7 +49,7 @@
                 <div class="piece-grid" id="cv-debug-grid"></div>
                 <canvas id="cv-arrow-canvas" width="200" height="200"></canvas>
               </div>
-              <div class="compact-moves hidden" id="cv-compact-moves"></div>
+              <div class="compact-moves" id="cv-compact-moves"></div>
               <div class="board-status">
                   <span class="turn-dot white" id="cv-turn-dot"></span>
                   <span id="cv-turn-text">White</span>
@@ -95,6 +95,17 @@
           </div>
         </div>
 
+        <!-- Lichess -->
+        <div class="panel-section" id="sec-lichess">
+          <div class="section-header" data-section="lichess">Lichess</div>
+          <div class="section-body">
+            <div class="lichess-controls">
+              <button class="toggle-btn" id="cv-lichess-btn" data-tip="Open floating Lichess analysis board">&#9816; Analysis board</button>
+              <label class="lichess-sync-label"><input type="checkbox" id="cv-lichess-sync" checked><span>Auto-sync position</span></label>
+            </div>
+          </div>
+        </div>
+
         <!-- Settings -->
         <div class="panel-section" id="sec-settings">
           <div class="section-header" data-section="settings">Settings</div>
@@ -104,10 +115,20 @@
               <input type="range" id="cv-loss-threshold" min="0" max="200" value="0" step="10">
               <span id="cv-loss-threshold-val">0</span>
             </div>
+            <div class="pv-depth-row">
+              <label data-tip="Show loss label on played move arrow when loss exceeds this threshold (cp)">Move loss</label>
+              <input type="range" id="cv-played-loss-threshold" min="0" max="200" value="50" step="10">
+              <span id="cv-played-loss-threshold-val">50</span>
+            </div>
             <div class="pv-depth-row" id="cv-pv-depth-row">
               <label data-tip="Number of moves shown in best line">PV depth</label>
               <input type="range" id="cv-pv-depth" min="1" max="11" value="10">
               <span id="cv-pv-depth-val">10</span>
+            </div>
+            <div class="pv-depth-row">
+              <label data-tip="Frame capture rate (frames per second)">FPS</label>
+              <input type="range" id="cv-target-fps" min="1" max="5" value="2" step="1">
+              <span id="cv-target-fps-val">2</span>
             </div>
             <div class="pv-depth-row">
               <label data-tip="Seconds between adding each new line arrow (starts at 2, grows to max)">Grow</label>
@@ -157,6 +178,7 @@
             <div class="fen" id="cv-debug-fen">Waiting...</div>
             <div class="debug-orient" id="cv-orientation-info"></div>
             <div class="meta" id="cv-debug-info"></div>
+            <div class="detection-status" id="cv-detection-status" style="display:none"></div>
           </div>
         </div>
 

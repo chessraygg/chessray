@@ -24,14 +24,21 @@ declare global {
       setMultiPvMax: (n: number) => void;
       setMultiPvRamp: (n: number) => void;
       setChangeDetect: (enabled: boolean) => void;
+      setTargetFps: (fps: number) => void;
       onResetPanelPosition: (cb: () => void) => void;
       minimizeApp: () => void;
       closeApp: () => void;
+      openExternal: (url: string) => void;
+      toggleLichess: (fen: string, color: string) => void;
+      updateLichess: (fen: string, color: string) => void;
     };
   }
 }
 
 // ── Module-level state ──
+let lichessOpen = false;
+let lichessSync = true;
+let lastLichessFen: string | null = null;
 
 let userPanel: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
@@ -57,6 +64,7 @@ const state: OverlayState = {
   sourceVisible: true,
   selectedLineIndex: 0,
   lossThreshold: 50,
+  playedLossThreshold: 50,
   autoMode: false,
   vboardOverlayVisible: true,
   pvPreviewLineIndex: null,
@@ -671,7 +679,9 @@ function initOverlay(): void {
       pvCyclePreviewTimer = null;
       state.pvPreviewLineIndex = null;
       (window as any).__chessrayPvPlaying = true;
-      document.getElementById('cv-debug-grid')?.classList.add('analysis');
+      if (state.vboardOverlayVisible) {
+        document.getElementById('cv-debug-grid')?.classList.add('analysis');
+      }
 
       // First step immediately, then continue on interval
       pvCycleStep();
@@ -800,6 +810,22 @@ function initOverlay(): void {
     });
   }
 
+  // ── Played move loss label threshold slider ──
+  const playedLossSlider = document.getElementById('cv-played-loss-threshold') as HTMLInputElement | null;
+  const playedLossVal = document.getElementById('cv-played-loss-threshold-val');
+  state.playedLossThreshold = prefs.playedLossThreshold;
+  if (playedLossSlider && playedLossVal) {
+    playedLossSlider.value = String(state.playedLossThreshold);
+    playedLossVal.textContent = String(state.playedLossThreshold);
+    playedLossSlider.addEventListener('input', () => {
+      state.playedLossThreshold = parseInt(playedLossSlider.value, 10);
+      playedLossVal.textContent = String(state.playedLossThreshold);
+      savePrefs({ playedLossThreshold: state.playedLossThreshold });
+      renderArrows(state);
+      renderVideoOverlay(state);
+    });
+  }
+
   const evalBtn = document.getElementById('cv-eval-btn');
   if (evalBtn) {
     evalBtn.classList.toggle('active', state.evalBarVisible);
@@ -865,6 +891,22 @@ function initOverlay(): void {
     changeDetectCheckbox.addEventListener('change', () => {
       savePrefs({ changeDetect: changeDetectCheckbox.checked });
       window.chessRay.setChangeDetect(changeDetectCheckbox.checked);
+    });
+  }
+
+  // ── Frame rate slider ──
+  const fpsSlider = document.getElementById('cv-target-fps') as HTMLInputElement | null;
+  const fpsVal = document.getElementById('cv-target-fps-val');
+  if (fpsSlider && fpsVal) {
+    const fps = prefs.targetFps;
+    fpsSlider.value = String(fps);
+    fpsVal.textContent = String(fps);
+    window.chessRay.setTargetFps(fps);
+    fpsSlider.addEventListener('input', () => {
+      const v = parseInt(fpsSlider.value, 10);
+      fpsVal.textContent = String(v);
+      savePrefs({ targetFps: v });
+      window.chessRay.setTargetFps(v);
     });
   }
 
@@ -968,7 +1010,7 @@ function initOverlay(): void {
     compactMode = on;
     userPanel?.classList.toggle('compact', on);
     compactBtn?.classList.toggle('active', on);
-    if (compactMovesEl) compactMovesEl.classList.toggle('hidden', !on);
+    // compact-moves is always visible now
     savePrefs({ compactMode: on });
     if (on) updateCompactMoves();
   }
@@ -978,7 +1020,7 @@ function initOverlay(): void {
   collapseBtn?.addEventListener('click', () => { collapsed = !collapsed; setCollapsed(collapsed); });
 
   function updateCompactMoves(): void {
-    if (!compactMode || !compactMovesEl) return;
+    if (!compactMovesEl) return;
     const result = state.currentResult;
     if (!result?.evaluation?.top_moves?.length) {
       compactMovesEl.innerHTML = '';
@@ -1066,6 +1108,33 @@ function initOverlay(): void {
   // ── Window controls ──
   const closeBtn = document.getElementById('cv-close-btn');
   closeBtn?.addEventListener('click', () => window.chessRay.closeApp());
+
+  // Lichess analysis — toggle floating window + sync control
+  const lichessBtn = document.getElementById('cv-lichess-btn');
+  const lichessSyncCheckbox = document.getElementById('cv-lichess-sync') as HTMLInputElement | null;
+
+  lichessBtn?.addEventListener('click', () => {
+    const fen = state.currentResult?.evaluation?.fen ?? state.currentResult?.recognition?.fen;
+    if (fen) {
+      lichessOpen = !lichessOpen;
+      lichessBtn.classList.toggle('active', lichessOpen);
+      const color = state.displayFlipped ? 'black' : 'white';
+      window.chessRay.toggleLichess(fen, color);
+    }
+  });
+
+  lichessSyncCheckbox?.addEventListener('change', () => {
+    lichessSync = lichessSyncCheckbox.checked;
+    // If re-enabling sync, immediately update to current position
+    if (lichessSync && lichessOpen) {
+      const fen = state.currentResult?.evaluation?.fen ?? state.currentResult?.recognition?.fen;
+      if (fen) {
+        lastLichessFen = fen.split(' ')[0];
+        const color = state.displayFlipped ? 'black' : 'white';
+        window.chessRay.updateLichess(fen, color);
+      }
+    }
+  });
 }
 
 initOverlay();
@@ -1147,6 +1216,19 @@ function processPendingResult(): void {
   state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
   renderVideoOverlay(state);
+
+  // Auto-update Lichess window when position changes (if sync enabled).
+  // Compare position-only part of FEN to avoid reloading on eval depth changes
+  // or recognition→eval FEN format transitions.
+  if (lichessOpen && lichessSync) {
+    const fen = result.evaluation?.fen ?? result.recognition?.fen;
+    const positionOnly = fen?.split(' ')[0];
+    if (fen && positionOnly && positionOnly !== lastLichessFen) {
+      lastLichessFen = positionOnly;
+      const color = state.displayFlipped ? 'black' : 'white';
+      window.chessRay.updateLichess(fen, color);
+    }
+  }
 }
 
 window.chessRay.onFrameResult((result) => {

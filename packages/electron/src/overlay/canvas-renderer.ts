@@ -19,6 +19,7 @@ export interface OverlayState {
   sourceVisible: boolean;
   selectedLineIndex: number;
   lossThreshold: number;
+  playedLossThreshold: number;
   autoMode: boolean;
   vboardOverlayVisible: boolean;
   pvPreviewLineIndex: number | null;
@@ -47,7 +48,7 @@ const videoArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
 const vboardArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
 
 function arrowKey(a: ArrowDescriptor): string {
-  return `${a.from}-${a.to}-${a.color}`;
+  return `${a.from}-${a.to}`;
 }
 
 function updateAnimatedArrows(
@@ -68,8 +69,9 @@ function updateAnimatedArrows(
     const key = arrowKey(a);
     const prev = prevMap.get(key);
     if (prev) {
-      // Update arrow properties, keep animation state
-      next.push({ ...a, fadeOpacity: prev.fadeOpacity, progress: prev.progress, fading: prev.progress >= 1 ? 'steady' : 'in' });
+      // Update arrow properties (color, width, opacity), keep animation state
+      const steady = prev.progress >= 1;
+      next.push({ ...a, fadeOpacity: steady ? a.opacity : prev.fadeOpacity, progress: prev.progress, fading: steady ? 'steady' : 'in' });
     } else {
       // New arrow — extend from source
       next.push({ ...a, fadeOpacity: a.opacity, progress: 0, fading: 'in' });
@@ -345,9 +347,24 @@ export function renderArrows(state: OverlayState): void {
     return;
   }
 
+  // Draw played move arrow (behind engine arrows)
+  if (state.currentResult?.played_move) {
+    const pm = state.currentResult.played_move;
+    const pmArrow: ArrowDescriptor = {
+      from: pm.from, to: pm.to,
+      color: lossToColor(pm.loss_cp),
+      width: 3, opacity: 0.5,
+      loss_cp: pm.loss_cp,
+    };
+    drawArrow(ctx, pmArrow, virtualBoard, 1, state.displayFlipped);
+    if (pm.loss_cp >= state.playedLossThreshold) {
+      drawLossLabel(ctx, pm.from, pm.loss_cp, virtualBoard, state.displayFlipped);
+    }
+  }
+
   const targetArrows = getActiveArrows(state);
 
-  if (targetArrows.length === 0) {
+  if (targetArrows.length === 0 && !state.currentResult?.played_move) {
     vboardArrowState.animated = [];
     if (vboardArrowState.timer) { clearInterval(vboardArrowState.timer); vboardArrowState.timer = 0; }
     return;
@@ -435,6 +452,22 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.strokeStyle = 'rgba(255, 0, 255, 0.7)';
     ctx.lineWidth = 2;
     ctx.strokeRect(bx, by, bw, bh);
+  }
+
+  // Draw played move arrow (behind engine arrows)
+  if (result.played_move) {
+    const pm = result.played_move;
+    const pmArrow: ArrowDescriptor = {
+      from: pm.from, to: pm.to,
+      color: lossToColor(pm.loss_cp),
+      width: 3, opacity: 0.5,
+      loss_cp: pm.loss_cp,
+    };
+    const arrowScale = (bw + bh) / 2 / 192;
+    drawArrow(ctx, pmArrow, boardRect, arrowScale, state.displayFlipped);
+    if (pm.loss_cp >= state.playedLossThreshold) {
+      drawLossLabel(ctx, pm.from, pm.loss_cp, boardRect, state.displayFlipped);
+    }
   }
 
   if (state.arrowsVisible || state.lineVisible || state.pvPreviewLineIndex !== null) {

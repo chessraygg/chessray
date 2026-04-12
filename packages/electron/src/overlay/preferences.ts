@@ -8,6 +8,7 @@ export interface Prefs {
   lineVisible: boolean;
   pvDepth: number;
   lossThreshold: number;
+  playedLossThreshold: number;
   maxDepth: number;
   multiPvMax: number;
   multiPvRamp: number;
@@ -19,6 +20,7 @@ export interface Prefs {
   pvGrowDelaySec: number;
   vboardOverlayVisible: boolean;
   compactMode: boolean;
+  targetFps: number;
   changeDetect: boolean;
   pvWhiteColor: string;
   pvBlackColor: string;
@@ -37,11 +39,13 @@ export const DEFAULT_PREFS: Prefs = {
   pvGrowDelaySec: 3,
   vboardOverlayVisible: true,
   compactMode: false,
+  targetFps: 2,
   changeDetect: true,
   pvWhiteColor: '#60a5fa',
   pvBlackColor: '#f9a8d4',
   pvDepth: 10,
   lossThreshold: 0,
+  playedLossThreshold: 50,
   maxDepth: 28,
   multiPvMax: 5,
   multiPvRamp: 1,

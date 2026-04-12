@@ -131,48 +131,9 @@ export function detectOrientationFromLabels(pixels: PixelBuffer): boolean | null
  */
 export function detectBoardFlipped(
   fen: string,
-  highlightedIndices?: number[],
-  options?: { skipPawnMove?: boolean },
 ): OrientationResult {
-  // Strategy 1: pawn move direction from highlights
-  // Skip when piece_count alone is reliable (20+ pieces) — pawn_move can
-  // misfire when highlight detection picks wrong squares.
-  if (!options?.skipPawnMove && highlightedIndices && highlightedIndices.length === 2) {
-    const rows = fen.split('/');
-    const board: (string | null)[] = new Array(64).fill(null);
-    for (let rank = 0; rank < 8; rank++) {
-      let file = 0;
-      for (const ch of rows[rank]) {
-        if (ch >= '1' && ch <= '8') { file += parseInt(ch); }
-        else { board[rank * 8 + file] = ch; file++; }
-      }
-    }
-
-    const [idx0, idx1] = highlightedIndices;
-    const piece0 = board[idx0];
-    const piece1 = board[idx1];
-
-    let pawn: string | null = null;
-    let fromRow = -1;
-    let toRow = -1;
-    if (piece0 && (piece0 === 'P' || piece0 === 'p') && !piece1) {
-      pawn = piece0; toRow = Math.floor(idx0 / 8); fromRow = Math.floor(idx1 / 8);
-    } else if (piece1 && (piece1 === 'P' || piece1 === 'p') && !piece0) {
-      pawn = piece1; toRow = Math.floor(idx1 / 8); fromRow = Math.floor(idx0 / 8);
-    }
-
-    if (pawn && fromRow !== toRow) {
-      const movedDown = toRow > fromRow;
-      if (pawn === 'P') return { flipped: movedDown, source: 'pawn_move' };
-      if (pawn === 'p') return { flipped: !movedDown, source: 'pawn_move' };
-    }
-  }
-
-  // Strategy 2: piece count heuristic (fallback)
-  // Counts white vs black pieces in the bottom half of the image.
-  // Works well when there's any asymmetry. In very sparse equal positions
-  // (e.g. K vs k+p) it can fail, but those cases should be caught by
-  // label detection or pawn move detection first.
+  // Piece count heuristic: counts white vs black pieces in the bottom half
+  // of the image. Works well when there's any asymmetry.
   const rows = fen.split('/');
   let whiteBottom = 0, blackBottom = 0;
 

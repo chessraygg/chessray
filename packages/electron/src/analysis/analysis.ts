@@ -7,7 +7,7 @@
 
 import {
   detectBoard, cropPixels, recognizeBoard,
-  computeArrows, compareFen, guessTurn, buildFullFen,
+  computeArrows, compareFen, guessTurn, buildFullFen, detectSequentialMove, isStartingPosition,
 } from '@chessray/core';
 import { Chess } from 'chess.js';
 import type {
@@ -18,7 +18,7 @@ import type {
 import { EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH, multiPvForDepth, setMultiPvMax, setMultiPvRamp, cacheGet, cachePut } from './eval-cache.js';
 import { sampleBoardPixels, boardUnchanged } from './change-detect.js';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
-import { initAndStartCapture, stopCapture } from './frame-capture.js';
+import { initAndStartCapture, stopCapture, setTargetFps } from './frame-capture.js';
 
 declare global {
   interface Window {
@@ -35,6 +35,7 @@ declare global {
       onSetMultiPvMax: (cb: (n: number) => void) => void;
       onSetMultiPvRamp: (cb: (n: number) => void) => void;
       onSetChangeDetect: (cb: (enabled: boolean) => void) => void;
+      onSetTargetFps: (cb: (fps: number) => void) => void;
     };
   }
 }
@@ -51,6 +52,9 @@ let lastOrientationSource: OrientationSource | undefined;
 let lastHighlightedSquares: number[] = [];
 let lastHighlightTurn: 'w' | 'b' | null = null;
 let lastArrows: ArrowDescriptor[] = [];
+let lastFullFen: string | null = null;
+let lastPlayedMove: PipelineResult['played_move'] = null;
+let cachedOrientation: { prevFen: string; orientation: { flipped: boolean; source: OrientationSource } } | null = null;
 let cachedBbox: BoardBBox | null = null;
 let frameCount = 0;
 let EVAL_MAX_DEPTH = DEFAULT_MAX_DEPTH;
@@ -73,6 +77,9 @@ function resetPipelineState(): void {
   prevPositionFen = null;
   lastEval = null;
   lastArrows = [];
+  lastFullFen = null;
+  lastPlayedMove = null;
+  cachedOrientation = null;
   lastBoardSample = null;
   lastRecognitionResult = null;
   cachedBbox = null;
@@ -129,6 +136,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
         recognition: null,
         evaluation: null,
         arrows: [],
+        detection_status: 'No board detected',
         total_elapsed_ms: Date.now() - startTime,
       });
       return;
@@ -149,9 +157,12 @@ async function processFrame(imageData: ImageData): Promise<void> {
     const boardImageUrl = previewCanvas.toDataURL('image/jpeg', 0.7);
     const tPreview = Date.now() - t;
 
+    t = Date.now();
     const boardSample = sampleBoardPixels(cropped.data, cropped.width, cropped.height);
     const visuallyUnchanged = changeDetectEnabled && lastBoardSample && boardUnchanged(lastBoardSample, boardSample);
+    const prevBoardSample = lastBoardSample;
     lastBoardSample = boardSample;
+    const tChangeDetect = Date.now() - t;
 
     let recognition: RecognitionResult | null = null;
     let isFlipped = false;
@@ -160,6 +171,8 @@ async function processFrame(imageData: ImageData): Promise<void> {
     let highlightedSquares: number[] = [];
     let highlightTurn: 'w' | 'b' | null = null;
     let tRecog = 0;
+    let brTiming: { pieces_ms: number; orientation_ms: number; highlights_ms: number; disambiguate_ms: number; pawnRefine_ms: number; turn_ms: number; total_ms: number } | null = null;
+    let detectionStatus: string | undefined;
 
     if (visuallyUnchanged && lastRecognitionResult) {
       recognition = lastRecognitionResult;
@@ -171,15 +184,34 @@ async function processFrame(imageData: ImageData): Promise<void> {
     } else {
       t = Date.now();
       if (recognizer) {
-        const boardResult = await recognizeBoard(cropped, recognizer);
-        recognition = boardResult.recognition;
-        rawFen = boardResult.rawFen;
-        isFlipped = boardResult.flipped;
-        orientationSource = boardResult.orientationSource;
-        highlightedSquares = boardResult.highlightedSquares;
-        highlightTurn = boardResult.turn;
-        if (frameCount <= 3) {
-          debugLog(`Recognition: rawFen=${rawFen} conf=${recognition.confidence.toFixed(2)}`);
+        const boardResult = await recognizeBoard(cropped, recognizer, cachedOrientation);
+        brTiming = boardResult.timing;
+
+        // Skip mid-animation frames — piece is still sliding, FEN is inconsistent
+        if (boardResult.midAnimation) {
+          detectionStatus = 'Mid-animation — piece sliding';
+          debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms recog=${Date.now() - t}ms [mid-animation, skipped] total=${Date.now() - startTime}ms`);
+          // Restore previous board sample so next frame's change detection
+          // compares against the last good frame, not the mid-animation one
+          lastBoardSample = prevBoardSample;
+          // Reuse previous result
+          recognition = lastRecognitionResult;
+          rawFen = lastRawFen;
+          isFlipped = lastIsFlipped;
+          orientationSource = lastOrientationSource;
+          highlightedSquares = lastHighlightedSquares;
+          highlightTurn = lastHighlightTurn;
+        } else {
+          recognition = boardResult.recognition;
+          rawFen = boardResult.rawFen;
+          isFlipped = boardResult.flipped;
+          orientationSource = boardResult.orientationSource;
+          highlightedSquares = boardResult.highlightedSquares;
+          highlightTurn = boardResult.turn;
+          cachedOrientation = { prevFen: rawFen, orientation: { flipped: isFlipped, source: orientationSource } };
+          if (frameCount <= 3) {
+            debugLog(`Recognition: rawFen=${rawFen} conf=${recognition.confidence.toFixed(2)}`);
+          }
         }
       }
       tRecog = Date.now() - t;
@@ -205,26 +237,57 @@ async function processFrame(imageData: ImageData): Promise<void> {
       game_over: opts.game_over,
       flipped: isFlipped,
       orientation_source: orientationSource,
+      played_move: lastPlayedMove,
+      detection_status: detectionStatus,
       board_image_url: boardImageUrl,
       frame_dimensions: { width: pixels.width, height: pixels.height },
       total_elapsed_ms: Date.now() - startTime,
     });
 
-    const recogDetail = recognition?.timing
-      ? `recog=${tRecog}ms(prep=${recognition.timing.prep_ms} infer=${recognition.timing.infer_ms} post=${recognition.timing.post_ms})`
-      : `recog=${tRecog}ms`;
+    // Build detailed timing string for this frame
+    let recogDetail: string;
+    if (brTiming) {
+      const rt = recognition?.timing;
+      const yolo = rt ? `yolo=${rt.prep_ms}+${rt.infer_ms}+${rt.post_ms}` : '';
+      recogDetail = `recog=${tRecog}ms(${yolo} orient=${brTiming.orientation_ms} hl=${brTiming.highlights_ms} disamb=${brTiming.disambiguate_ms} pawn=${brTiming.pawnRefine_ms} turn=${brTiming.turn_ms})`;
+    } else {
+      recogDetail = `recog=${tRecog}ms [cached]`;
+    }
 
     if (!recognition || recognition.confidence < 0.3) {
-      debugLog(`Timing: detect=${tDetect}ms preview=${tPreview}ms ${recogDetail} [low conf] total=${Date.now() - startTime}ms`);
+      detectionStatus = `Low confidence: ${recognition ? (recognition.confidence * 100).toFixed(0) + '%' : 'no recognition'}`;
+      debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [low conf] total=${Date.now() - startTime}ms`);
       sendResult(makeResult({}));
       return;
     }
 
     const positionFen = recognition.fen;
+
+    // Require highlights unless it's a starting position.
+    // Without highlights, we may have captured a mid-move frame where the
+    // piece is sliding and the highlight hasn't appeared yet.
+    if (highlightedSquares.length === 0 && !isStartingPosition(positionFen)) {
+      detectionStatus = 'No highlights — waiting for move to complete';
+      debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [no highlights] total=${Date.now() - startTime}ms`);
+      // Keep showing previous result if available
+      if (lastPositionFen && lastEval) {
+        sendResult(makeResult({
+          evaluation: lastEval,
+          arrows: lastArrows,
+          eval_depth: lastEval.depth,
+          eval_max_depth: lastEval.depth < EVAL_MAX_DEPTH ? EVAL_MAX_DEPTH : undefined,
+        }));
+      } else {
+        sendResult(makeResult({}));
+      }
+      return;
+    }
+
     // Dedup: same position AND turn hasn't been corrected by highlight detection
     const evalTurnMismatch = highlightTurn && lastEval?.fen?.split(' ')[1] && lastEval.fen.split(' ')[1] !== highlightTurn;
     if (lastPositionFen && compareFen(lastPositionFen, positionFen) && !evalTurnMismatch) {
-      debugLog(`Timing: detect=${tDetect}ms preview=${tPreview}ms ${recogDetail} [dedup] total=${Date.now() - startTime}ms`);
+      detectionStatus = 'Position unchanged';
+      debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [dedup] total=${Date.now() - startTime}ms`);
       sendResult(makeResult({
         evaluation: lastEval,
         arrows: lastArrows,
@@ -240,6 +303,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     const whiteKings = (positionFen.match(/K/g) || []).length;
     const blackKings = (positionFen.match(/k/g) || []).length;
     if (whiteKings !== 1 || blackKings !== 1) {
+      detectionStatus = `Invalid: ${whiteKings}K ${blackKings}k`;
       sendResult(makeResult({}));
       return;
     }
@@ -247,6 +311,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     // Validate FEN structure to avoid crashing Stockfish WASM
     const fenRanks = positionFen.split('/');
     if (fenRanks.length !== 8) {
+      detectionStatus = 'Invalid FEN structure';
       sendResult(makeResult({}));
       return;
     }
@@ -254,6 +319,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     const rank1 = fenRanks[7];
     const rank8 = fenRanks[0];
     if (/[pP]/.test(rank1) || /[pP]/.test(rank8)) {
+      detectionStatus = 'Pawns on rank 1/8 — invalid';
       debugLog(`Skipping eval: pawns on rank 1/8 in FEN ${positionFen}`);
       sendResult(makeResult({}));
       return;
@@ -264,17 +330,23 @@ async function processFrame(imageData: ImageData): Promise<void> {
       return;
     }
 
+    t = Date.now();
     const turn = highlightTurn ?? guessTurn(prevPositionFen, positionFen);
-    debugLog(`Turn: highlight=${highlightTurn} guess=${guessTurn(prevPositionFen, positionFen)} final=${turn} hl=[${highlightedSquares}]`);
     const fullFen = buildFullFen(positionFen, turn);
+    const tFenBuild = Date.now() - t;
+
+    // Detect sequential move before updating lastFullFen
+    // (detection needs the PREVIOUS fullFen)
 
     // Detect checkmate/stalemate — skip engine if game is over
+    t = Date.now();
     let gameOver: 'checkmate' | 'stalemate' | undefined;
     try {
       const chess = new Chess(fullFen);
       if (chess.isCheckmate()) gameOver = 'checkmate';
       else if (chess.isStalemate()) gameOver = 'stalemate';
     } catch { /* invalid FEN — continue to engine */ }
+    const tGameOver = Date.now() - t;
 
     if (gameOver) {
       debugLog(`Game over: ${gameOver}`);
@@ -282,8 +354,51 @@ async function processFrame(imageData: ImageData): Promise<void> {
       return;
     }
 
+    // Detect if this position is one legal move from the previous
+    t = Date.now();
+    lastPlayedMove = null;
+    let prevBestScore: number | null = null;
+    if (lastFullFen && lastEval) {
+      const seqMove = detectSequentialMove(lastFullFen, positionFen);
+      if (seqMove) {
+        const prevBest = lastEval.top_moves[0];
+        prevBestScore = prevBest?.score_cp ?? null;
+        const matchingMove = lastEval.top_moves.find(m => m.move === seqMove.uci);
+        const lossCp = matchingMove ? matchingMove.loss_cp : null;
+        lastPlayedMove = {
+          from: seqMove.uci.slice(0, 2),
+          to: seqMove.uci.slice(2, 4),
+          uci: seqMove.uci,
+          san: seqMove.san,
+          loss_cp: lossCp ?? 0,
+        };
+        if (lossCp !== null) {
+          debugLog(`Sequential move: ${seqMove.san} (${seqMove.uci}) loss=${lossCp}cp`);
+        } else {
+          debugLog(`Sequential move: ${seqMove.san} (${seqMove.uci}) — not in top ${lastEval.top_moves.length}, loss pending`);
+        }
+      }
+    }
+    const tSeqMove = Date.now() - t;
+
+    // Whether loss was already known from previous top moves (accurate, no update needed)
+    const playedMoveLossFromTopMoves = lastPlayedMove ?
+      lastEval?.top_moves.some(m => m.move === lastPlayedMove!.uci) ?? false : false;
+
+    // Update played move loss from eval scores (for moves not in previous top N).
+    // Called at each depth to refine the loss as the eval deepens.
+    function updatePlayedMoveLoss(evalResult: EvalResult): void {
+      if (!lastPlayedMove || prevBestScore === null || playedMoveLossFromTopMoves) return;
+      // loss = prevBest + currBest (both from side-to-move perspective)
+      const currBest = evalResult.top_moves[0]?.score_cp ?? 0;
+      const loss = Math.max(0, prevBestScore + currBest);
+      lastPlayedMove = { ...lastPlayedMove, loss_cp: loss };
+      debugLog(`Played move loss updated: ${lastPlayedMove.san} loss=${loss}cp (prev=${prevBestScore} curr=${currBest} d=${evalResult.depth})`);
+    }
+
     prevPositionFen = positionFen;
     lastPositionFen = positionFen;
+    lastFullFen = fullFen;
     // Clear stale eval so dedup frames don't show old position's eval
     lastEval = null;
     lastArrows = [];
@@ -297,10 +412,11 @@ async function processFrame(imageData: ImageData): Promise<void> {
     // Check eval cache — return cached result instantly, then continue deepening
     const cached = cacheGet(fullFen);
     if (cached) {
+      updatePlayedMoveLoss(cached.evaluation);
       lastEval = cached.evaluation;
       lastArrows = cached.arrows;
       const cachedDepth = cached.evaluation.depth;
-      debugLog(`Timing: detect=${tDetect}ms preview=${tPreview}ms ${recogDetail} [cache d=${cachedDepth}] total=${Date.now() - startTime}ms`);
+      debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms [cache d=${cachedDepth}] total=${Date.now() - startTime}ms`);
       sendResult(makeResult({
         evaluation: cached.evaluation,
         arrows: cached.arrows,
@@ -323,11 +439,12 @@ async function processFrame(imageData: ImageData): Promise<void> {
               await reinitEngine();
               break;
             }
+            updatePlayedMoveLoss(result);
             const arrows = computeArrows(result.top_moves);
             lastEval = result;
             lastArrows = arrows;
             cachePut(fullFen, { evaluation: result, arrows });
-            debugLog(`Eval depth ${result.depth}/${EVAL_MAX_DEPTH} in ${result.elapsed_ms}ms pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
+            debugLog(`Eval depth ${result.depth}/${EVAL_MAX_DEPTH} in ${result.elapsed_ms}ms score=${result.top_moves[0]?.score_cp}cp pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
             sendResult(makeResult({
               evaluation: result,
               arrows,
@@ -353,6 +470,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     }
 
     if (firstResult) {
+      updatePlayedMoveLoss(firstResult);
       const arrows = computeArrows(firstResult.top_moves);
       lastEval = firstResult;
       lastArrows = arrows;
@@ -366,7 +484,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       }));
     }
 
-    debugLog(`Timing: detect=${tDetect}ms preview=${tPreview}ms ${recogDetail} eval=${tEval}ms d=${firstResult?.depth ?? 'abort'}/${EVAL_MAX_DEPTH} [new pos] total=${Date.now() - startTime}ms`);
+    debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms eval=${tEval}ms d=${firstResult?.depth ?? 'abort'}/${EVAL_MAX_DEPTH} [new pos] total=${Date.now() - startTime}ms`);
 
     // Continue deepening in background
     if (firstResult && EVAL_START_DEPTH + EVAL_DEPTH_STEP <= EVAL_MAX_DEPTH) {
@@ -381,11 +499,12 @@ async function processFrame(imageData: ImageData): Promise<void> {
             await reinitEngine();
             break;
           }
+          updatePlayedMoveLoss(result);
           const arrows = computeArrows(result.top_moves);
           lastEval = result;
           lastArrows = arrows;
           cachePut(fullFen, { evaluation: result, arrows });
-          debugLog(`Eval depth ${result.depth}/${EVAL_MAX_DEPTH} in ${result.elapsed_ms}ms pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
+          debugLog(`Eval depth ${result.depth}/${EVAL_MAX_DEPTH} in ${result.elapsed_ms}ms score=${result.top_moves[0]?.score_cp}cp pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
           sendResult(makeResult({
             evaluation: result,
             arrows,
@@ -430,6 +549,11 @@ let changeDetectEnabled = true;
 window.chessRay.onSetChangeDetect((enabled: boolean) => {
   debugLog(`Change detection ${enabled ? 'enabled' : 'disabled'}`);
   changeDetectEnabled = enabled;
+});
+
+window.chessRay.onSetTargetFps((fps: number) => {
+  debugLog(`Target FPS changed to ${fps}`);
+  setTargetFps(fps);
 });
 
 // Signal to main that all IPC listeners are registered

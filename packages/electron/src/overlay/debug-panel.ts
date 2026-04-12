@@ -302,4 +302,15 @@ export function updateDebugPanel(
     parts.push(`${result.total_elapsed_ms}ms`);
     debugInfo.textContent = parts.join(' | ');
   }
+
+  // Detection status
+  const statusEl = document.getElementById('cv-detection-status');
+  if (statusEl) {
+    if (result.detection_status) {
+      statusEl.textContent = result.detection_status;
+      statusEl.style.display = '';
+    } else {
+      statusEl.style.display = 'none';
+    }
+  }
 }

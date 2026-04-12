@@ -68,6 +68,12 @@ const api = {
   onSetChangeDetect: (cb: (enabled: boolean) => void) =>
     ipcRenderer.on('set-change-detect', (_e, enabled: boolean) => cb(enabled)),
 
+  // Frame rate
+  setTargetFps: (fps: number) =>
+    ipcRenderer.send('set-target-fps', fps),
+  onSetTargetFps: (cb: (fps: number) => void) =>
+    ipcRenderer.on('set-target-fps', (_e, fps: number) => cb(fps)),
+
   // Panel reset
   onResetPanelPosition: (cb: () => void) =>
     ipcRenderer.on('reset-panel-position', () => cb()),
@@ -77,6 +83,12 @@ const api = {
     ipcRenderer.send('minimize-app'),
   closeApp: () =>
     ipcRenderer.send('close-app'),
+  openExternal: (url: string) =>
+    ipcRenderer.send('open-external', url),
+  toggleLichess: (fen: string, color: string) =>
+    ipcRenderer.send('toggle-lichess', fen, color),
+  updateLichess: (fen: string, color: string) =>
+    ipcRenderer.send('update-lichess', fen, color),
 };
 
 contextBridge.exposeInMainWorld('chessRay', api);

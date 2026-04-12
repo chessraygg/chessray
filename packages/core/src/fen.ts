@@ -81,10 +81,61 @@ export function compareFen(a: string, b: string): boolean {
 }
 
 /**
+ * Compute similarity between two FEN positions (0-1).
+ * Expands both to 64 squares and counts matches.
+ */
+export function fenSimilarity(a: string, b: string): number {
+  const expand = (fen: string): string[] => {
+    const squares: string[] = [];
+    for (const ch of fen.split(' ')[0]) {
+      if (ch === '/') continue;
+      if (ch >= '1' && ch <= '8') {
+        for (let i = 0; i < parseInt(ch); i++) squares.push('.');
+      } else {
+        squares.push(ch);
+      }
+    }
+    return squares;
+  };
+  const sa = expand(a);
+  const sb = expand(b);
+  if (sa.length !== 64 || sb.length !== 64) return 0;
+  let matches = 0;
+  for (let i = 0; i < 64; i++) {
+    if (sa[i] === sb[i]) matches++;
+  }
+  return matches / 64;
+}
+
+/**
  * Guess whose turn it is by comparing previous and current FEN.
  * Looks at which side lost a piece or which side's pieces moved.
  */
 const STARTING_POSITION = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
+
+/**
+ * Check if a position-only FEN is a starting position (classical or freestyle).
+ * Starting positions have all pieces on ranks 1-2 and 7-8, with ranks 3-6 empty.
+ */
+export function isStartingPosition(fen: string): boolean {
+  const rows = fen.split(' ')[0].split('/');
+  if (rows.length !== 8) return false;
+  // Ranks 3-6 (rows[2]-rows[5]) must be empty (all digits)
+  for (let i = 2; i <= 5; i++) {
+    if (rows[i] !== '8' && rows[i] !== String(rows[i].length)) {
+      // Check if row contains only digits summing to 8
+      let sum = 0;
+      for (const ch of rows[i]) {
+        if (ch >= '1' && ch <= '8') sum += parseInt(ch);
+        else return false; // has a piece
+      }
+      if (sum !== 8) return false;
+    }
+  }
+  // Ranks 1-2 and 7-8 must have pieces (not all empty)
+  const hasPieces = (row: string) => /[a-zA-Z]/.test(row);
+  return hasPieces(rows[0]) && hasPieces(rows[1]) && hasPieces(rows[6]) && hasPieces(rows[7]);
+}
 
 export function guessTurn(prevFen: string | null, currFen: string): 'w' | 'b' {
   const posOnly = currFen.split(' ')[0];
@@ -118,6 +169,38 @@ export function guessTurn(prevFen: string | null, currFen: string): 'w' | 'b' {
 
   // If white pieces changed more, white just moved, so it's black's turn
   return whiteDiff >= blackDiff ? 'b' : 'w';
+}
+
+/**
+ * Detect if currPositionFen is reachable from prevFullFen in exactly one legal move.
+ * Returns the move in UCI and SAN notation, or null if not sequential.
+ */
+export function detectSequentialMove(
+  prevFullFen: string,
+  currPositionFen: string,
+): { uci: string; san: string } | null {
+  let chess: Chess;
+  try {
+    chess = new Chess(prevFullFen);
+  } catch {
+    return null;
+  }
+
+  const currPosition = currPositionFen.split(' ')[0];
+  const moves = chess.moves({ verbose: true });
+
+  for (const move of moves) {
+    chess.move(move);
+    if (chess.fen().split(' ')[0] === currPosition) {
+      const from = move.from;
+      const to = move.to;
+      const promo = move.promotion ? move.promotion : '';
+      return { uci: `${from}${to}${promo}`, san: move.san };
+    }
+    chess.undo();
+  }
+
+  return null;
 }
 
 /**

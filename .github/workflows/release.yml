@@ -174,3 +174,44 @@ jobs:
           files: artifacts/**/*
           generate_release_notes: true
           prerelease: ${{ steps.prerelease.outputs.is_prerelease == 'true' }}
+
+      - name: Update Homebrew tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${{ needs.version.outputs.new_version }}"
+          TAG="${{ needs.version.outputs.tag }}"
+
+          # Find the darwin-arm64 zip asset and compute SHA256
+          ZIP=$(find artifacts -name '*darwin-arm64*.zip' | head -1)
+          if [ -z "$ZIP" ]; then
+            echo "No darwin-arm64 zip found — skipping tap update"
+            exit 0
+          fi
+          SHA256=$(shasum -a 256 "$ZIP" | awk '{print $1}')
+          echo "Asset: $ZIP"
+          echo "SHA256: $SHA256"
+
+          # Clone the tap repo
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/chessraygg/homebrew-tap.git" tap
+          cd tap
+
+          # Update the cask file
+          CASK="Casks/chessray.rb"
+          if [ ! -f "$CASK" ]; then
+            echo "Cask file not found at $CASK — skipping"
+            exit 0
+          fi
+          sed -i "s|version \".*\"|version \"${VERSION}\"|" "$CASK"
+          sed -i "s|sha256 \".*\"|sha256 \"${SHA256}\"|" "$CASK"
+
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$CASK"
+          if git diff --cached --quiet; then
+            echo "No changes to cask — skipping push"
+          else
+            git commit -m "Update ChessRay to ${TAG}"
+            git push
+          fi
