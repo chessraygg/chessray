@@ -861,7 +861,7 @@
     - square: a5
       score: 155.2
 - file: test-agadmator-carlsen-niemann.png
-  white_pawns: up
+  orientation: white bottom
   highlighted:
     - f8
     - b4
