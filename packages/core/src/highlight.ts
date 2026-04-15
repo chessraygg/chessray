@@ -337,11 +337,12 @@ export function disambiguateHighlights(
     }
 
     // Also try: expanded empty × expanded piece (both outside initial candidates).
-    // Only when all candidates look like annotations (high channel-ratio variance),
-    // meaning the real highlight pair is likely entirely outside the candidate list.
-    const allCandidatesAnnotation = candidates.length >= 2 &&
-      candidates.every(idx => annotationPenalty(idx) > 0.08);
-    if (allCandidatesAnnotation) for (const srcEntry of expandedEmpty) {
+    // Runs when no valid pair was found OR all found pairs contain an
+    // annotation-colored square, meaning the real pair may be outside candidates.
+    const annotationThreshold = 0.08;
+    const hasNonAnnotationPair = validPairs.some(p =>
+      annotationPenalty(p.src) <= annotationThreshold && annotationPenalty(p.dest) <= annotationThreshold);
+    if (!hasNonAnnotationPair) for (const srcEntry of expandedEmpty) {
       const srcRank = Math.floor(srcEntry.idx / 8);
       const srcFile = srcEntry.idx % 8;
 
@@ -357,10 +358,6 @@ export function disambiguateHighlights(
 
     if (validPairs.length > 0) {
       // Rank by naturalness: prefer pairs without annotation-colored squares.
-      // A square is "annotation-like" when its channel-ratio variance is high
-      // (>0.08). Small variance differences between real highlights and normal
-      // squares are ignored — only penalize clearly foreign colors.
-      const annotationThreshold = 0.08;
       validPairs.sort((a, b) => {
         const penA = (annotationPenalty(a.src) > annotationThreshold ? 1 : 0) +
                      (annotationPenalty(a.dest) > annotationThreshold ? 1 : 0);

@@ -383,4 +383,15 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     orientation_source: 'piece_count',
     expected_labels: null,
   },
+  {
+    file: 'test-agadmator-carlsen-niemann.png',
+    white_pawns: 'up',
+    highlighted: ['f8', 'b4'],
+    turn: 'w',
+    bbox: { x: 126, y: 120, width: 544, height: 544 },
+    squareSize: 68,
+    expectedFen: 'rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR',
+    orientation_source: 'piece_count',
+    expected_labels: null,
+  },
 ];
