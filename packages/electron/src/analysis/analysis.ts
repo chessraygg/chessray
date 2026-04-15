@@ -173,6 +173,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     let tRecog = 0;
     let brTiming: { pieces_ms: number; orientation_ms: number; highlights_ms: number; disambiguate_ms: number; pawnRefine_ms: number; turn_ms: number; total_ms: number } | null = null;
     let detectionStatus: string | undefined;
+    const prevHighlightedSquares = [...lastHighlightedSquares];
 
     if (visuallyUnchanged && lastRecognitionResult) {
       recognition = lastRecognitionResult;
@@ -225,12 +226,13 @@ async function processFrame(imageData: ImageData): Promise<void> {
 
     }
 
-    const makeResult = (opts: { evaluation?: EvalResult | null; arrows?: ArrowDescriptor[]; eval_depth?: number; eval_max_depth?: number; game_over?: 'checkmate' | 'stalemate' }): PipelineResult => ({
+    const makeResult = (opts: { evaluation?: EvalResult | null; arrows?: ArrowDescriptor[]; eval_depth?: number; eval_max_depth?: number; game_over?: 'checkmate' | 'stalemate'; stale_eval?: boolean }): PipelineResult => ({
       board_detection: { found: true, bbox: activeBbox!, confidence: detectionConf },
       recognition,
       evaluation: opts.evaluation ?? null,
       eval_depth: opts.eval_depth,
       eval_max_depth: opts.eval_max_depth,
+      stale_eval: opts.stale_eval,
       arrows: opts.arrows ?? [],
       highlighted_squares: highlightedSquares,
       turn: highlightTurn ?? undefined,
@@ -298,6 +300,26 @@ async function processFrame(imageData: ImageData): Promise<void> {
     }
     if (evalTurnMismatch) {
       debugLog(`Turn corrected by highlight: eval had '${lastEval!.fen.split(' ')[1]}' but highlight says '${highlightTurn}' — re-evaluating`);
+    }
+
+    // Detect intermediate frames: FEN changed but highlights didn't.
+    // This means a piece is mid-transition — the old highlights are stale
+    // and the new move hasn't landed yet. Skip and reuse previous result.
+    if (lastPositionFen && !compareFen(lastPositionFen, positionFen) &&
+        highlightedSquares.length === 2 && prevHighlightedSquares.length === 2 &&
+        highlightedSquares[0] === prevHighlightedSquares[0] &&
+        highlightedSquares[1] === prevHighlightedSquares[1]) {
+      detectionStatus = 'Intermediate frame — highlights unchanged';
+      debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [intermediate, skipped] total=${Date.now() - startTime}ms`);
+      // Restore board sample so next frame compares against last good frame
+      lastBoardSample = prevBoardSample;
+      sendResult(makeResult({
+        evaluation: lastEval,
+        arrows: lastArrows,
+        eval_depth: lastEval?.depth,
+        eval_max_depth: lastEval && lastEval.depth < EVAL_MAX_DEPTH ? EVAL_MAX_DEPTH : undefined,
+      }));
+      return;
     }
 
     const whiteKings = (positionFen.match(/K/g) || []).length;
@@ -399,7 +421,9 @@ async function processFrame(imageData: ImageData): Promise<void> {
     prevPositionFen = positionFen;
     lastPositionFen = positionFen;
     lastFullFen = fullFen;
-    // Clear stale eval so dedup frames don't show old position's eval
+    // Keep previous eval temporarily so the eval bar doesn't flash off.
+    // Background eval will overwrite it when the first depth completes.
+    const staleEval = lastEval;
     lastEval = null;
     lastArrows = [];
 
@@ -429,16 +453,18 @@ async function processFrame(imageData: ImageData): Promise<void> {
         // Align to the depth stepping sequence
         let nextDepth = EVAL_START_DEPTH;
         while (nextDepth <= cachedDepth) nextDepth += EVAL_DEPTH_STEP;
+        const cachedEvalPositionFen = positionFen;
         (async () => {
           for (let depth = nextDepth; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
             if (signal.aborted) break;
             const result = await engine!.runDepth(fullFen, depth, multiPvForDepth(depth), signal);
-            if (!result) break;
+            if (!result || signal.aborted) break;
             if (!result.top_moves[0]?.pv?.length) {
               debugLog(`Engine returned empty PV at depth ${depth} — reinitializing`);
               await reinitEngine();
               break;
             }
+            if (lastPositionFen !== cachedEvalPositionFen) break;
             updatePlayedMoveLoss(result);
             const arrows = computeArrows(result.top_moves);
             lastEval = result;
@@ -457,63 +483,40 @@ async function processFrame(imageData: ImageData): Promise<void> {
       return;
     }
 
-    t = Date.now();
-    const firstResult = await engine.runDepth(fullFen, EVAL_START_DEPTH, multiPvForDepth(EVAL_START_DEPTH), signal);
-    const tEval = Date.now() - t;
+    // Send result immediately with stale eval (keeps eval bar visible until new eval arrives)
+    debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms [new pos] total=${Date.now() - startTime}ms`);
+    sendResult(makeResult({ evaluation: staleEval, eval_max_depth: EVAL_MAX_DEPTH, stale_eval: true }));
 
-    // Detect broken eval (no PV = engine in bad state)
-    if (firstResult && !firstResult.top_moves[0]?.pv?.length) {
-      debugLog(`Engine returned empty PV — reinitializing`);
-      await reinitEngine();
-      sendResult(makeResult({ evaluation: lastEval, arrows: lastArrows }));
-      return;
-    }
-
-    if (firstResult) {
-      updatePlayedMoveLoss(firstResult);
-      const arrows = computeArrows(firstResult.top_moves);
-      lastEval = firstResult;
-      lastArrows = arrows;
-      cachePut(fullFen, { evaluation: firstResult, arrows });
-      debugLog(`Eval depth ${firstResult.depth}/${EVAL_MAX_DEPTH} in ${firstResult.elapsed_ms}ms pv=${firstResult.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
-      sendResult(makeResult({
-        evaluation: firstResult,
-        arrows,
-        eval_depth: firstResult.depth,
-        eval_max_depth: EVAL_MAX_DEPTH,
-      }));
-    }
-
-    debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms eval=${tEval}ms d=${firstResult?.depth ?? 'abort'}/${EVAL_MAX_DEPTH} [new pos] total=${Date.now() - startTime}ms`);
-
-    // Continue deepening in background
-    if (firstResult && EVAL_START_DEPTH + EVAL_DEPTH_STEP <= EVAL_MAX_DEPTH) {
-      (async () => {
-        for (let depth = EVAL_START_DEPTH + EVAL_DEPTH_STEP; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
-          if (signal.aborted) break;
-          const result = await engine!.runDepth(fullFen, depth, multiPvForDepth(depth), signal);
-          if (!result) break;
-          // Detect broken eval during deepening
-          if (!result.top_moves[0]?.pv?.length) {
-            debugLog(`Engine returned empty PV at depth ${depth} — reinitializing`);
-            await reinitEngine();
-            break;
-          }
-          updatePlayedMoveLoss(result);
-          const arrows = computeArrows(result.top_moves);
-          lastEval = result;
-          lastArrows = arrows;
-          cachePut(fullFen, { evaluation: result, arrows });
-          debugLog(`Eval depth ${result.depth}/${EVAL_MAX_DEPTH} in ${result.elapsed_ms}ms score=${result.top_moves[0]?.score_cp}cp pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
-          sendResult(makeResult({
-            evaluation: result,
-            arrows,
-            eval_depth: result.depth,
-            eval_max_depth: result.depth < EVAL_MAX_DEPTH ? EVAL_MAX_DEPTH : undefined,
-          }));
+    // Run all eval depths in background (non-blocking).
+    // Check signal.aborted after each depth AND before updating state to avoid
+    // writing stale results from a previous position's eval.
+    const evalPositionFen = positionFen;
+    (async () => {
+      for (let depth = EVAL_START_DEPTH; depth <= EVAL_MAX_DEPTH; depth += EVAL_DEPTH_STEP) {
+        if (signal.aborted) break;
+        const result = await engine!.runDepth(fullFen, depth, multiPvForDepth(depth), signal);
+        if (!result || signal.aborted) break;
+        if (!result.top_moves[0]?.pv?.length) {
+          debugLog(`Engine returned empty PV at depth ${depth} — reinitializing`);
+          await reinitEngine();
+          break;
         }
-      })();
-    }
+        // Verify position hasn't changed since we started this eval
+        if (lastPositionFen !== evalPositionFen) break;
+        updatePlayedMoveLoss(result);
+        const arrows = computeArrows(result.top_moves);
+        lastEval = result;
+        lastArrows = arrows;
+        cachePut(fullFen, { evaluation: result, arrows });
+        debugLog(`Eval depth ${result.depth}/${EVAL_MAX_DEPTH} in ${result.elapsed_ms}ms score=${result.top_moves[0]?.score_cp}cp pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
+        sendResult(makeResult({
+          evaluation: result,
+          arrows,
+          eval_depth: result.depth,
+          eval_max_depth: result.depth < EVAL_MAX_DEPTH ? EVAL_MAX_DEPTH : undefined,
+        }));
+      }
+    })();
 
   } catch (err) {
     debugLog(`Frame processing error: ${err}`);

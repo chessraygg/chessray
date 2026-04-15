@@ -428,11 +428,13 @@ for (const tc of PIPELINE_CASES) {
   line(fullFen, dimGray);
 
   // Labels
-  if (tc.expected_labels === null || tc.expected_labels === undefined) {
+  if (tc.expected_labels.skipped) {
+    line(`LABELS: SKIPPED (${tc.expected_labels.reason})`, cyan);
+  } else if (tc.expected_labels.result === null) {
     line(`LABELS: NONE`, cyan);
   } else {
     line(`LABELS:`, cyan);
-    for (const lbl of tc.expected_labels) {
+    for (const lbl of tc.expected_labels.result) {
       line(`  ${lbl.side.toUpperCase()} ${lbl.type.toUpperCase()} ${lbl.chars.toUpperCase()} ${lbl.direction.toUpperCase()}`, cyan);
     }
   }
@@ -460,11 +462,13 @@ function countLabelLines(tc: PipelineTestCase): number {
   count += 2; // corrected fen (label + value)
   count += 2; // full fen (label + value)
   // labels
-  if (tc.expected_labels === null || tc.expected_labels === undefined) {
+  if (tc.expected_labels.skipped) {
+    count += 1; // "LABELS: SKIPPED (reason)"
+  } else if (tc.expected_labels.result === null) {
     count += 1; // "LABELS: NONE"
   } else {
     count += 1; // "LABELS:"
-    count += tc.expected_labels.length; // one line per label
+    count += tc.expected_labels.result.length; // one line per label
   }
   return count;
 }

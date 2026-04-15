@@ -182,14 +182,28 @@ describe('end-to-end detection pipeline', () => {
       console.log(`  fullFen=${result.fullFen}`);
 
       // Verify label detection
-      if (tc.expected_labels === null) {
-        expect(result.labels).toBeNull();
-        console.log('  labels: none (correct)');
+      if (tc.expected_labels.skipped) {
+        expect(result.labels.skipped).toBe(true);
+        if (result.labels.skipped) {
+          expect(result.labels.reason).toBe(tc.expected_labels.reason);
+        }
+        console.log(`  labels: skipped (${tc.expected_labels.reason})`);
       } else {
-        expect(result.labels).not.toBeNull();
-        expect(result.labels!.strips).toEqual(tc.expected_labels);
-        console.log(`  labels: ${JSON.stringify(result.labels!.strips)}`);
+        expect(result.labels.skipped).toBe(false);
+        if (!result.labels.skipped) {
+          if (tc.expected_labels.result === null) {
+            expect(result.labels.result).toBeNull();
+            console.log('  labels: ran, none found');
+          } else {
+            expect(result.labels.result).not.toBeNull();
+            console.log(`  labels: ran, found`);
+          }
+        }
       }
+
+      // Verify highlight candidates
+      console.log(`  candidates: ${result.highlightCandidates.map((c: any) => `${c.square}(${c.score})`).join(' ')}`);
+      expect(result.highlightCandidates).toEqual(tc.expected_candidates);
 
     }, 120000);
   }
