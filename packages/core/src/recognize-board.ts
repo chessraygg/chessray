@@ -25,8 +25,8 @@ export interface BoardRecognitionResult {
   orientationSource: OrientationSource;
   /** True when highlights indicate a move but the piece hasn't landed yet (mid-animation) */
   midAnimation: boolean;
-  /** Label detection result (null when skipped due to sufficient piece count or no labels found) */
-  labels: LabelDetectionResult | null;
+  /** Label detection result */
+  labels: { skipped: true; reason: 'piece_count' | 'cached' } | { skipped: false; result: LabelDetectionResult | null };
   /** Per-square border-frame median color (indexed 0-63, raw image orientation) */
   highlightColors: Array<[number, number, number]>;
   /** Per-square highlight scores sorted descending */
@@ -71,15 +71,19 @@ export async function recognizeBoard(
   const pieceCount = rawFen.replace(/[0-8/]/g, '').length;
   const pieceCountReliable = pieceCount >= 20;
   let orientation: OrientationResult;
-  let labelResult: OrientationResult | null = null;
+  let labelsResult: BoardRecognitionResult['labels'];
+  let labelDetectionResult: LabelDetectionResult | null = null;
   const similarity = cachedOrientation ? fenSimilarity(cachedOrientation.prevFen, rawFen) : 0;
   if (cachedOrientation && similarity > 0.5) {
     orientation = cachedOrientation.orientation;
+    labelsResult = { skipped: true, reason: 'cached' };
   } else if (pieceCountReliable) {
     orientation = detectBoardFlipped(rawFen);
+    labelsResult = { skipped: true, reason: 'piece_count' };
   } else {
-    labelResult = await detectLabels(cropped);
-    orientation = labelResult ?? detectBoardFlipped(rawFen);
+    labelDetectionResult = await detectLabels(cropped);
+    orientation = labelDetectionResult ?? detectBoardFlipped(rawFen);
+    labelsResult = { skipped: false, result: labelDetectionResult };
   }
   const tOrientation = Date.now() - t;
 
@@ -173,7 +177,7 @@ export async function recognizeBoard(
     turn,
     midAnimation,
     orientationSource: orientation.source,
-    labels: labelResult,
+    labels: labelsResult,
     highlightColors: hlResult.colors ?? [],
     highlightScores: hlResult.scores ?? [],
     highlightMedians: hlResult.medians ?? { light: [0, 0, 0], dark: [0, 0, 0] },
