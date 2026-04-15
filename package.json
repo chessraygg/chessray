@@ -13,8 +13,8 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "cd packages/core && npx vitest run",
+    "test:watch": "cd packages/core && npx vitest",
     "test:e2e": "npx playwright test",
     "setup": "node scripts/download-vendor.js",
     "gen-expected": "tsx scripts/gen-expected-images.ts",

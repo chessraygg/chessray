@@ -46,8 +46,8 @@ describe('rankToOpacity', () => {
     expect(rankToOpacity(1)).toBeGreaterThan(rankToOpacity(2));
   });
 
-  it('returns 1.0 for best move', () => {
-    expect(rankToOpacity(0)).toBe(0.9);
+  it('returns 0.675 for best move', () => {
+    expect(rankToOpacity(0)).toBe(0.675);
   });
 });
 

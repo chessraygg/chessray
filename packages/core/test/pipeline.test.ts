@@ -7,7 +7,7 @@ import { runDetectionPipeline, indexToSquare, flipFen, YoloPieceRecognizer } fro
 import type { BoardBBox } from '@chessray/core';
 import { PIPELINE_CASES } from './fixtures/pipeline-cases.js';
 
-const MODEL_PATH = path.join(__dirname, '../vendor/yolo-chess/chess-pieces.onnx');
+const MODEL_PATH = path.join(__dirname, '../../../vendor/yolo-chess/chess-pieces.onnx');
 let session: ort.InferenceSession;
 let recognizer: YoloPieceRecognizer;
 
