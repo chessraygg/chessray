@@ -35,8 +35,8 @@ Platform-specific code is isolated in `packages/electron/src/main/platform.ts` v
 
 ## Commands
 
-- `npm test` — run board detection tests (Vitest)
-- `npm test -- -t "<filter>"` — run a single test case by name (e.g. `npm test -- -t "agadmator"`)
+- `npm test` — run ALL board detection tests (Vitest). **Expensive (~2-3 min).** Only run after all individual tests pass.
+- `npm test -- -t "<filter>"` — run a single test case by name (e.g. `npm test -- -t "carlsen-niemann"`). **Always use this first** when developing/debugging.
 - `npm run build` — build the Electron app
 - `npm run setup` — download vendor assets (Stockfish, ONNX Runtime)
 - `npm run install-app -w packages/electron` — build and install locally
