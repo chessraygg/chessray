@@ -2,7 +2,7 @@ import type { RecognitionResult } from './types.js';
 import type { PixelBuffer } from './pixel-utils.js';
 import { detectHighlightedSquares, disambiguateHighlights, turnFromHighlight } from './highlight.js';
 import { detectBoardFlipped, type OrientationSource } from './orientation.js';
-import { flipFen, buildFullFen, fenSimilarity } from './fen.js';
+import { flipFen, buildFullFen, fenSimilarity, indexToSquare } from './fen.js';
 import type { OrientationResult } from './image-utils.js';
 import { detectLabels, type LabelDetectionResult } from './label-detect.js';
 
@@ -25,6 +25,8 @@ export interface BoardRecognitionResult {
   orientationSource: OrientationSource;
   /** True when highlights indicate a move but the piece hasn't landed yet (mid-animation) */
   midAnimation: boolean;
+  /** Highlight candidate squares above threshold, sorted by score descending (corrected orientation) */
+  highlightCandidates: Array<{ square: string; score: number }>;
   /** Label detection result */
   labels: { skipped: true; reason: 'piece_count' | 'cached' } | { skipped: false; result: LabelDetectionResult | null };
   /** Per-square border-frame median color (indexed 0-63, raw image orientation) */
@@ -176,6 +178,12 @@ export async function recognizeBoard(
     flipped: orientation.flipped,
     turn,
     midAnimation,
+    highlightCandidates: (hlResult.scores ?? [])
+      .filter(s => s.dist >= 18)
+      .map(s => {
+        const idx = orientation.flipped ? 63 - s.idx : s.idx;
+        return { square: indexToSquare(Math.floor(idx / 8), idx % 8), score: Math.round(s.dist * 10) / 10 };
+      }),
     orientationSource: orientation.source,
     labels: labelsResult,
     highlightColors: hlResult.colors ?? [],

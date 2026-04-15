@@ -201,6 +201,10 @@ describe('end-to-end detection pipeline', () => {
         }
       }
 
+      // Verify highlight candidates
+      console.log(`  candidates: ${result.highlightCandidates.map((c: any) => `${c.square}(${c.score})`).join(' ')}`);
+      expect(result.highlightCandidates).toEqual(tc.expected_candidates);
+
     }, 120000);
   }
 });

@@ -19,6 +19,8 @@ export interface PipelineTestCase {
   orientation_source: 'label' | 'pawn_move' | 'piece_count';
   /** Expected label detection result */
   expected_labels: { skipped: true; reason: 'piece_count' | 'cached' } | { skipped: false; result: LabelStrip[] | null };
+  /** Expected highlight candidates above threshold, sorted by score descending */
+  expected_candidates: Array<{ square: string; score: number }>;
 }
 
 export const PIPELINE_CASES: PipelineTestCase[] = [
@@ -32,6 +34,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '1K1RQ2R/1PP3P1/PNN1PPB1/2BP4/5pp1/2nppn2/pppbbq2/1k3rr1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"c1","score":71},{"square":"f4","score":66.4}],
   },
   {
     file: 'test-oro-aronian2.png',
@@ -43,6 +46,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '1K1RQ2R/1PP3P1/PNN1PPB1/2BP2p1/5p2/2nppn2/pppbbq2/1k3rr1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"b4","score":69.2},{"square":"b5","score":33.9}],
   },
   {
     file: 'test-carlsen-titled.png',
@@ -54,6 +58,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '1K2R3/1PP1R2P/P1N3PB/2pP4/pp1p2p1/1n1rpQ1p/kb2r3/4q3',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"c2","score":179.9},{"square":"c6","score":174.5}],
   },
   {
     file: 'test-caruana-american.png',
@@ -65,6 +70,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '2r1k2r/pp2bppp/1qn1p3/2ppPn1P/3P4/2PQ1NP1/PP2NP2/R1B2RK1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"h4","score":241.1},{"square":"h5","score":187.8}],
   },
   {
     file: 'test-caruana-american2.png',
@@ -76,6 +82,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '2r1k2r/pp2bpp1/1qn1p2p/2ppPn1P/3P4/2PQ1NP1/PP1BNP2/R4RK1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"d2","score":85.2},{"square":"c1","score":85.2}],
   },
   {
     file: 'test-caruana-american3.png',
@@ -87,6 +94,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '5rk1/pR2bpp1/2r1p2p/3pP2P/3Q4/q1P3P1/P2B1P2/R5K1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"d3","score":236.8},{"square":"d4","score":181.1}],
   },
   {
     file: 'test-caruana-american4.png',
@@ -100,6 +108,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expected_labels: { skipped: false, result: [
       { side: 'left', type: 'digit', chars: '87654311', direction: 'desc' },
     ] },
+    expected_candidates: [{"square":"a8","score":233.6},{"square":"c8","score":233.6}],
   },
   {
     file: 'test-candidates-nakamura.png',
@@ -111,6 +120,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'r4rk1/p4ppp/b1p1pn2/2q5/4P3/2Q3PP/PP3PB1/RN1R2K1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"c3","score":227.8},{"square":"b3","score":198.5}],
   },
   {
     file: 'test-candidates-nakamura2.png',
@@ -122,6 +132,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'r4rk1/p4ppp/bqp1pn2/8/4P3/2Q3PP/PP3PB1/RN1R2K1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"c5","score":242.4},{"square":"b6","score":238.9}],
   },
   {
     file: 'test-carlsen-titled2.png',
@@ -133,6 +144,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '1K6/7k/7p/8/8/1P6/PR6/r7',
     orientation_source: 'pawn_move',
     expected_labels: { skipped: false, result: null },
+    expected_candidates: [{"square":"g5","score":305.4},{"square":"g6","score":217.1}],
   },
   {
     file: 'test-carlsen-titled3.png',
@@ -144,6 +156,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'R2KQ2R/PBP2PP1/3B1N1P/3PN3/1P4p1/3pp2p/ppp1n1b1/r1bkq1nr',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"g5","score":304.2},{"square":"g4","score":206.3}],
   },
   {
     file: 'test-carlsen-titled4.png',
@@ -155,6 +168,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'R2KQ2R/1BP2PP1/3B1N1P/P2PN3/1P1n2p1/3pp2p/ppp1n1b1/r1bkq2r',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"b8","score":298},{"square":"d7","score":203.4}],
   },
   {
     file: 'test-carlsen-titled5.png',
@@ -166,6 +180,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '2K5/1P6/2P2nP1/k1BP2p1/p7/8/5N2/2b5',
     orientation_source: 'piece_count',
     expected_labels: { skipped: false, result: null },
+    expected_candidates: [{"square":"f8","score":311.6},{"square":"c7","score":307.8},{"square":"a6","score":207.7}],
   },
   {
     file: 'test-carlsen-titled6.png',
@@ -177,6 +192,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '2R3K1/5PPP/1k6/6p1/R1pb4/1p3r1p/8/8',
     orientation_source: 'piece_count',
     expected_labels: { skipped: false, result: null },
+    expected_candidates: [{"square":"h4","score":301.7},{"square":"g7","score":298},{"square":"h5","score":211.1}],
   },
   {
     file: 'test-candidates-nakamura3.png',
@@ -188,6 +204,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '1K2R2R/1BP1N1PP/PP3Q2/3P4/8/p1np1pqb/1pp4p/1kr4r',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"h6","score":1114.6},{"square":"h7","score":844.8},{"square":"e1","score":161.3},{"square":"h8","score":134.7},{"square":"d4","score":120.7},{"square":"f2","score":112.5},{"square":"e3","score":108.1},{"square":"c3","score":97.4},{"square":"a5","score":97.3},{"square":"e2","score":95.7},{"square":"d8","score":91.6},{"square":"h4","score":81.4},{"square":"f1","score":73},{"square":"h2","score":71.3},{"square":"b8","score":57.9},{"square":"g3","score":56.9},{"square":"d2","score":56.6},{"square":"c4","score":55.4},{"square":"d3","score":52.3},{"square":"e7","score":51.3},{"square":"e8","score":46.7},{"square":"c8","score":46.5},{"square":"g7","score":45.9},{"square":"a1","score":43.8},{"square":"a4","score":43.6},{"square":"e4","score":38},{"square":"d7","score":36.1},{"square":"g4","score":30.5},{"square":"b6","score":30.4},{"square":"f4","score":30.4},{"square":"a6","score":29.4},{"square":"d6","score":26.7},{"square":"g5","score":25},{"square":"c1","score":24.2},{"square":"a7","score":23.9},{"square":"f5","score":23},{"square":"g2","score":19.1},{"square":"h3","score":18.6},{"square":"b2","score":18.6}],
   },
   {
     file: 'test-eric-rosen.png',
@@ -201,6 +218,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expected_labels: { skipped: false, result: [
       { side: 'left', type: 'digit', chars: '8854337', direction: 'desc' },
     ] },
+    expected_candidates: [{"square":"b7","score":66.2},{"square":"b5","score":53.6},{"square":"b3","score":19.9}],
   },
   {
     file: 'test-eric-rosen2.png',
@@ -214,6 +232,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expected_labels: { skipped: false, result: [
       { side: 'left', type: 'digit', chars: '8364331', direction: 'desc' },
     ] },
+    expected_candidates: [{"square":"a5","score":99.3},{"square":"b4","score":99.2},{"square":"a1","score":20.3},{"square":"h1","score":20},{"square":"h7","score":19.7},{"square":"a7","score":18.4}],
   },
   {
     file: 'test-eric-rosen3.png',
@@ -227,6 +246,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expected_labels: { skipped: false, result: [
       { side: 'bottom', type: 'letter', chars: 'abefgh', direction: 'asc' },
     ] },
+    expected_candidates: [{"square":"b1","score":321.9},{"square":"a1","score":284.7},{"square":"h7","score":25.7},{"square":"h1","score":22.7}],
   },
   {
     file: 'test-grenke-nepo.png',
@@ -238,6 +258,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'rkqrb1nn/1pp1p2p/6pb/p4p2/3PP3/B5N1/PPP3PP/RKQR1BN1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"f8","score":493.2},{"square":"h6","score":482.4}],
   },
   {
     file: 'test-grenke-aronian.png',
@@ -249,6 +270,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '1r2rn2/kp3qp1/p1p1p2n/P1Np1p2/1RPP1P2/3P1QPB/1P6/1KR5',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"f6","score":503.8},{"square":"f5","score":478.4}],
   },
   {
     file: 'test-carlsen-titled7.png',
@@ -260,6 +282,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '1K6/1BB3R1/PP3P2/3P4/pp1b1p2/1nq1p2Q/1k6/2r5',
     orientation_source: 'piece_count',
     expected_labels: { skipped: false, result: null },
+    expected_candidates: [{"square":"e5","score":322.2},{"square":"f1","score":236.8},{"square":"g2","score":236.8}],
   },
   {
     file: 'test-grenke-kamsky.png',
@@ -271,6 +294,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '2rqr1kb/1b1n1p1p/n1pP2p1/8/1p1PPp2/1P1N2P1/1BQN3P/R4RKB',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"e4","score":496.9},{"square":"c5","score":404.1},{"square":"d4","score":159.7},{"square":"d6","score":148.6}],
   },
   {
     file: 'test-grenke-dominguez.png',
@@ -282,6 +306,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '4r2k/pppq1r1p/4Np2/3n2Q1/5P2/8/PPP5/2KR3R',
     orientation_source: 'piece_count',
     expected_labels: { skipped: false, result: null },
+    expected_candidates: [{"square":"g7","score":451.8},{"square":"f6","score":445.4}],
   },
   {
     file: 'test-freestyle-starting.png',
@@ -293,6 +318,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'rnbbknqr/pppppppp/8/8/8/8/PPPPPPPP/RNBBKNQR',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [],
   },
   {
     file: 'test-grenke-carlsen-keymer.png',
@@ -304,6 +330,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '5Q2/1pq5/2pkrp2/3p4/8/6R1/PP4P1/6K1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: false, result: null },
+    expected_candidates: [{"square":"b8","score":598.1},{"square":"f8","score":594.7}],
   },
   {
     file: 'test-carlsen-titled8.png',
@@ -315,6 +342,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '2kr1n1r/ppq1bpp1/2p2nb1/3p2Bp/3P1P1P/2N1P1N1/PP1QB1P1/2KR3R',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"g2","score":660.6},{"square":"g3","score":265.3},{"square":"e8","score":201.8},{"square":"c8","score":197.9}],
   },
   {
     file: 'test-agadmator-carlsen-svidler.png',
@@ -326,6 +354,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'b3r3/2bq1pkp/3pn1pN/2p1p1Nn/2B1P3/3P2P1/1P1B1P1P/2Q1R1K1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"g5","score":114.6},{"square":"f3","score":86.8},{"square":"a7","score":20.6},{"square":"h7","score":19},{"square":"b3","score":18.9}],
   },
   {
     file: 'test-agadmator-carlsen-svidler2.png',
@@ -338,6 +367,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '4r2k/2bq1p1P/5NpQ/2p1p3/2B5/3P1bP1/1P3P1P/4R1K1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"h7","score":857.1},{"square":"f6","score":148.5},{"square":"h6","score":131.7},{"square":"g4","score":114.3},{"square":"b3","score":18.9}],
   },
   {
     file: 'test-agadmator-carlsen-svidler3.png',
@@ -349,6 +379,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'r1bqk2r/1pppbppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"e7","score":116.1},{"square":"f8","score":114.6},{"square":"a7","score":20.9},{"square":"h7","score":19},{"square":"b3","score":18.9}],
   },
   {
     file: 'test-agadmator-carlsen-svidler4.png',
@@ -360,6 +391,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'b2n1rk1/2pqbppp/3p1n2/1p2p3/4P3/1B1P1N2/1PPBNPPP/3Q1RK1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"g6","score":836.1},{"square":"f5","score":836.1},{"square":"h5","score":831.2},{"square":"g3","score":822.8},{"square":"g7","score":118.9},{"square":"e2","score":115.3},{"square":"c3","score":115.1},{"square":"a7","score":24.9},{"square":"b3","score":21},{"square":"h7","score":18.8}],
   },
   {
     file: 'test-agadmator-carlsen-svidler5.png',
@@ -371,6 +403,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'b2b1rk1/3q1ppp/3pnn2/1pp1pN2/4P3/1B1P1N2/1PPB1PPP/3Q1RK1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"e7","score":127.4},{"square":"d8","score":118.1},{"square":"f5","score":22.8},{"square":"a7","score":20.9},{"square":"h7","score":19},{"square":"b3","score":18.9}],
   },
   {
     file: 'test-carlsen-freestyle2.png',
@@ -382,6 +415,7 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: '1RB1KB2/1PPN1P1P/4P1R1/2Q3P1/1P4pp/3qn3/1bppppb1/1r2k1r1',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"a7","score":284.7},{"square":"b1","score":237},{"square":"b3","score":236.9},{"square":"a5","score":155.2}],
   },
   {
     file: 'test-agadmator-carlsen-niemann.png',
@@ -393,5 +427,6 @@ export const PIPELINE_CASES: PipelineTestCase[] = [
     expectedFen: 'rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR',
     orientation_source: 'piece_count',
     expected_labels: { skipped: true, reason: 'piece_count' },
+    expected_candidates: [{"square":"e3","score":459.4},{"square":"c2","score":330.4},{"square":"f8","score":108.5},{"square":"b4","score":103.2},{"square":"a7","score":22.8},{"square":"b3","score":21.5},{"square":"a8","score":20.4},{"square":"a1","score":19.8},{"square":"h7","score":18.8}],
   },
 ];
