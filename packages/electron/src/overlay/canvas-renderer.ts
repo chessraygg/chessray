@@ -257,9 +257,6 @@ function drawPlayedMoveMarker(
   board: { x: number; y: number; width: number; height: number },
   displayFlipped: boolean,
 ): void {
-  // Skip marker entirely for negligible loss (would just show "0.0")
-  if (lossCp < 10) return;
-
   const squareW = board.width / 8;
   const squareH = board.height / 8;
   let file = square.charCodeAt(0) - 97;
@@ -269,29 +266,32 @@ function drawPlayedMoveMarker(
   const cx = board.x + (file + 0.5) * squareW;
   const cy = board.y + (7 - rank + 0.5) * squareH;
   const fontSize = Math.max(7, Math.round(Math.min(squareW, squareH) * 0.20));
-  const r = fontSize * 1.25;
+  const showLossText = lossCp >= 10;
+  // Compact dot when no text; text-sized disk otherwise
+  const r = showLossText ? fontSize * 1.25 : Math.min(squareW, squareH) * 0.18;
   const color = lossToColor(lossCp);
-  const text = `−${(lossCp / 100).toFixed(1)}`;
 
   ctx.save();
   // Translucent colored disk
-  ctx.globalAlpha = 0.7;
+  ctx.globalAlpha = showLossText ? 0.7 : 0.25;
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
 
-  // Contrast-aware text
-  const hex = color.replace('#', '');
-  const lum = (parseInt(hex.substring(0, 2), 16) * 299
-    + parseInt(hex.substring(2, 4), 16) * 587
-    + parseInt(hex.substring(4, 6), 16) * 114) / 1000;
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = lum > 140 ? '#000' : '#fff';
-  ctx.font = `bold ${fontSize}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, cx, cy);
+  if (showLossText) {
+    // Contrast-aware text
+    const hex = color.replace('#', '');
+    const lum = (parseInt(hex.substring(0, 2), 16) * 299
+      + parseInt(hex.substring(2, 4), 16) * 587
+      + parseInt(hex.substring(4, 6), 16) * 114) / 1000;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = lum > 140 ? '#000' : '#fff';
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`−${(lossCp / 100).toFixed(1)}`, cx, cy);
+  }
   ctx.restore();
 }
 
