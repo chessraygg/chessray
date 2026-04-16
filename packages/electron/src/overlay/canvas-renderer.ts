@@ -257,6 +257,9 @@ function drawPlayedMoveMarker(
   board: { x: number; y: number; width: number; height: number },
   displayFlipped: boolean,
 ): void {
+  // Skip marker entirely for negligible loss (would just show "0.0")
+  if (lossCp < 10) return;
+
   const squareW = board.width / 8;
   const squareH = board.height / 8;
   let file = square.charCodeAt(0) - 97;
@@ -268,7 +271,7 @@ function drawPlayedMoveMarker(
   const fontSize = Math.max(7, Math.round(Math.min(squareW, squareH) * 0.20));
   const r = fontSize * 1.25;
   const color = lossToColor(lossCp);
-  const text = lossCp >= 10 ? `−${(lossCp / 100).toFixed(1)}` : '0.0';
+  const text = `−${(lossCp / 100).toFixed(1)}`;
 
   ctx.save();
   // Translucent colored disk
