@@ -333,16 +333,9 @@ canvas#video-overlay {
   height: 22px;
 }
 
-.piece-grid .light { background: #e8dcc8; }
-.piece-grid .dark { background: #b58863; }
-.piece-grid .light.highlight { background: #f5f682; }
-.piece-grid .dark.highlight { background: #bbca2b; }
-
-/* Analysis/PV mode: cooler blue-gray tint to indicate virtual position */
-.piece-grid.analysis .light { background: #cdd5de; }
-.piece-grid.analysis .dark { background: #7e8ea3; }
-.piece-grid.analysis .light.highlight { background: #a8c4f0; }
-.piece-grid.analysis .dark.highlight { background: #6a8fc4; }
+/* Square background colors are set inline by renderBoardGrid using the
+ * detected real-board theme (with brightening when the grid has class
+ * "analysis"). See packages/electron/src/shared/colors.ts. */
 
 /* ── Compact mode ── */
 

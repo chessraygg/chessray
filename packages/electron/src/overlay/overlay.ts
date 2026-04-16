@@ -470,7 +470,7 @@ function initOverlay(): void {
       // Reset virtual board if visible
       if (state.vboardOverlayVisible) {
         const grid = document.getElementById('cv-debug-grid');
-        if (grid) renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, []);
+        if (grid) renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, [], state.currentResult?.square_colors);
         if (state.canvas) {
           const ctx = state.canvas.getContext('2d');
           if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
@@ -549,6 +549,7 @@ function initOverlay(): void {
       fen: pickedUpFen,
       flipped: pvCycleFlipped,
       highlight: [fromIdx, toIdx],
+      squareColors: state.currentResult?.square_colors,
       anim: movingPiece ? {
         piece: movingPiece, fromSq, toSq, isWhite, step,
         progress: 0,
@@ -587,7 +588,7 @@ function initOverlay(): void {
     const container = grid?.parentElement;
     if (!grid || !container) { pvCycleStop(); return; }
 
-    renderBoardGrid(grid, pickedUpFen, pvCycleFlipped, [fromIdx, toIdx]);
+    renderBoardGrid(grid, pickedUpFen, pvCycleFlipped, [fromIdx, toIdx], state.currentResult?.square_colors);
 
     // Compute pixel positions for source and destination squares
     const sq = 25; // grid square size in CSS px
@@ -617,7 +618,7 @@ function initOverlay(): void {
     floater.addEventListener('transitionend', () => {
       floater.remove();
       if ((window as any).__chessrayPvPlaying) {
-        renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight);
+        renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight, state.currentResult?.square_colors);
       }
     }, { once: true });
     // Fallback if transitionend doesn't fire
@@ -625,7 +626,7 @@ function initOverlay(): void {
       if (floater.parentElement) {
         floater.remove();
         if ((window as any).__chessrayPvPlaying) {
-          renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight);
+          renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight, state.currentResult?.square_colors);
         }
       }
     }, 500);
@@ -757,7 +758,7 @@ function initOverlay(): void {
     document.querySelectorAll('.piece-anim').forEach(el => el.remove());
     // Restore board grid to base position (before animation moved pieces)
     if (wasPlaying && pvCycleBaseFen && grid) {
-      renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, []);
+      renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, [], state.currentResult?.square_colors);
     }
     if (wasPlaying) {
       state.pvDisplayDepth = state.pvDepth; // restore full depth

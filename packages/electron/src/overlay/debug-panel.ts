@@ -1,6 +1,7 @@
 import type { PipelineResult } from '../shared/types.js';
 import { uciToSan, formatMoveLine, type Turn } from '@chessray/core';
 import { lossToColor } from '../shared/arrows.js';
+import { rgbToCss, squareColorPalette, type RGB } from '../shared/colors.js';
 import { savePrefs } from './preferences.js';
 import { pieceSvg } from './piece-svg.js';
 
@@ -82,12 +83,15 @@ export function setTrackingState(tracking: boolean): void {
   }
 }
 
-/** Render the virtual board grid with SVG pieces */
+/** Render the virtual board grid with SVG pieces. Square colors come from the
+ * detected real-board theme (when available). When the grid is in analysis mode
+ * (CSS class `analysis`), colors are brightened to signal projected content. */
 export function renderBoardGrid(
   grid: HTMLElement,
   fen: string,
   flipped: boolean,
   highlightedSquares: number[],
+  squareColors?: { light: RGB; dark: RGB } | null,
 ): void {
   const rawHl = highlightedSquares || [];
   const hl = new Set(flipped ? rawHl.map(i => 63 - i) : rawHl);
@@ -97,6 +101,14 @@ export function renderBoardGrid(
     fenRows = fenRows.reverse().map(r => r.split('').reverse().join(''));
   }
 
+  const palette = squareColorPalette(squareColors, {
+    analysis: grid.classList.contains('analysis'),
+  });
+  const bg = (isLight: boolean, isHl: boolean): string =>
+    rgbToCss(isHl
+      ? (isLight ? palette.lightHl : palette.darkHl)
+      : (isLight ? palette.light : palette.dark));
+
   let html = '';
   let rank = 0;
   for (const row of fenRows) {
@@ -104,15 +116,15 @@ export function renderBoardGrid(
     for (const ch of row) {
       if (ch >= '1' && ch <= '8') {
         for (let i = 0; i < parseInt(ch); i++) {
-          const sq = (rank + file) % 2 === 0 ? 'light' : 'dark';
-          const hi = hl.has(rank * 8 + file) ? ' highlight' : '';
-          html += `<div class="sq ${sq}${hi}"></div>`;
+          const isLight = (rank + file) % 2 === 0;
+          const isHl = hl.has(rank * 8 + file);
+          html += `<div class="sq" style="background:${bg(isLight, isHl)}"></div>`;
           file++;
         }
       } else {
-        const sq = (rank + file) % 2 === 0 ? 'light' : 'dark';
-        const hi = hl.has(rank * 8 + file) ? ' highlight' : '';
-        html += `<div class="sq ${sq}${hi}">${pieceSvg(ch, 22)}</div>`;
+        const isLight = (rank + file) % 2 === 0;
+        const isHl = hl.has(rank * 8 + file);
+        html += `<div class="sq" style="background:${bg(isLight, isHl)}">${pieceSvg(ch, 22)}</div>`;
         file++;
       }
     }
@@ -200,7 +212,7 @@ export function updateDebugPanel(
   // Update virtual board grid (user panel) — skip while PV playback is animating
   const grid = document.getElementById('cv-debug-grid');
   if (grid && result.recognition?.fen && !(window as any).__chessrayPvPlaying) {
-    renderBoardGrid(grid, result.recognition.fen, !!result.flipped, result.highlighted_squares || []);
+    renderBoardGrid(grid, result.recognition.fen, !!result.flipped, result.highlighted_squares || [], result.square_colors);
   }
 
   // Turn indicator — use highlight-based turn (always current), fall back to eval FEN

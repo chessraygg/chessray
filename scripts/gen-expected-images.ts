@@ -23,11 +23,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCREENSHOTS_DIR = path.join(__dirname, '..', 'packages', 'core', 'test', 'screenshots');
 const OUT_DIR = path.join(__dirname, '..', 'packages', 'core', 'test', 'fixtures', 'expected-images');
 
-// Colors for the virtual board
-const LIGHT_SQ = [240, 217, 181] as const;  // #f0d9b5
-const DARK_SQ = [181, 136, 99] as const;    // #b58863
-const HIGHLIGHT_LIGHT = [247, 247, 105] as const;  // #f7f769
-const HIGHLIGHT_DARK = [218, 202, 58] as const;    // #daca3a
+// Default virtual board colors (used when a case has no detected square colors)
+const DEFAULT_LIGHT_SQ = [240, 217, 181] as const;  // #f0d9b5
+const DEFAULT_DARK_SQ = [181, 136, 99] as const;    // #b58863
+const HIGHLIGHT_YELLOW = [247, 247, 105] as const;  // #f7f769
+const HIGHLIGHT_BLEND = 0.55;
+
+/** Mix `rgb` with HIGHLIGHT_YELLOW by the standard blend factor */
+function blendHighlight(rgb: readonly [number, number, number]): readonly [number, number, number] {
+  return [
+    Math.round(rgb[0] * (1 - HIGHLIGHT_BLEND) + HIGHLIGHT_YELLOW[0] * HIGHLIGHT_BLEND),
+    Math.round(rgb[1] * (1 - HIGHLIGHT_BLEND) + HIGHLIGHT_YELLOW[1] * HIGHLIGHT_BLEND),
+    Math.round(rgb[2] * (1 - HIGHLIGHT_BLEND) + HIGHLIGHT_YELLOW[2] * HIGHLIGHT_BLEND),
+  ];
+}
 
 // Inline SVG chess pieces — cburnett set from lichess (CC BY-SA 3.0).
 // Source: https://github.com/lichess-org/lila/tree/master/public/piece/cburnett
@@ -202,10 +211,16 @@ function drawVirtualBoard(
   fen: string,
   highlightedSquares: Set<string>,
   whitePawns: 'up' | 'down',
+  detectedColors?: { light: readonly [number, number, number]; dark: readonly [number, number, number] },
 ) {
   const board = parseFen(fen);
   const sq = boardSize / 8;
   const pieceSize = Math.round(sq * 0.9);
+
+  const lightSq = detectedColors?.light ?? DEFAULT_LIGHT_SQ;
+  const darkSq = detectedColors?.dark ?? DEFAULT_DARK_SQ;
+  const lightHl = blendHighlight(lightSq);
+  const darkHl = blendHighlight(darkSq);
 
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
@@ -230,9 +245,9 @@ function drawVirtualBoard(
       // Square background
       let bgColor: readonly [number, number, number];
       if (isHighlighted) {
-        bgColor = isLight ? HIGHLIGHT_LIGHT : HIGHLIGHT_DARK;
+        bgColor = isLight ? lightHl : darkHl;
       } else {
-        bgColor = isLight ? LIGHT_SQ : DARK_SQ;
+        bgColor = isLight ? lightSq : darkSq;
       }
 
       // Fill square
@@ -370,7 +385,7 @@ for (const tc of PIPELINE_CASES) {
   const boardX = png.width + gap;
   const boardY = 0;
   const hlSet = new Set(tc.highlighted);
-  drawVirtualBoard(out, boardX, boardY, boardDisplaySize, tc.expectedFen, hlSet, tc.orientation === 'white bottom' ? 'up' : 'down');
+  drawVirtualBoard(out, boardX, boardY, boardDisplaySize, tc.expectedFen, hlSet, tc.orientation === 'white bottom' ? 'up' : 'down', tc.expected_square_colors);
 
   // Draw big colored swatches showing the expected light/dark square colors
   let postBoardY = boardDisplaySize + 8;

@@ -1,11 +1,14 @@
 import type { ArrowDescriptor, PipelineResult } from '../shared/types.js';
 import { computeCurveOffsets, lossToColor } from '../shared/arrows.js';
+import { rgbToCss, squareColorPalette, type RGB } from '../shared/colors.js';
 import { pieceImages } from './piece-svg.js';
 
 export interface PvBoardState {
   fen: string;           // Current board FEN (piece placement only)
   flipped: boolean;
   highlight: number[];   // Highlighted square indices (in non-flipped coordinate space)
+  /** Detected square colors of the real board, used to theme the analysis board */
+  squareColors?: { light: RGB; dark: RGB };
   anim: {
     piece: string;       // FEN char being animated (e.g. 'N', 'p')
     fromSq: string;      // UCI source square (e.g. 'e2')
@@ -130,11 +133,6 @@ function updateAnimatedArrows(
 
 // ── Piece image cache for canvas rendering ──
 
-const ANALYSIS_LIGHT = '#cdd5de';
-const ANALYSIS_DARK = '#7e8ea3';
-const ANALYSIS_LIGHT_HL = '#a8c4f0';
-const ANALYSIS_DARK_HL = '#6a8fc4';
-
 /** Draw analysis board (background + pieces + animated piece + arrow) on the video overlay canvas */
 function drawAnalysisBoard(
   ctx: CanvasRenderingContext2D,
@@ -144,6 +142,7 @@ function drawAnalysisBoard(
   const sqW = boardRect.width / 8;
   const sqH = boardRect.height / 8;
   const hlSet = new Set(pvBoard.flipped ? pvBoard.highlight.map(i => 63 - i) : pvBoard.highlight);
+  const palette = squareColorPalette(pvBoard.squareColors, { analysis: true });
 
   // Draw colored squares
   for (let rank = 0; rank < 8; rank++) {
@@ -151,9 +150,9 @@ function drawAnalysisBoard(
       const idx = rank * 8 + file;
       const isLight = (rank + file) % 2 === 0;
       const isHl = hlSet.has(idx);
-      ctx.fillStyle = isLight
-        ? (isHl ? ANALYSIS_LIGHT_HL : ANALYSIS_LIGHT)
-        : (isHl ? ANALYSIS_DARK_HL : ANALYSIS_DARK);
+      ctx.fillStyle = rgbToCss(isHl
+        ? (isLight ? palette.lightHl : palette.darkHl)
+        : (isLight ? palette.light : palette.dark));
       ctx.fillRect(boardRect.x + file * sqW, boardRect.y + rank * sqH, sqW, sqH);
     }
   }
