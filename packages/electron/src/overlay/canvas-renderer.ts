@@ -279,7 +279,7 @@ function drawPlayedMoveMarker(
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = 0.55;
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = strokeW;
     ctx.lineCap = 'round';
