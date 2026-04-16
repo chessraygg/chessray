@@ -23,6 +23,9 @@ jobs:
           rm -rf node_modules package-lock.json
           npm install
 
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Download vendor assets
         run: npm run setup
 
