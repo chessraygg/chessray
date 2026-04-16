@@ -44,16 +44,10 @@ npm test
 ## Development
 
 ```bash
-# Start the app in dev mode (macOS/Linux)
-./app.sh start
+# Start the app in dev mode (cross-platform via electron-forge)
+npm start -w packages/electron
 
-# View logs
-./app.sh log
-
-# Stop the app
-./app.sh stop
-
-# Build and install locally
+# Build and install locally (packages, then copies into your OS app dir)
 npm run install-app -w packages/electron
 ```
 

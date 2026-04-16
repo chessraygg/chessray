@@ -47,11 +47,12 @@ Platform-specific code is isolated in `packages/electron/src/main/platform.ts` v
 - `npm test` — run all tests (Vitest)
 - `npm test -- -t "<filter>"` — run a single test case by name (e.g. `npm test -- -t "carlsen-niemann"`)
 - `npm run typecheck` — strict TypeScript typecheck across all workspaces (also enforced in CI)
+- `npm start -w packages/electron` — launch the app in dev mode (electron-forge)
 - `npm run build` — build the Electron app
 - `npm run setup` — download vendor assets (Stockfish, ONNX Runtime)
-- `npm run install-app -w packages/electron` — build and install locally
+- `npm run install-app -w packages/electron` — build the app and copy it into the OS-specific install location
 - `npm run gen-expected` — regenerate expected-output images for highlight test cases
 - `npm run gen-expected -- <filter>` — regenerate only cases matching filter (e.g. `caruana-american3`)
-- `npm run release` — cut a release locally (normally CI does this on merge to main, see Release workflow)
 - `npx tsx scripts/detect-screenshot.ts <filename>` — detect board from a screenshot in `test/screenshots/` and output a draft `PipelineTestCase` entry
-- `./app.sh {start|stop|restart|log|forge-log|status}` — manage the Electron app in dev mode
+
+Releases are produced by CI when a PR merges to `main` (see `.github/workflows/release.yml`). The version bump (`major` / `minor` / `patch`) is determined by labels on the merged PR. There is no local release command.

@@ -35,13 +35,13 @@ While at 0.x, breaking changes may occur in minor versions. Releases are cut aut
 
 ## Development
 
-Start the app in dev mode:
+Start the app in dev mode (cross-platform):
 
 ```bash
-./app.sh start    # start
-./app.sh log      # view logs
-./app.sh stop     # stop
+npm start -w packages/electron
 ```
+
+This launches electron-forge in the foreground and streams logs to your terminal. Stop it with Ctrl-C.
 
 ## Project Structure
 
