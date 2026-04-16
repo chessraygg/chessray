@@ -27,16 +27,16 @@ Platform-specific code is isolated in `packages/electron/src/main/platform.ts` v
 
 - **Fail fast.** No fallbacks, no graceful degradation. If something fails, let it fail loudly. Never catch errors silently. Always `throw`, never log an error and continue.
 - **No hacky solutions.** Don't layer fixes on top of a broken approach — step back and find the right one.
-- **Never patch a wrong approach.** If the current implementation uses a wrong algorithm, REPLACE it. Do not add guardrails to a fundamentally wrong approach.
+- **Never patch a wrong approach.** If the current implementation uses a wrong algorithm, replace it. Don't add guardrails around a fundamentally wrong approach.
 - **Keep it simple.** Don't over-engineer or add speculative features. No premature optimization.
 - **Research first.** Before implementing detection/CV algorithms, search for established approaches. Don't invent custom solutions when proven ones exist.
 - **Use libraries, don't reimplement.** If a battle-tested library exists, use it. One function call beats 200 lines of buggy reimplementation.
-- **Never change test expectations without discussion.** Tests define the spec — they describe what the correct output is, not what the implementation currently produces. If the implementation can't pass, fix the implementation — never weaken the test. No rationalizing ("the model outputs X so the test should expect X"). If you can't fix the implementation, leave the test failing and say so.
+- **Tests define the spec.** They describe what the correct output should be, not what the implementation currently produces. If the implementation can't pass, fix the implementation — don't weaken the test.
 
 ## Commands
 
-- `npm test` — run ALL board detection tests (Vitest). **Expensive (~2-3 min).** Only run after all individual tests pass.
-- `npm test -- -t "<filter>"` — run a single test case by name (e.g. `npm test -- -t "carlsen-niemann"`). **Always use this first** when developing/debugging.
+- `npm test` — run all tests (Vitest)
+- `npm test -- -t "<filter>"` — run a single test case by name (e.g. `npm test -- -t "carlsen-niemann"`)
 - `npm run build` — build the Electron app
 - `npm run setup` — download vendor assets (Stockfish, ONNX Runtime)
 - `npm run install-app -w packages/electron` — build and install locally
