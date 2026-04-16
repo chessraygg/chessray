@@ -1,4 +1,4 @@
-import type { PipelineResult } from '@chessray/core';
+import type { PipelineResult } from '../shared/types.js';
 import { uciToSan, formatMoveLine } from '@chessray/core';
 import { lossToColor } from '../shared/arrows.js';
 import { savePrefs } from './preferences.js';

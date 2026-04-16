@@ -3,7 +3,7 @@
  * Port of content/overlay.ts adapted for Electron (no Shadow DOM, screen coords).
  */
 
-import type { PipelineResult } from '@chessray/core';
+import type { PipelineResult } from '../shared/types.js';
 import { applyUciMoves, uciToSan } from '@chessray/core';
 import { lossToColor } from '../shared/arrows.js';
 import { loadPrefs, savePrefs } from './preferences.js';

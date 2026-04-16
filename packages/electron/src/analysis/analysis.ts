@@ -11,9 +11,10 @@ import {
 } from '@chessray/core';
 import { Chess } from 'chess.js';
 import type {
-  PixelBuffer, PipelineResult, EvalResult, RecognitionResult, BoardBBox, ArrowDescriptor,
+  PixelBuffer, EvalResult, RecognitionResult, BoardBBox,
   OrientationSource,
 } from '@chessray/core';
+import type { PipelineResult, ArrowDescriptor } from '../shared/types.js';
 
 import { EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH, multiPvForDepth, setMultiPvMax, setMultiPvRamp, cacheGet, cachePut } from './eval-cache.js';
 import { sampleBoardPixels, boardUnchanged } from './change-detect.js';

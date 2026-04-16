@@ -1,4 +1,4 @@
-import type { ArrowDescriptor, PipelineResult } from '@chessray/core';
+import type { ArrowDescriptor, PipelineResult } from '../shared/types.js';
 import { computeCurveOffsets, computePvArrows, lossToColor } from '../shared/arrows.js';
 import { pieceImages } from './piece-svg.js';
 

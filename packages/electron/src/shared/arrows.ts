@@ -1,4 +1,5 @@
-import type { ArrowDescriptor, EvalMove } from '@chessray/core';
+import type { EvalMove } from '@chessray/core';
+import type { ArrowDescriptor } from './types.js';
 
 /**
  * Map centipawn loss to a hex color.
