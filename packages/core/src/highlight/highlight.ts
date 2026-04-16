@@ -1,4 +1,5 @@
 import type { PixelBuffer } from '../board/pixel-utils.js';
+import type { Turn } from '../types.js';
 
 export interface HighlightResult {
   highlighted: number[];
@@ -383,7 +384,7 @@ export function disambiguateHighlights(
 export function turnFromHighlight(
   highlightedIndices: number[],
   fen: string
-): 'w' | 'b' | null {
+): Turn | null {
   if (highlightedIndices.length < 1) return null;
 
   const rows = fen.split('/');

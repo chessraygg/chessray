@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
-import type { LabelStrip } from '@chessray/core';
+import type { LabelStrip, Turn, OrientationSource, LabelsSkipReason } from '@chessray/core';
 
 export interface PipelineTestCase {
   /** Screenshot filename in test/screenshots/ */
@@ -11,7 +11,7 @@ export interface PipelineTestCase {
   /** Highlighted squares in correct chess notation (e.g. ['c1', 'f4']). Null for starting positions with no highlights. */
   highlighted: [string, string] | null;
   /** Whose turn it is after this move. Null if turn can't be determined from highlights (starting positions). */
-  turn: 'w' | 'b' | null;
+  turn: Turn | null;
   /** Expected refined board bounding box (pixel coordinates) */
   bbox: { x: number; y: number; width: number; height: number };
   /** Expected grid square size in pixels (bbox.width / 8) */
@@ -19,9 +19,9 @@ export interface PipelineTestCase {
   /** Expected FEN (position only, raw image orientation before flip) */
   expectedFen: string;
   /** How board orientation was detected */
-  orientation_source: 'label' | 'pawn_move' | 'piece_count';
+  orientation_source: OrientationSource;
   /** Expected label detection result */
-  expected_labels: { skipped: true; reason: 'piece_count' | 'cached' } | { skipped: false; result: LabelStrip[] | null };
+  expected_labels: { skipped: true; reason: LabelsSkipReason } | { skipped: false; result: LabelStrip[] | null };
   /** Expected highlight candidates above threshold, sorted by score descending */
   expected_candidates: Array<{ square: string; score: number }>;
 }

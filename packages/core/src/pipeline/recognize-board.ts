@@ -1,10 +1,13 @@
-import type { RecognitionResult } from '../types.js';
+import type { RecognitionResult, Turn } from '../types.js';
 import type { PixelBuffer } from '../board/pixel-utils.js';
 import { detectHighlightedSquares, disambiguateHighlights, turnFromHighlight } from '../highlight/highlight.js';
 import { detectBoardFlipped, type OrientationSource } from '../orientation/orientation.js';
 import { flipFen, buildFullFen, fenSimilarity, indexToSquare } from '../fen/fen.js';
 import type { OrientationResult } from '../orientation/orientation.js';
 import { detectLabels, type LabelDetectionResult } from '../orientation/label-detect.js';
+
+/** Why label detection was skipped */
+export type LabelsSkipReason = 'piece_count' | 'cached';
 
 export interface BoardRecognitionResult {
   /** FEN as read from raw image (before orientation correction) */
@@ -20,7 +23,7 @@ export interface BoardRecognitionResult {
   /** Whether the board image is flipped (black at bottom in raw image) */
   flipped: boolean;
   /** Turn determined from highlights, or null if not determinable */
-  turn: 'w' | 'b' | null;
+  turn: Turn | null;
   /** How orientation was detected */
   orientationSource: OrientationSource;
   /** True when highlights indicate a move but the piece hasn't landed yet (mid-animation) */
@@ -28,7 +31,7 @@ export interface BoardRecognitionResult {
   /** Highlight candidate squares above threshold, sorted by score descending (corrected orientation) */
   highlightCandidates: Array<{ square: string; score: number }>;
   /** Label detection result */
-  labels: { skipped: true; reason: 'piece_count' | 'cached' } | { skipped: false; result: LabelDetectionResult | null };
+  labels: { skipped: true; reason: LabelsSkipReason } | { skipped: false; result: LabelDetectionResult | null };
   /** Per-square border-frame median color (indexed 0-63, raw image orientation) */
   highlightColors: Array<[number, number, number]>;
   /** Per-square highlight scores sorted descending */

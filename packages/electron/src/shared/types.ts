@@ -1,4 +1,7 @@
-import type { BoardBBox, RecognitionResult, EvalResult } from '@chessray/core';
+import type { BoardBBox, RecognitionResult, EvalResult, Turn, OrientationSource } from '@chessray/core';
+
+/** Detected end-of-game state */
+export type GameOver = 'checkmate' | 'stalemate';
 
 /** Descriptor for a single arrow to be drawn on the board */
 export interface ArrowDescriptor {
@@ -26,9 +29,9 @@ export interface PipelineResult {
   arrows: ArrowDescriptor[];
   highlighted_squares?: number[]; // indices of highlighted squares (0-63, corrected orientation)
   flipped?: boolean; // true = board is flipped (white at top in video)
-  turn?: 'w' | 'b'; // whose turn it is (from highlight detection)
-  game_over?: 'checkmate' | 'stalemate'; // detected end-of-game state
-  orientation_source?: 'label' | 'pawn_move' | 'piece_count'; // how orientation was detected
+  turn?: Turn; // whose turn it is (from highlight detection)
+  game_over?: GameOver; // detected end-of-game state
+  orientation_source?: OrientationSource; // how orientation was detected
   played_move?: {
     from: string;    // algebraic square (source)
     to: string;      // algebraic square (destination)

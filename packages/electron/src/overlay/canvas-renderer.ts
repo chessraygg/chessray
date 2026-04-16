@@ -1,4 +1,5 @@
 import type { ArrowDescriptor, PipelineResult } from '../shared/types.js';
+import type { Turn } from '@chessray/core';
 import { computeCurveOffsets, computePvArrows, lossToColor } from '../shared/arrows.js';
 import { pieceImages } from './piece-svg.js';
 
@@ -239,7 +240,7 @@ export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
         const idx = Math.min(state.selectedLineIndex, state.currentResult!.evaluation!.top_moves.length - 1);
         const pv = state.currentResult!.evaluation!.top_moves[idx].pv;
         const turn = state.currentResult!.turn
-          ?? state.currentResult!.evaluation!.fen?.split(' ')[1] as 'w' | 'b'
+          ?? state.currentResult!.evaluation!.fen?.split(' ')[1] as Turn
           ?? 'w';
         return computePvArrows(pv, turn, state.pvDisplayDepth, state.pvWhiteColor, state.pvBlackColor);
       })()

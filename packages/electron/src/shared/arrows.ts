@@ -1,4 +1,4 @@
-import type { EvalMove } from '@chessray/core';
+import type { EvalMove, Turn } from '@chessray/core';
 import type { ArrowDescriptor } from './types.js';
 
 /**
@@ -69,7 +69,7 @@ export function computeArrows(topMoves: EvalMove[]): ArrowDescriptor[] {
  * @param maxMoves - Maximum number of PV moves to show
  */
 export function computePvArrows(
-  pv: string[], turn: 'w' | 'b', maxMoves: number,
+  pv: string[], turn: Turn, maxMoves: number,
   whiteColor = '#60a5fa', blackColor = '#f9a8d4',
 ): ArrowDescriptor[] {
   const moves = pv.slice(0, maxMoves);
@@ -107,7 +107,7 @@ export function computePvArrows(
 export function squareToPixel(
   square: string,
   boardRect: { x: number; y: number; width: number; height: number },
-  orientation: 'w' | 'b' = 'w'
+  orientation: Turn = 'w'
 ): { x: number; y: number } {
   const file = square.charCodeAt(0) - 97; // a=0, h=7
   const rank = parseInt(square[1], 10) - 1; // 1->0, 8->7
@@ -139,7 +139,7 @@ export function arrowGeometry(
   from: string,
   to: string,
   boardRect: { x: number; y: number; width: number; height: number },
-  orientation: 'w' | 'b' = 'w'
+  orientation: Turn = 'w'
 ): { x1: number; y1: number; x2: number; y2: number } {
   const fromPixel = squareToPixel(from, boardRect, orientation);
   const toPixel = squareToPixel(to, boardRect, orientation);

@@ -1,4 +1,5 @@
 import { Chess } from 'chess.js';
+import type { Turn } from '../types.js';
 
 /**
  * Convert an array of UCI moves to SAN notation given a starting FEN position.
@@ -49,7 +50,7 @@ export function applyUciMoves(fen: string, uciMoves: string[], count: number): {
  * e.g. ["e4", "e5", "Nf3"] with startTurn 'w' -> "1.e4 e5 2.Nf3"
  * If starting as black, first move uses "1..." prefix.
  */
-export function formatMoveLine(sanMoves: string[], startTurn: 'w' | 'b'): string {
+export function formatMoveLine(sanMoves: string[], startTurn: Turn): string {
   if (sanMoves.length === 0) return '';
 
   const parts: string[] = [];

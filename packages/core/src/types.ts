@@ -1,3 +1,6 @@
+/** Side to move in a chess position (also used for board orientation) */
+export type Turn = 'w' | 'b';
+
 /** Bounding box of a detected chessboard in pixel coordinates */
 export interface BoardBBox {
   x: number;

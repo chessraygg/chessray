@@ -1,4 +1,5 @@
 import { Chess } from 'chess.js';
+import type { Turn } from '../types.js';
 
 /** Piece character or null for empty square */
 export type PieceChar = 'p' | 'n' | 'b' | 'r' | 'q' | 'k' | 'P' | 'N' | 'B' | 'R' | 'Q' | 'K' | null;
@@ -137,7 +138,7 @@ export function isStartingPosition(fen: string): boolean {
   return hasPieces(rows[0]) && hasPieces(rows[1]) && hasPieces(rows[6]) && hasPieces(rows[7]);
 }
 
-export function guessTurn(prevFen: string | null, currFen: string): 'w' | 'b' {
+export function guessTurn(prevFen: string | null, currFen: string): Turn {
   const posOnly = currFen.split(' ')[0];
   if (posOnly === STARTING_POSITION) return 'w';
   if (!prevFen) return 'w';
@@ -208,7 +209,7 @@ export function detectSequentialMove(
  */
 export function buildFullFen(
   position: string,
-  turn: 'w' | 'b' = 'w',
+  turn: Turn = 'w',
   castling?: string,
   enPassant: string = '-',
   halfmove: number = 0,
