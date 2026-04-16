@@ -1,10 +1,10 @@
-import type { RecognitionResult } from './types.js';
-import type { PixelBuffer } from './pixel-utils.js';
-import { detectHighlightedSquares, disambiguateHighlights, turnFromHighlight } from './highlight.js';
-import { detectBoardFlipped, type OrientationSource } from './orientation.js';
-import { flipFen, buildFullFen, fenSimilarity, indexToSquare } from './fen.js';
-import type { OrientationResult } from './image-utils.js';
-import { detectLabels, type LabelDetectionResult } from './label-detect.js';
+import type { RecognitionResult } from '../types.js';
+import type { PixelBuffer } from '../board/pixel-utils.js';
+import { detectHighlightedSquares, disambiguateHighlights, turnFromHighlight } from '../highlight/highlight.js';
+import { detectBoardFlipped, type OrientationSource } from '../orientation/orientation.js';
+import { flipFen, buildFullFen, fenSimilarity, indexToSquare } from '../fen/fen.js';
+import type { OrientationResult } from '../orientation/orientation.js';
+import { detectLabels, type LabelDetectionResult } from '../orientation/label-detect.js';
 
 export interface BoardRecognitionResult {
   /** FEN as read from raw image (before orientation correction) */

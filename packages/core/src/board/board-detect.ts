@@ -1,4 +1,4 @@
-import type { BoardBBox } from './types.js';
+import type { BoardBBox } from '../types.js';
 import { refineBbox } from './bbox-refine.js';
 import type { PixelBuffer } from './pixel-utils.js';
 

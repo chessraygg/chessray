@@ -1,4 +1,4 @@
-import type { BoardBBox } from './types.js';
+import type { BoardBBox } from '../types.js';
 
 /** Simple RGBA pixel buffer compatible with ImageData */
 export interface PixelBuffer {

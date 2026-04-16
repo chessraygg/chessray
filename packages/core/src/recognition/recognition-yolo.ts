@@ -1,6 +1,6 @@
-import type { RecognitionResult, TileClassification } from './types.js';
+import type { RecognitionResult, TileClassification } from '../types.js';
 import type { PieceRecognizerInterface } from './recognition-interface.js';
-import { indexToSquare } from './fen.js';
+import { indexToSquare } from '../fen/fen.js';
 
 // NAKSTStudio/yolov8m class mapping (0=board, 1-12=pieces)
 const CLASS_TO_FEN: Record<number, string> = {

@@ -1,4 +1,4 @@
-import type { RecognitionResult } from './types.js';
+import type { RecognitionResult } from '../types.js';
 
 /**
  * Common interface for all piece recognition implementations.

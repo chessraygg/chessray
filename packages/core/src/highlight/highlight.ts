@@ -1,4 +1,4 @@
-import type { PixelBuffer } from './pixel-utils.js';
+import type { PixelBuffer } from '../board/pixel-utils.js';
 
 export interface HighlightResult {
   highlighted: number[];

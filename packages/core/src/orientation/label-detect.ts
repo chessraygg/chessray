@@ -13,7 +13,7 @@
  * the SVTR-based recognition model handles low-contrast scene text natively.
  */
 
-import type { PixelBuffer } from './pixel-utils.js';
+import type { PixelBuffer } from '../board/pixel-utils.js';
 import type { OrientationResult } from './orientation.js';
 
 export interface LabelStrip {
@@ -76,7 +76,7 @@ async function getSession(): Promise<any> {
       const path = require('path');
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fs = require('fs');
-      const vendorDir = path.resolve(__dirname, '..', '..', '..', 'vendor', 'paddle-ocr');
+      const vendorDir = path.resolve(__dirname, '..', '..', '..', '..', 'vendor', 'paddle-ocr');
       session = await ort.InferenceSession.create(
         path.join(vendorDir, 'en_PP-OCRv5_mobile_rec_infer.onnx'),
       );

@@ -1,9 +1,9 @@
-import type { BoardBBox } from './types.js';
-import type { PixelBuffer } from './pixel-utils.js';
-import { cropPixels } from './pixel-utils.js';
-import { detectBoard, type BoardDetectionResult } from './board-detect.js';
+import type { BoardBBox } from '../types.js';
+import type { PixelBuffer } from '../board/pixel-utils.js';
+import { cropPixels } from '../board/pixel-utils.js';
+import { detectBoard, type BoardDetectionResult } from '../board/board-detect.js';
 import { recognizeBoard, type BoardRecognitionResult } from './recognize-board.js';
-import type { OrientationResult } from './image-utils.js';
+import type { OrientationResult } from '../orientation/orientation.js';
 
 export interface DetectionPipelineResult extends BoardRecognitionResult {
   /** Board was found in the frame */

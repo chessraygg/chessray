@@ -1,4 +1,4 @@
-import type { EvalResult, EvalMove } from './types.js';
+import type { EvalResult, EvalMove } from '../types.js';
 import { parseInfoLine, parseBestMove } from './stockfish-uci-parser.js';
 
 export interface StockfishOptions {
