@@ -633,10 +633,11 @@ function initOverlay(): void {
 
     // Animate arrow following piece movement on virtual board canvas
     if (state.canvas) {
+      const ARROW_BASE_OPACITY = 0.8;
       const moveArrow = {
         from: fromSq, to: toSq,
         color: isWhite ? '#e5e5e5' : '#1a1a1a',
-        width: 3, opacity: 0.8, loss_cp: 0,
+        width: 3, opacity: ARROW_BASE_OPACITY, loss_cp: 0,
         label: String(step),
       };
       const VB_TRANSITION_MS = 350;
@@ -661,7 +662,9 @@ function initOverlay(): void {
         const ctx = state.canvas.getContext('2d')!;
         ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
         ctx.clearRect(0, 0, size, size);
-        drawArrow(ctx, moveArrow, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, progress, true);
+        // Sine-bell opacity: fade in, peak mid-movement, fade out
+        const bellOpacity = ARROW_BASE_OPACITY * Math.sin(Math.PI * progress);
+        drawArrow(ctx, { ...moveArrow, opacity: bellOpacity }, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, progress, true);
 
         if (progress < 1) requestAnimationFrame(tickArrow);
       }

@@ -202,12 +202,15 @@ function drawAnalysisBoard(
       ctx.drawImage(img, px, py, pieceSize, pieceSize);
     }
 
-    // Animated arrow (same style as virtual board: no arrowhead, step label)
+    // Animated arrow — same style as virtual board (no arrowhead, step label).
+    // Opacity follows a sine bell so the arrow fades in, peaks at mid-movement,
+    // and fades back out as the piece settles.
     const arrowScale = (boardRect.width + boardRect.height) / 2 / 192;
+    const bellOpacity = 0.8 * Math.sin(Math.PI * t);
     drawArrow(ctx, {
       from: a.fromSq, to: a.toSq,
       color: a.isWhite ? '#e5e5e5' : '#1a1a1a',
-      width: 3, opacity: 0.8, loss_cp: 0,
+      width: 3, opacity: bellOpacity, loss_cp: 0,
       label: String(a.step),
     }, boardRect, arrowScale, pvBoard.flipped, 0, t, true);
   }
