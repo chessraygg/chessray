@@ -265,33 +265,51 @@ function drawPlayedMoveMarker(
 
   const cx = board.x + (file + 0.5) * squareW;
   const cy = board.y + (7 - rank + 0.5) * squareH;
+
+  if (lossCp < 10) {
+    // Excellent move — stylish white checkmark, no badge
+    const size = Math.min(squareW, squareH) * 0.28;
+    const strokeW = Math.max(2, size * 0.22);
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+    ctx.shadowBlur = strokeW * 1.5;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = strokeW;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - size * 0.50, cy + size * 0.05);
+    ctx.lineTo(cx - size * 0.10, cy + size * 0.40);
+    ctx.lineTo(cx + size * 0.55, cy - size * 0.40);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  // Loss badge — colored disk with centipawn loss text inside
   const fontSize = Math.max(7, Math.round(Math.min(squareW, squareH) * 0.20));
-  const showLossText = lossCp >= 10;
-  // Compact dot when no text; text-sized disk otherwise
-  const r = showLossText ? fontSize * 1.25 : Math.min(squareW, squareH) * 0.18;
+  const r = fontSize * 1.25;
   const color = lossToColor(lossCp);
 
   ctx.save();
-  // Translucent colored disk
-  ctx.globalAlpha = showLossText ? 0.7 : 0.25;
+  ctx.globalAlpha = 0.7;
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
 
-  if (showLossText) {
-    // Contrast-aware text
-    const hex = color.replace('#', '');
-    const lum = (parseInt(hex.substring(0, 2), 16) * 299
-      + parseInt(hex.substring(2, 4), 16) * 587
-      + parseInt(hex.substring(4, 6), 16) * 114) / 1000;
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = lum > 140 ? '#000' : '#fff';
-    ctx.font = `bold ${fontSize}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`−${(lossCp / 100).toFixed(1)}`, cx, cy);
-  }
+  // Contrast-aware text
+  const hex = color.replace('#', '');
+  const lum = (parseInt(hex.substring(0, 2), 16) * 299
+    + parseInt(hex.substring(2, 4), 16) * 587
+    + parseInt(hex.substring(4, 6), 16) * 114) / 1000;
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = lum > 140 ? '#000' : '#fff';
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`−${(lossCp / 100).toFixed(1)}`, cx, cy);
   ctx.restore();
 }
 
