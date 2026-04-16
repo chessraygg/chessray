@@ -275,15 +275,12 @@ function initOverlay(): void {
         renderArrows(state);
         if (state.lineVisible && !pvCycleTimer) pvCycleStart();
       } else {
-        // Clean up virtual board visuals
+        // Clean up virtual board visuals only — keep the cycle running so the
+        // actual-board piece animation continues uninterrupted.
         document.querySelectorAll('.piece-anim').forEach(el => el.remove());
         if (state.canvas) {
           const ctx = state.canvas.getContext('2d');
           if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-        }
-        // Stop animation and restore board to original state
-        if ((window as any).__chessrayPvPlaying) {
-          pvCycleStop();
         }
       }
     });
