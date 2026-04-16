@@ -35,6 +35,7 @@ let lastIsFlipped = false;
 let lastOrientationSource: OrientationSource | undefined;
 let lastHighlightedSquares: number[] = [];
 let lastHighlightTurn: Turn | null = null;
+let lastSquareColors: PipelineResult['square_colors'] | undefined;
 let lastArrows: ArrowDescriptor[] = [];
 let lastFullFen: string | null = null;
 let lastPlayedMove: PipelineResult['played_move'] = null;
@@ -66,6 +67,7 @@ function resetPipelineState(): void {
   cachedOrientation = null;
   lastBoardSample = null;
   lastRecognitionResult = null;
+  lastSquareColors = undefined;
   cachedBbox = null;
   if (previewCanvas) {
     previewCanvas.width = 0;
@@ -159,6 +161,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     let detectionStatus: string | undefined;
     const prevHighlightedSquares = [...lastHighlightedSquares];
 
+    let squareColors: PipelineResult['square_colors'] = lastSquareColors;
     if (visuallyUnchanged && lastRecognitionResult) {
       recognition = lastRecognitionResult;
       rawFen = lastRawFen;
@@ -193,6 +196,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
           orientationSource = boardResult.orientationSource;
           highlightedSquares = boardResult.highlightedSquares;
           highlightTurn = boardResult.turn;
+          squareColors = boardResult.highlightMedians;
           cachedOrientation = { prevFen: rawFen, orientation: { flipped: isFlipped, source: orientationSource } };
           if (frameCount <= 3) {
             debugLog(`Recognition: rawFen=${rawFen} conf=${recognition.confidence.toFixed(2)}`);
@@ -207,6 +211,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       lastOrientationSource = orientationSource;
       lastHighlightedSquares = highlightedSquares;
       lastHighlightTurn = highlightTurn;
+      lastSquareColors = squareColors;
 
     }
 
@@ -227,6 +232,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       detection_status: detectionStatus,
       board_image_url: boardImageUrl,
       frame_dimensions: { width: pixels.width, height: pixels.height },
+      square_colors: squareColors,
       total_elapsed_ms: Date.now() - startTime,
     });
 
