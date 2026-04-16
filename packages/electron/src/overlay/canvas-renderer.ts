@@ -1,6 +1,5 @@
 import type { ArrowDescriptor, PipelineResult } from '../shared/types.js';
-import type { Turn } from '@chessray/core';
-import { computeCurveOffsets, computePvArrows, lossToColor } from '../shared/arrows.js';
+import { computeCurveOffsets, lossToColor } from '../shared/arrows.js';
 import { pieceImages } from './piece-svg.js';
 
 export interface PvBoardState {
@@ -31,8 +30,6 @@ export interface OverlayState {
   lineVisible: boolean;
   pvDepth: number;
   pvDisplayDepth: number;
-  pvWhiteColor: string;
-  pvBlackColor: string;
   evalBarVisible: boolean;
   sourceVisible: boolean;
   selectedLineIndex: number;
@@ -217,7 +214,7 @@ function drawAnalysisBoard(
   }
 }
 
-/** Get the arrows to display based on current mode (top moves, PV line, or both) */
+/** Get the arrows to display based on current mode (top moves, with optional preview emphasis) */
 export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
   // Preview mode: show all move arrows but emphasize the selected line's first move
   if (state.pvPreviewLineIndex !== null && state.currentResult?.evaluation?.top_moves?.length) {
@@ -231,21 +228,9 @@ export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
     return [];
   }
 
-  const moveArrows = state.arrowsVisible
+  return state.arrowsVisible
     ? state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold)
     : [];
-  const pvArrows = (state.lineVisible && state.currentResult?.evaluation?.top_moves?.length)
-    ? (() => {
-        const idx = Math.min(state.selectedLineIndex, state.currentResult!.evaluation!.top_moves.length - 1);
-        const pv = state.currentResult!.evaluation!.top_moves[idx].pv;
-        const turn = state.currentResult!.turn
-          ?? state.currentResult!.evaluation!.fen?.split(' ')[1] as Turn
-          ?? 'w';
-        return computePvArrows(pv, turn, state.pvDisplayDepth, state.pvWhiteColor, state.pvBlackColor);
-      })()
-    : [];
-  if (moveArrows.length && pvArrows.length) return [...pvArrows, ...moveArrows];
-  return pvArrows.length ? pvArrows : moveArrows;
 }
 
 /** Draw a small colored badge on the target square of the played move (overlaid on
@@ -547,15 +532,6 @@ export function renderArrows(state: OverlayState): void {
     drawArrow(ctx, drawList[i].arrow, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow);
   }
 
-  // Draw cp loss label for the active PV line
-  if (state.lineVisible && state.pvDisplayDepth > 0 && state.currentResult?.evaluation?.top_moves?.length) {
-    const idx = Math.min(state.selectedLineIndex, state.currentResult.evaluation.top_moves.length - 1);
-    const move = state.currentResult.evaluation.top_moves[idx];
-    if (move.loss_cp >= 5 && targetArrows[0]) {
-      drawLossLabel(ctx, targetArrows[0].from, move.loss_cp, virtualBoard, state.displayFlipped);
-    }
-  }
-
   // Draw cp loss label during preview mode on the highlighted arrow
   if (state.pvPreviewLineIndex !== null && state.currentResult?.evaluation?.top_moves?.length) {
     const idx = Math.min(state.pvPreviewLineIndex, state.currentResult.evaluation.top_moves.length - 1);
@@ -632,7 +608,7 @@ export function renderVideoOverlay(state: OverlayState): void {
       drawPlayedMoveMarker(ctx, pm.to, pm.loss_cp, boardRect, state.displayFlipped);
     }
 
-    if (state.arrowsVisible || state.lineVisible || state.pvPreviewLineIndex !== null) {
+    if (state.arrowsVisible || state.pvPreviewLineIndex !== null) {
       const targetArrows = getActiveArrows(state);
       const animated = updateAnimatedArrows(targetArrows, videoArrowState, () => renderVideoOverlay(state));
       // Draw with animated opacity
@@ -642,18 +618,6 @@ export function renderVideoOverlay(state: OverlayState): void {
       const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
       for (let i = drawList.length - 1; i >= 0; i--) {
         drawArrow(ctx, drawList[i].arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress);
-      }
-
-      // Draw cp loss label for the active PV line
-      if (state.lineVisible && state.pvDisplayDepth > 0 && result.evaluation?.top_moves?.length) {
-        const idx = Math.min(state.selectedLineIndex, result.evaluation.top_moves.length - 1);
-        const move = result.evaluation.top_moves[idx];
-        if (move.loss_cp >= 5) {
-          const firstArrow = targetArrows[0];
-          if (firstArrow) {
-            drawLossLabel(ctx, firstArrow.from, move.loss_cp, boardRect, state.displayFlipped);
-          }
-        }
       }
 
       // Draw cp loss label during preview mode on the highlighted arrow

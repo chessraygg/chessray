@@ -20,7 +20,7 @@
       <button class="toggle icon-toggle active" id="cv-eval-btn" data-tip="Show eval bar next to detected board">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="1" width="6" height="14" rx="1"/><rect x="5" y="7" width="6" height="8" rx="0" fill="currentColor" stroke="none"/></svg>
       </button>
-      <button class="toggle icon-toggle active" id="cv-line-btn" data-tip="Show best line as numbered arrows on board">
+      <button class="toggle icon-toggle active" id="cv-line-btn" data-tip="Replay engine's best line as piece animation on the board">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="14" x2="4" y2="3"/><polygon points="4,1 2,4 6,4" fill="currentColor" stroke="none"/><line x1="12" y1="2" x2="12" y2="13"/><polygon points="12,15 10,12 14,12" fill="currentColor" stroke="none"/></svg>
       </button>
       <button class="toggle icon-toggle" id="cv-arrows-btn" data-tip="Show top engine moves as arrows on board">
@@ -116,7 +116,7 @@
               <span id="cv-loss-threshold-val">0</span>
             </div>
             <div class="pv-depth-row" id="cv-pv-depth-row">
-              <label data-tip="Number of moves shown in best line">PV depth</label>
+              <label data-tip="Number of moves to play through in the best-line piece animation">PV depth</label>
               <input type="range" id="cv-pv-depth" min="1" max="11" value="10">
               <span id="cv-pv-depth-val">10</span>
             </div>
@@ -126,7 +126,7 @@
               <span id="cv-target-fps-val">2</span>
             </div>
             <div class="pv-depth-row">
-              <label data-tip="Seconds between adding each new line arrow (starts at 2, grows to max)">Grow</label>
+              <label data-tip="Seconds between each move in the best-line piece animation">Grow</label>
               <input type="range" id="cv-pv-grow-delay" min="1" max="10" value="3" step="1">
               <span id="cv-pv-grow-delay-val">3</span><span style="font-size:8px;color:var(--text-faint)">s</span>
             </div>
@@ -134,11 +134,6 @@
               <label data-tip="Seconds to wait after position stabilizes before showing moves (0 = instant)">Wait</label>
               <input type="range" id="cv-show-moves-delay" min="0" max="10" value="0" step="1">
               <span id="cv-show-moves-delay-val">0</span><span style="font-size:8px;color:var(--text-faint)">s</span>
-            </div>
-            <div class="pv-depth-row">
-              <label data-tip="Line arrow colors for white and black moves">Colors</label>
-              <input type="color" id="cv-pv-white-color" value="#60a5fa" class="color-pick">
-              <input type="color" id="cv-pv-black-color" value="#f9a8d4" class="color-pick">
             </div>
             <div class="pv-depth-row" id="cv-auto-delay-row">
               <label data-tip="Seconds to show top moves before switching to best line">Delay</label>

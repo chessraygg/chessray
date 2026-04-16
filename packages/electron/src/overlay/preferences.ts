@@ -22,8 +22,6 @@ export interface Prefs {
   compactMode: boolean;
   targetFps: number;
   changeDetect: boolean;
-  pvWhiteColor: string;
-  pvBlackColor: string;
   collapsedSections: string[];
   panelLeft: number | null;
   panelTop: number | null;
@@ -42,8 +40,6 @@ export const DEFAULT_PREFS: Prefs = {
   compactMode: false,
   targetFps: 2,
   changeDetect: true,
-  pvWhiteColor: '#60a5fa',
-  pvBlackColor: '#f9a8d4',
   pvDepth: 10,
   lossThreshold: 0,
   maxDepth: 28,

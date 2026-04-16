@@ -40,8 +40,6 @@ const state: OverlayState = {
   lineVisible: false,
   pvDepth: 10,
   pvDisplayDepth: 2,
-  pvWhiteColor: '#60a5fa',
-  pvBlackColor: '#f9a8d4',
   evalBarVisible: true,
   sourceVisible: true,
   selectedLineIndex: 0,
@@ -799,38 +797,6 @@ function initOverlay(): void {
       showMovesDelaySec = parseInt(showMovesSlider.value, 10);
       showMovesVal.textContent = String(showMovesDelaySec);
       savePrefs({ showMovesDelaySec });
-    });
-  }
-
-  // ── PV line colors ──
-  const pvWhiteColorInput = document.getElementById('cv-pv-white-color') as HTMLInputElement | null;
-  const pvBlackColorInput = document.getElementById('cv-pv-black-color') as HTMLInputElement | null;
-  state.pvWhiteColor = prefs.pvWhiteColor;
-  state.pvBlackColor = prefs.pvBlackColor;
-
-  function colorPickerFocus() { window.chessRay.setAlwaysOnTop(false); }
-  function colorPickerBlur() { window.chessRay.setAlwaysOnTop(true); }
-
-  if (pvWhiteColorInput) {
-    pvWhiteColorInput.value = state.pvWhiteColor;
-    pvWhiteColorInput.addEventListener('click', colorPickerFocus);
-    pvWhiteColorInput.addEventListener('blur', colorPickerBlur);
-    pvWhiteColorInput.addEventListener('input', () => {
-      state.pvWhiteColor = pvWhiteColorInput.value;
-      savePrefs({ pvWhiteColor: state.pvWhiteColor });
-      renderArrows(state);
-      renderVideoOverlay(state);
-    });
-  }
-  if (pvBlackColorInput) {
-    pvBlackColorInput.value = state.pvBlackColor;
-    pvBlackColorInput.addEventListener('click', colorPickerFocus);
-    pvBlackColorInput.addEventListener('blur', colorPickerBlur);
-    pvBlackColorInput.addEventListener('input', () => {
-      state.pvBlackColor = pvBlackColorInput.value;
-      savePrefs({ pvBlackColor: state.pvBlackColor });
-      renderArrows(state);
-      renderVideoOverlay(state);
     });
   }
 
