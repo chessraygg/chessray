@@ -1,5 +1,7 @@
 # AGENTS.md
 
+This file provides repository-wide guidance for AI coding assistants (Claude Code, Cursor, Aider, Codex, etc.). It documents the project's stack, architecture, and engineering conventions so generated changes fit the codebase.
+
 ## Project
 
 Electron app for real-time chess position recognition and evaluation, rendered as a transparent overlay on screen. Detection is purely vision-based (screen capture + ML models) — never DOM-based.
@@ -31,15 +33,14 @@ Monorepo with two packages:
 
 Platform-specific code is isolated in `packages/electron/src/main/platform.ts` via an adapter pattern.
 
-## Principles
+## Engineering conventions
 
-- **Fail fast.** No fallbacks, no graceful degradation. If something fails, let it fail loudly. Never catch errors silently. Always `throw`, never log an error and continue.
-- **No hacky solutions.** Don't layer fixes on top of a broken approach — step back and find the right one.
-- **Never patch a wrong approach.** If the current implementation uses a wrong algorithm, replace it. Don't add guardrails around a fundamentally wrong approach.
-- **Keep it simple.** Don't over-engineer or add speculative features. No premature optimization.
-- **Research first.** Before implementing detection/CV algorithms, search for established approaches. Don't invent custom solutions when proven ones exist.
-- **Use libraries, don't reimplement.** If a battle-tested library exists, use it. One function call beats 200 lines of buggy reimplementation.
-- **Tests define the spec.** They describe what the correct output should be, not what the implementation currently produces. If the implementation can't pass, fix the implementation — don't weaken the test.
+- **Vision-based only.** The detection pipeline must rely on screen capture and ML models. Do not introduce DOM scraping, accessibility-tree reading, or site-specific integrations into detection code.
+- **Prefer fail-fast error handling.** Surface unexpected errors instead of swallowing them. Reserve `try`/`catch` for cases with a meaningful recovery path; do not log-and-continue on conditions that indicate a bug.
+- **Keep changes focused.** Avoid speculative abstractions, premature optimization, or scope creep. Implement what the task requires and stop.
+- **Reuse established libraries.** Before writing non-trivial detection, computer-vision, or chess logic, check whether a proven library already solves it.
+- **Treat tests as the specification.** Tests describe intended behavior. When a test fails, investigate the implementation first; only update an expectation when the spec itself has changed and that change is intentional.
+- **Match existing structure.** New code should follow the subdirectory organization in `packages/core/src/` (one concern per subdir) and the platform-adapter pattern in `packages/electron/src/main/platform.ts`.
 
 ## Commands
 
