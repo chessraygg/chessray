@@ -7,35 +7,12 @@ import type { PipelineResult } from '@chessray/core';
 import { applyUciMoves, uciToSan } from '@chessray/core';
 import { lossToColor } from '../shared/arrows.js';
 import { loadPrefs, savePrefs } from './preferences.js';
-import { type OverlayState, type PvBoardState, renderArrows, renderVideoOverlay, clearVideoOverlay, drawArrow } from './canvas-renderer.js';
+import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, drawArrow } from './canvas-renderer.js';
 import { preloadPieceImages } from './piece-svg.js';
 import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid } from './debug-panel.js';
 import { pieceSvg } from './piece-svg.js';
 
-declare global {
-  interface Window {
-    chessRay: {
-      onFrameResult: (cb: (result: unknown) => void) => void;
-      onStopTracking: (cb: () => void) => void;
-      setMousePassthrough: (passthrough: boolean) => void;
-      setAlwaysOnTop: (enabled: boolean) => void;
-      onDisplayInfo: (cb: (info: any) => void) => void;
-      onSourceVisibility: (cb: (visible: boolean) => void) => void;
-      reopenPicker: () => void;
-      setMaxDepth: (depth: number) => void;
-      setMultiPvMax: (n: number) => void;
-      setMultiPvRamp: (n: number) => void;
-      setChangeDetect: (enabled: boolean) => void;
-      setTargetFps: (fps: number) => void;
-      onResetPanelPosition: (cb: () => void) => void;
-      minimizeApp: () => void;
-      closeApp: () => void;
-      openExternal: (url: string) => void;
-      toggleLichess: (fen: string, color: string) => void;
-      updateLichess: (fen: string, color: string) => void;
-    };
-  }
-}
+/// <reference path="../shared/window.d.ts" />
 
 // ── Module-level state ──
 let lichessOpen = false;
@@ -1099,7 +1076,6 @@ function initOverlay(): void {
       // Convert to SAN via core
       const sanArr = fen ? uciToSan(fen, [uci]) : [uci];
       const label = sanArr[0] || uci;
-      const scoreStr = move.score_cp >= 0 ? `+${(move.score_cp / 100).toFixed(1)}` : (move.score_cp / 100).toFixed(1);
       const cls = (i === state.selectedLineIndex ? ' selected' : '') + (i === userLockedLine ? ' locked' : '');
       const hex = lossToColor(move.loss_cp);
       const cr = parseInt(hex.slice(1, 3), 16);
@@ -1151,10 +1127,11 @@ function initOverlay(): void {
 
   // ── Reset panel position (triggered from dock menu) ──
   window.chessRay.onResetPanelPosition(() => {
-    if (userPanel) {
-      userPanel.style.left = '20px';
-      userPanel.style.top = '20px';
-      userPanel.style.right = 'auto';
+    const panel = userPanel;
+    if (panel) {
+      panel.style.left = '20px';
+      panel.style.top = '20px';
+      panel.style.right = 'auto';
       savePrefs({ panelLeft: 20, panelTop: 20 });
       // Dim everything and highlight the panel
       document.querySelectorAll('.reset-dim').forEach(el => el.remove());
@@ -1162,10 +1139,10 @@ function initOverlay(): void {
       dim.className = 'reset-dim';
       document.body.appendChild(dim);
       dim.addEventListener('animationend', () => dim.remove());
-      userPanel.classList.remove('flash');
-      void userPanel.offsetWidth;
-      userPanel.classList.add('flash');
-      userPanel.addEventListener('animationend', () => userPanel.classList.remove('flash'), { once: true });
+      panel.classList.remove('flash');
+      void panel.offsetWidth;
+      panel.classList.add('flash');
+      panel.addEventListener('animationend', () => panel.classList.remove('flash'), { once: true });
     }
   });
 

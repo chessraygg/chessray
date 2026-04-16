@@ -47,6 +47,7 @@ export interface OverlayState {
     workArea: { x: number; y: number; width: number; height: number };
     scaleFactor: number;
     overlayBounds?: { x: number; y: number; width: number; height: number };
+    displayBounds?: { x: number; y: number; width: number; height: number };
   } | null;
 }
 
@@ -515,9 +516,6 @@ export function renderVideoOverlay(state: OverlayState): void {
 
   const result = state.currentResult;
   if (!result?.board_detection?.found || !result.board_detection.bbox || !result.frame_dimensions) return;
-
-  const frameW = result.frame_dimensions.width;
-  const frameH = result.frame_dimensions.height;
 
   // The overlay window covers the work area (excludes menu bar/dock).
   // The captured frame covers the full display (includes menu bar).

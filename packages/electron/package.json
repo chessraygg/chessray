@@ -11,7 +11,8 @@
     "build": "electron-forge make",
     "package": "electron-forge package",
     "install-app": "node scripts/kill-app.js && electron-forge package && node scripts/install-app.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@chessray/core": "*"

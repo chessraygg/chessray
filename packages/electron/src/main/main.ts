@@ -304,44 +304,13 @@ function guessMimeType(filePath: string): string {
 // For window captures, hide overlay when the tracked app is not frontmost.
 // Screen captures are always visible.
 
-let trackedPid: string | null = null;
 let visibilityInterval: ReturnType<typeof setInterval> | null = null;
-let sourceVisible = true;
-
-function startVisibilityTracking(sourceId: string): void {
-  stopVisibilityTracking();
-  sourceVisible = true;
-
-  // Screen captures: always visible, no tracking needed
-  if (sourceId.startsWith('screen:')) return;
-
-  // Extract PID from "window:PID:index"
-  const parts = sourceId.split(':');
-  trackedPid = parts[1] ?? null;
-  if (!trackedPid) return;
-
-  visibilityInterval = setInterval(async () => {
-    const frontPid = await platform.getFrontmostPid();
-    if (!frontPid) return;
-    // Also treat our own app as "visible" (user interacting with debug panel)
-    const isOurApp = frontPid === String(process.pid);
-    const visible = frontPid === trackedPid || isOurApp;
-    if (visible !== sourceVisible) {
-      sourceVisible = visible;
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send('source-visibility', visible);
-      }
-    }
-  }, 500);
-}
 
 function stopVisibilityTracking(): void {
   if (visibilityInterval) {
     clearInterval(visibilityInterval);
     visibilityInterval = null;
   }
-  trackedPid = null;
-  sourceVisible = true;
 }
 
 // ── IPC handlers ──

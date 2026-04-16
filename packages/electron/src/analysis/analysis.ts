@@ -21,25 +21,7 @@ import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } 
 import { initAndStartCapture, stopCapture, setTargetFps } from './frame-capture.js';
 import { computeArrows } from '../shared/arrows.js';
 
-declare global {
-  interface Window {
-    chessRay: {
-      onStartCapture: (cb: (sourceId: string) => void) => void;
-      onStopCapture: (cb: () => void) => void;
-      sendRendererReady: () => void;
-      getSourceId: () => Promise<string | null>;
-      sendFrameResult: (result: unknown) => void;
-      sendDebugLog: (msg: string) => void;
-      getSources: () => Promise<Array<{ id: string; name: string; thumbnailDataUrl: string; display_id: string }>>;
-      selectSource: (id: string) => void;
-      onSetMaxDepth: (cb: (depth: number) => void) => void;
-      onSetMultiPvMax: (cb: (n: number) => void) => void;
-      onSetMultiPvRamp: (cb: (n: number) => void) => void;
-      onSetChangeDetect: (cb: (enabled: boolean) => void) => void;
-      onSetTargetFps: (cb: (fps: number) => void) => void;
-    };
-  }
-}
+/// <reference path="../shared/window.d.ts" />
 
 // Pipeline state
 let lastPositionFen: string | null = null;
