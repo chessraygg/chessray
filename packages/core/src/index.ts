@@ -1,6 +1,5 @@
 export * from './types.js';
 export * from './fen.js';
-export * from './arrows.js';
 export * from './board-detect.js';
 export * from './pixel-utils.js';
 export * from './bbox-refine.js';

@@ -4,7 +4,8 @@
  */
 
 import type { PipelineResult } from '@chessray/core';
-import { applyUciMoves, uciToSan, lossToColor } from '@chessray/core';
+import { applyUciMoves, uciToSan } from '@chessray/core';
+import { lossToColor } from '../shared/arrows.js';
 import { loadPrefs, savePrefs } from './preferences.js';
 import { type OverlayState, type PvBoardState, renderArrows, renderVideoOverlay, clearVideoOverlay, drawArrow } from './canvas-renderer.js';
 import { preloadPieceImages } from './piece-svg.js';

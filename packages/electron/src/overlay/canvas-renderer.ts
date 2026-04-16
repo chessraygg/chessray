@@ -1,5 +1,5 @@
 import type { ArrowDescriptor, PipelineResult } from '@chessray/core';
-import { computeCurveOffsets, computePvArrows, lossToColor } from '@chessray/core';
+import { computeCurveOffsets, computePvArrows, lossToColor } from '../shared/arrows.js';
 import { pieceImages } from './piece-svg.js';
 
 export interface PvBoardState {

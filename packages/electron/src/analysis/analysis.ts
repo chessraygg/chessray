@@ -7,7 +7,7 @@
 
 import {
   detectBoard, cropPixels, recognizeBoard,
-  computeArrows, compareFen, guessTurn, buildFullFen, detectSequentialMove, isStartingPosition,
+  compareFen, guessTurn, buildFullFen, detectSequentialMove, isStartingPosition,
 } from '@chessray/core';
 import { Chess } from 'chess.js';
 import type {
@@ -19,6 +19,7 @@ import { EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH,
 import { sampleBoardPixels, boardUnchanged } from './change-detect.js';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
 import { initAndStartCapture, stopCapture, setTargetFps } from './frame-capture.js';
+import { computeArrows } from '../shared/arrows.js';
 
 declare global {
   interface Window {

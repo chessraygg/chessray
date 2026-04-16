@@ -13,7 +13,9 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "cd packages/core && npx vitest run",
+    "test": "npm test --workspaces --if-present",
+    "test:core": "cd packages/core && npx vitest run",
+    "test:electron": "cd packages/electron && npx vitest run",
     "test:watch": "cd packages/core && npx vitest",
     "test:e2e": "npx playwright test",
     "setup": "node scripts/download-vendor.js",

@@ -1,5 +1,6 @@
 import type { PipelineResult } from '@chessray/core';
-import { uciToSan, formatMoveLine, lossToColor } from '@chessray/core';
+import { uciToSan, formatMoveLine } from '@chessray/core';
+import { lossToColor } from '../shared/arrows.js';
 import { savePrefs } from './preferences.js';
 import { pieceSvg } from './piece-svg.js';
 
