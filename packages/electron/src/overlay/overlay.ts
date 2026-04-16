@@ -7,7 +7,7 @@ import type { PipelineResult } from '../shared/types.js';
 import { applyUciMoves, uciToSan } from '@chessray/core';
 import { lossToColor } from '../shared/arrows.js';
 import { loadPrefs, savePrefs } from './preferences.js';
-import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, drawArrow } from './canvas-renderer.js';
+import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow } from './canvas-renderer.js';
 import { preloadPieceImages } from './piece-svg.js';
 import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid } from './debug-panel.js';
 import { pieceSvg } from './piece-svg.js';
@@ -1209,6 +1209,8 @@ function processPendingResult(): void {
   if (recogFen && recogFen !== lastRecogFen) {
     lastRecogFen = recogFen;
     (window as any).__chessrayPvPlayStop?.();
+    // Snap old PV arrows away so they don't fade out over the new position
+    resetVideoArrowAnimation();
 
     // Hold moves if showMovesDelay is configured
     if (showMovesDelaySec > 0) {

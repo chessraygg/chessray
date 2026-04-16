@@ -739,3 +739,14 @@ export function clearVideoOverlay(state: OverlayState): void {
   const ctx = state.videoCanvas.getContext('2d');
   if (ctx) ctx.clearRect(0, 0, state.videoCanvas.width, state.videoCanvas.height);
 }
+
+/** Snap-clear video overlay arrow animations. Use when the underlying position
+ * changes, so old PV arrows disappear instantly instead of fading out over the
+ * new position's squares. */
+export function resetVideoArrowAnimation(): void {
+  videoArrowState.animated = [];
+  if (videoArrowState.timer) {
+    clearInterval(videoArrowState.timer);
+    videoArrowState.timer = 0;
+  }
+}
