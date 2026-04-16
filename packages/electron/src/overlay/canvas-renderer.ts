@@ -268,7 +268,7 @@ function drawSourceCircle(
   const r = Math.min(squareW, squareH) * 0.32;
 
   ctx.save();
-  ctx.globalAlpha = 0.6;
+  ctx.globalAlpha = 0.25;
   ctx.fillStyle = lossToColor(lossCp);
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
