@@ -47,6 +47,7 @@ export async function runDetectionPipeline(
       fullFen: null,
       recognition: null as any,
       highlightedSquares: [],
+      invalidHighlights: false,
       flipped: false,
       turn: null,
       orientationSource: 'piece_count',

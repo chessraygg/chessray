@@ -35,6 +35,7 @@ let lastIsFlipped = false;
 let lastOrientationSource: OrientationSource | undefined;
 let lastHighlightedSquares: number[] = [];
 let lastHighlightTurn: Turn | null = null;
+let lastInvalidHighlights = false;
 let lastSquareColors: PipelineResult['square_colors'] | undefined;
 let lastArrows: ArrowDescriptor[] = [];
 let lastFullFen: string | null = null;
@@ -156,6 +157,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     let rawFen = '';
     let highlightedSquares: number[] = [];
     let highlightTurn: Turn | null = null;
+    let invalidHighlights = false;
     let tRecog = 0;
     let brTiming: { pieces_ms: number; orientation_ms: number; highlights_ms: number; disambiguate_ms: number; pawnRefine_ms: number; turn_ms: number; total_ms: number } | null = null;
     let detectionStatus: string | undefined;
@@ -169,6 +171,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       orientationSource = lastOrientationSource;
       highlightedSquares = lastHighlightedSquares;
       highlightTurn = lastHighlightTurn;
+      invalidHighlights = lastInvalidHighlights;
     } else {
       t = Date.now();
       if (recognizer) {
@@ -196,6 +199,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
           orientationSource = boardResult.orientationSource;
           highlightedSquares = boardResult.highlightedSquares;
           highlightTurn = boardResult.turn;
+          invalidHighlights = boardResult.invalidHighlights;
           squareColors = boardResult.highlightMedians;
           cachedOrientation = { prevFen: rawFen, orientation: { flipped: isFlipped, source: orientationSource } };
           if (frameCount <= 3) {
@@ -211,6 +215,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       lastOrientationSource = orientationSource;
       lastHighlightedSquares = highlightedSquares;
       lastHighlightTurn = highlightTurn;
+      lastInvalidHighlights = invalidHighlights;
       lastSquareColors = squareColors;
 
     }
@@ -256,11 +261,15 @@ async function processFrame(imageData: ImageData): Promise<void> {
     const positionFen = recognition.fen;
 
     // Require highlights unless it's a starting position.
-    // Without highlights, we may have captured a mid-move frame where the
-    // piece is sliding and the highlight hasn't appeared yet.
+    // Without highlights — or with highlights that don't form a legal move —
+    // we likely captured a mid-move frame or a noisy detection. Keep showing
+    // the previous result and skip eval until the next clean frame.
     if (highlightedSquares.length === 0 && !isStartingPosition(positionFen)) {
-      detectionStatus = 'No highlights — waiting for move to complete';
-      debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [no highlights] total=${Date.now() - startTime}ms`);
+      detectionStatus = invalidHighlights
+        ? 'Invalid highlights — no legal move'
+        : 'No highlights — waiting for move to complete';
+      const reason = invalidHighlights ? 'invalid highlights' : 'no highlights';
+      debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [${reason}] total=${Date.now() - startTime}ms`);
       // Keep showing previous result if available
       if (lastPositionFen && lastEval) {
         sendResult(makeResult({

@@ -374,8 +374,10 @@ export function disambiguateHighlights(
     }
   }
 
-  // Fallback: pick top 2 by score
-  return candidates.slice(0, 2);
+  // No legal source/destination pair found among candidates or expanded score list.
+  // Refuse to guess — return empty so the pipeline can reject the frame as "highlights
+  // present but no legal move". Callers should treat this the same as no highlights.
+  return [];
 }
 
 /**

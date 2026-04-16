@@ -20,6 +20,9 @@ export interface BoardRecognitionResult {
   recognition: RecognitionResult;
   /** Highlighted square indices in corrected orientation (0-63) */
   highlightedSquares: number[];
+  /** True when raw highlight detection found candidates but none formed a legal
+   * move pair (so highlightedSquares ended up empty after disambiguation). */
+  invalidHighlights: boolean;
   /** Whether the board image is flipped (black at bottom in raw image) */
   flipped: boolean;
   /** Turn determined from highlights, or null if not determinable */
@@ -100,6 +103,16 @@ export async function recognizeBoard(
   // Step 3b: Disambiguate highlights
   t = Date.now();
   let highlightedSquares = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians, orientation.flipped);
+  // When the initial orientation guess (piece_count with low piece count) is
+  // unreliable AND no legal pair was found, retry with the flipped orientation
+  // so pawn_move refinement below can pick up the correct flip.
+  if (highlightedSquares.length === 0 && hlResult.highlighted.length > 0
+      && orientation.source === 'piece_count' && !pieceCountReliable) {
+    const flippedTry = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians, !orientation.flipped);
+    if (flippedTry.length === 2) highlightedSquares = flippedTry;
+  }
+  // Raw detection found candidates but disambiguation couldn't form a legal pair
+  const invalidHighlights = hlResult.highlighted.length > 0 && highlightedSquares.length === 0;
   const tDisambiguate = Date.now() - t;
 
   // Step 4: Refine orientation using pawn move direction from highlights.
@@ -178,6 +191,7 @@ export async function recognizeBoard(
     fullFen,
     recognition: { ...recognition, fen: correctedFen },
     highlightedSquares,
+    invalidHighlights,
     flipped: orientation.flipped,
     turn,
     midAnimation,
