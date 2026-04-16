@@ -315,7 +315,6 @@ function drawPlayedMoveMarker(
   ctx.lineWidth = Math.max(2, fontSize * 0.18);
   ctx.strokeStyle = '#000';
   ctx.strokeText(text, cx, cy);
-  ctx.globalAlpha = 0.55;
   ctx.fillStyle = '#fff';
   ctx.fillText(text, cx, cy);
   ctx.restore();
