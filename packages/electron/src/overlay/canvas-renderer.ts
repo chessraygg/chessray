@@ -267,21 +267,27 @@ function drawPlayedMoveMarker(
   const cy = board.y + (7 - rank + 0.5) * squareH;
 
   if (lossCp < 10) {
-    // Excellent move — stylish white checkmark, no badge
-    const size = Math.min(squareW, squareH) * 0.28;
-    const strokeW = Math.max(2, size * 0.22);
+    // Excellent move — white checkmark inside a translucent green disk
+    const r = Math.min(squareW, squareH) * 0.22;
+    const size = r * 1.25;
+    const strokeW = Math.max(2, r * 0.28);
 
     ctx.save();
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-    ctx.shadowBlur = strokeW * 1.5;
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#22c55e';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = strokeW;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.moveTo(cx - size * 0.50, cy + size * 0.05);
-    ctx.lineTo(cx - size * 0.10, cy + size * 0.40);
-    ctx.lineTo(cx + size * 0.55, cy - size * 0.40);
+    ctx.moveTo(cx - size * 0.45, cy + size * 0.05);
+    ctx.lineTo(cx - size * 0.10, cy + size * 0.35);
+    ctx.lineTo(cx + size * 0.50, cy - size * 0.35);
     ctx.stroke();
     ctx.restore();
     return;
