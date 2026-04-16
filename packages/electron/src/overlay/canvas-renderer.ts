@@ -248,8 +248,8 @@ export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
   return pvArrows.length ? pvArrows : moveArrows;
 }
 
-/** Draw a small colored circle on a square. Used to mark the target square of the
- * played move (overlaid on the piece), with color encoding centipawn loss. */
+/** Draw a small colored badge on the target square of the played move (overlaid on
+ * the piece). Color encodes centipawn loss, and the loss value is shown inside. */
 function drawPlayedMoveMarker(
   ctx: CanvasRenderingContext2D,
   square: string,
@@ -265,14 +265,30 @@ function drawPlayedMoveMarker(
 
   const cx = board.x + (file + 0.5) * squareW;
   const cy = board.y + (7 - rank + 0.5) * squareH;
-  const r = Math.min(squareW, squareH) * 0.18;
+  const fontSize = Math.max(7, Math.round(Math.min(squareW, squareH) * 0.20));
+  const r = fontSize * 1.25;
+  const color = lossToColor(lossCp);
+  const text = lossCp >= 10 ? `−${(lossCp / 100).toFixed(1)}` : '0.0';
 
   ctx.save();
-  ctx.globalAlpha = 0.25;
-  ctx.fillStyle = lossToColor(lossCp);
+  // Translucent colored disk
+  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = color;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
+
+  // Contrast-aware text
+  const hex = color.replace('#', '');
+  const lum = (parseInt(hex.substring(0, 2), 16) * 299
+    + parseInt(hex.substring(2, 4), 16) * 587
+    + parseInt(hex.substring(4, 6), 16) * 114) / 1000;
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = lum > 140 ? '#000' : '#fff';
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, cx, cy);
   ctx.restore();
 }
 
