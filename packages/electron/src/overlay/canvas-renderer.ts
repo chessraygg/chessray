@@ -248,9 +248,9 @@ export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
   return pvArrows.length ? pvArrows : moveArrows;
 }
 
-/** Draw a colored circle on a square. Used to mark the source of the played move,
- * with color encoding centipawn loss (via lossToColor). */
-function drawSourceCircle(
+/** Draw a small colored circle on a square. Used to mark the target square of the
+ * played move (overlaid on the piece), with color encoding centipawn loss. */
+function drawPlayedMoveMarker(
   ctx: CanvasRenderingContext2D,
   square: string,
   lossCp: number,
@@ -265,7 +265,7 @@ function drawSourceCircle(
 
   const cx = board.x + (file + 0.5) * squareW;
   const cy = board.y + (7 - rank + 0.5) * squareH;
-  const r = Math.min(squareW, squareH) * 0.32;
+  const r = Math.min(squareW, squareH) * 0.18;
 
   ctx.save();
   ctx.globalAlpha = 0.25;
@@ -480,10 +480,10 @@ export function renderArrows(state: OverlayState): void {
     return;
   }
 
-  // Mark the played move's source square with a loss-colored circle (no arrow, no label)
+  // Mark the played move's target square (on the moved piece) with a loss-colored dot
   if (state.currentResult?.played_move) {
     const pm = state.currentResult.played_move;
-    drawSourceCircle(ctx, pm.from, pm.loss_cp, virtualBoard, state.displayFlipped);
+    drawPlayedMoveMarker(ctx, pm.to, pm.loss_cp, virtualBoard, state.displayFlipped);
   }
 
   const targetArrows = getActiveArrows(state);
@@ -582,10 +582,10 @@ export function renderVideoOverlay(state: OverlayState): void {
     videoArrowState.animated = [];
     if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
   } else {
-    // Mark the played move's source square with a loss-colored circle (no arrow, no label)
+    // Mark the played move's target square (on the moved piece) with a loss-colored dot
     if (result.played_move) {
       const pm = result.played_move;
-      drawSourceCircle(ctx, pm.from, pm.loss_cp, boardRect, state.displayFlipped);
+      drawPlayedMoveMarker(ctx, pm.to, pm.loss_cp, boardRect, state.displayFlipped);
     }
 
     if (state.arrowsVisible || state.lineVisible || state.pvPreviewLineIndex !== null) {
