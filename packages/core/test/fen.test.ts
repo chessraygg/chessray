@@ -8,7 +8,7 @@ import {
   squareToIndex,
   indexToSquare,
   buildFullFen,
-} from '../src/fen.js';
+} from '../src/fen/fen.js';
 
 const STARTING_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const STARTING_POSITION = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';

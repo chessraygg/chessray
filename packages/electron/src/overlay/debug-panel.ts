@@ -1,5 +1,6 @@
-import type { PipelineResult } from '@chessray/core';
-import { uciToSan, formatMoveLine, lossToColor } from '@chessray/core';
+import type { PipelineResult } from '../shared/types.js';
+import { uciToSan, formatMoveLine, type Turn } from '@chessray/core';
+import { lossToColor } from '../shared/arrows.js';
 import { savePrefs } from './preferences.js';
 import { pieceSvg } from './piece-svg.js';
 
@@ -145,7 +146,7 @@ function renderBestMoves(
     let movesText: string;
     if (useSan && fen) {
       const sanMoves = uciToSan(fen, move.pv.slice(0, 5));
-      const turn = fen.split(' ')[1] as 'w' | 'b' || 'w';
+      const turn = fen.split(' ')[1] as Turn || 'w';
       movesText = formatMoveLine(sanMoves, turn);
     } else {
       movesText = move.pv.slice(0, 5).join(' ');

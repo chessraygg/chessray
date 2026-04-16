@@ -6,7 +6,8 @@
   "type": "module",
   "main": "./src/index.ts",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "chess.js": "^1.4.0"

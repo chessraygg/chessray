@@ -16,12 +16,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { PNG } from 'pngjs';
 import { Resvg } from '@resvg/resvg-js';
-import { PIPELINE_CASES, type PipelineTestCase } from '../test/fixtures/pipeline-cases.js';
+import { PIPELINE_CASES, type PipelineTestCase } from '../packages/core/test/fixtures/pipeline-cases.js';
 import { buildFullFen, flipFen } from '@chessray/core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCREENSHOTS_DIR = path.join(__dirname, '..', 'test', 'screenshots');
-const OUT_DIR = path.join(__dirname, '..', 'test', 'fixtures', 'expected-images');
+const SCREENSHOTS_DIR = path.join(__dirname, '..', 'packages', 'core', 'test', 'screenshots');
+const OUT_DIR = path.join(__dirname, '..', 'packages', 'core', 'test', 'fixtures', 'expected-images');
 
 // Colors for the virtual board
 const LIGHT_SQ = [240, 217, 181] as const;  // #f0d9b5

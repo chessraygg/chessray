@@ -7,38 +7,22 @@
 
 import {
   detectBoard, cropPixels, recognizeBoard,
-  computeArrows, compareFen, guessTurn, buildFullFen, detectSequentialMove, isStartingPosition,
+  compareFen, guessTurn, buildFullFen, detectSequentialMove, isStartingPosition,
 } from '@chessray/core';
 import { Chess } from 'chess.js';
 import type {
-  PixelBuffer, PipelineResult, EvalResult, RecognitionResult, BoardBBox, ArrowDescriptor,
-  OrientationSource,
+  PixelBuffer, EvalResult, RecognitionResult, BoardBBox,
+  OrientationSource, Turn,
 } from '@chessray/core';
+import type { PipelineResult, ArrowDescriptor, GameOver } from '../shared/types.js';
 
 import { EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH, multiPvForDepth, setMultiPvMax, setMultiPvRamp, cacheGet, cachePut } from './eval-cache.js';
 import { sampleBoardPixels, boardUnchanged } from './change-detect.js';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
 import { initAndStartCapture, stopCapture, setTargetFps } from './frame-capture.js';
+import { computeArrows } from '../shared/arrows.js';
 
-declare global {
-  interface Window {
-    chessRay: {
-      onStartCapture: (cb: (sourceId: string) => void) => void;
-      onStopCapture: (cb: () => void) => void;
-      sendRendererReady: () => void;
-      getSourceId: () => Promise<string | null>;
-      sendFrameResult: (result: unknown) => void;
-      sendDebugLog: (msg: string) => void;
-      getSources: () => Promise<Array<{ id: string; name: string; thumbnailDataUrl: string; display_id: string }>>;
-      selectSource: (id: string) => void;
-      onSetMaxDepth: (cb: (depth: number) => void) => void;
-      onSetMultiPvMax: (cb: (n: number) => void) => void;
-      onSetMultiPvRamp: (cb: (n: number) => void) => void;
-      onSetChangeDetect: (cb: (enabled: boolean) => void) => void;
-      onSetTargetFps: (cb: (fps: number) => void) => void;
-    };
-  }
-}
+/// <reference path="../shared/window.d.ts" />
 
 // Pipeline state
 let lastPositionFen: string | null = null;
@@ -50,7 +34,7 @@ let lastRawFen: string = '';
 let lastIsFlipped = false;
 let lastOrientationSource: OrientationSource | undefined;
 let lastHighlightedSquares: number[] = [];
-let lastHighlightTurn: 'w' | 'b' | null = null;
+let lastHighlightTurn: Turn | null = null;
 let lastArrows: ArrowDescriptor[] = [];
 let lastFullFen: string | null = null;
 let lastPlayedMove: PipelineResult['played_move'] = null;
@@ -169,7 +153,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     let orientationSource: OrientationSource | undefined;
     let rawFen = '';
     let highlightedSquares: number[] = [];
-    let highlightTurn: 'w' | 'b' | null = null;
+    let highlightTurn: Turn | null = null;
     let tRecog = 0;
     let brTiming: { pieces_ms: number; orientation_ms: number; highlights_ms: number; disambiguate_ms: number; pawnRefine_ms: number; turn_ms: number; total_ms: number } | null = null;
     let detectionStatus: string | undefined;
@@ -226,7 +210,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
 
     }
 
-    const makeResult = (opts: { evaluation?: EvalResult | null; arrows?: ArrowDescriptor[]; eval_depth?: number; eval_max_depth?: number; game_over?: 'checkmate' | 'stalemate'; stale_eval?: boolean }): PipelineResult => ({
+    const makeResult = (opts: { evaluation?: EvalResult | null; arrows?: ArrowDescriptor[]; eval_depth?: number; eval_max_depth?: number; game_over?: GameOver; stale_eval?: boolean }): PipelineResult => ({
       board_detection: { found: true, bbox: activeBbox!, confidence: detectionConf },
       recognition,
       evaluation: opts.evaluation ?? null,
@@ -362,7 +346,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
 
     // Detect checkmate/stalemate — skip engine if game is over
     t = Date.now();
-    let gameOver: 'checkmate' | 'stalemate' | undefined;
+    let gameOver: GameOver | undefined;
     try {
       const chess = new Chess(fullFen);
       if (chess.isCheckmate()) gameOver = 'checkmate';

@@ -1,0 +1,442 @@
+- file: test-oro-aronian.png
+  orientation: white top
+  highlighted:
+    - c1
+    - f4
+  turn: b
+  bbox:
+    x: 728
+    'y': 135
+    width: 537
+    height: 537
+  squareSize: 67
+  expectedFen: 1K1RQ2R/1PP3P1/PNN1PPB1/2BP4/5pp1/2nppn2/pppbbq2/1k3rr1
+  orientation_source: piece_count
+  expected_labels:
+    skipped: true
+    reason: piece_count
+  expected_candidates:
+    - square: c1
+      score: 71
+    - square: f4
+      score: 66.4
+- file: test-caruana-american.png
+  orientation: white bottom
+  highlighted:
+    - h4
+    - h5
+  turn: b
+  bbox:
+    x: 88
+    'y': 144
+    width: 1123
+    height: 1123
+  squareSize: 140
+  expectedFen: 2r1k2r/pp2bppp/1qn1p3/2ppPn1P/3P4/2PQ1NP1/PP2NP2/R1B2RK1
+  orientation_source: piece_count
+  expected_labels:
+    skipped: true
+    reason: piece_count
+  expected_candidates:
+    - square: h4
+      score: 241.1
+    - square: h5
+      score: 187.8
+- file: test-caruana-american4.png
+  orientation: white bottom
+  highlighted:
+    - c8
+    - a8
+  turn: w
+  bbox:
+    x: 67
+    'y': 80
+    width: 775
+    height: 775
+  squareSize: 97
+  expectedFen: r5k1/1R3pp1/P3p2p/3pP2P/1r1P4/2b1B1P1/R4P2/6K1
+  orientation_source: label
+  expected_labels:
+    skipped: false
+    result:
+      - side: left
+        type: digit
+        chars: '87654311'
+        direction: desc
+  expected_candidates:
+    - square: a8
+      score: 233.6
+    - square: c8
+      score: 233.6
+- file: test-candidates-nakamura2.png
+  orientation: white bottom
+  highlighted:
+    - c5
+    - b6
+  turn: w
+  bbox:
+    x: 183
+    'y': 150
+    width: 484
+    height: 484
+  squareSize: 61
+  expectedFen: r4rk1/p4ppp/bqp1pn2/8/4P3/2Q3PP/PP3PB1/RN1R2K1
+  orientation_source: piece_count
+  expected_labels:
+    skipped: true
+    reason: piece_count
+  expected_candidates:
+    - square: c5
+      score: 242.4
+    - square: b6
+      score: 238.9
+- file: test-carlsen-titled2.png
+  orientation: white top
+  highlighted:
+    - g5
+    - g6
+  turn: b
+  bbox:
+    x: 47
+    'y': 115
+    width: 699
+    height: 699
+  squareSize: 88
+  expectedFen: 1K6/7k/7p/8/8/1P6/PR6/r7
+  orientation_source: pawn_move
+  expected_labels:
+    skipped: false
+    result: null
+  expected_candidates:
+    - square: g5
+      score: 305.4
+    - square: g6
+      score: 217.1
+- file: test-eric-rosen.png
+  orientation: white bottom
+  highlighted:
+    - b7
+    - b5
+  turn: w
+  bbox:
+    x: 480
+    'y': 91
+    width: 692
+    height: 692
+  squareSize: 87
+  expectedFen: 8/p7/8/1p1K4/8/8/k7/8
+  orientation_source: label
+  expected_labels:
+    skipped: false
+    result:
+      - side: left
+        type: digit
+        chars: '8854337'
+        direction: desc
+  expected_candidates:
+    - square: b7
+      score: 66.2
+    - square: b5
+      score: 53.6
+    - square: b3
+      score: 19.9
+- file: test-eric-rosen3.png
+  orientation: white bottom
+  highlighted:
+    - b1
+    - a1
+  turn: b
+  bbox:
+    x: 480
+    'y': 108
+    width: 692
+    height: 692
+  squareSize: 87
+  expectedFen: 8/8/8/p7/1pk5/8/8/K7
+  orientation_source: label
+  expected_labels:
+    skipped: false
+    result:
+      - side: bottom
+        type: letter
+        chars: abefgh
+        direction: asc
+  expected_candidates:
+    - square: b1
+      score: 321.9
+    - square: a1
+      score: 284.7
+    - square: h7
+      score: 25.7
+    - square: h1
+      score: 22.7
+- file: test-carlsen-titled7.png
+  orientation: white top
+  highlighted:
+    - f1
+    - g2
+  turn: b
+  bbox:
+    x: 20
+    'y': 89
+    width: 1052
+    height: 1052
+  squareSize: 132
+  expectedFen: 1K6/1BB3R1/PP3P2/3P4/pp1b1p2/1nq1p2Q/1k6/2r5
+  orientation_source: piece_count
+  expected_labels:
+    skipped: false
+    result: null
+  expected_candidates:
+    - square: e5
+      score: 322.2
+    - square: f1
+      score: 236.8
+    - square: g2
+      score: 236.8
+- file: test-grenke-dominguez.png
+  orientation: white bottom
+  highlighted:
+    - f6
+    - g7
+  turn: w
+  bbox:
+    x: 64
+    'y': 199
+    width: 431
+    height: 431
+  squareSize: 54
+  expectedFen: 4r2k/pppq1r1p/4Np2/3n2Q1/5P2/8/PPP5/2KR3R
+  orientation_source: piece_count
+  expected_labels:
+    skipped: false
+    result: null
+  expected_candidates:
+    - square: g7
+      score: 451.8
+    - square: f6
+      score: 445.4
+- file: test-freestyle-starting.png
+  orientation: white bottom
+  highlighted: null
+  turn: null
+  bbox:
+    x: 280
+    'y': 402
+    width: 455
+    height: 455
+  squareSize: 57
+  expectedFen: rnbbknqr/pppppppp/8/8/8/8/PPPPPPPP/RNBBKNQR
+  orientation_source: piece_count
+  expected_labels:
+    skipped: true
+    reason: piece_count
+  expected_candidates: []
+- file: test-grenke-carlsen-keymer.png
+  orientation: white bottom
+  highlighted:
+    - b8
+    - f8
+  turn: b
+  bbox:
+    x: 51
+    'y': 68
+    width: 587
+    height: 587
+  squareSize: 73
+  expectedFen: 5Q2/1pq5/2pkrp2/3p4/8/6R1/PP4P1/6K1
+  orientation_source: piece_count
+  expected_labels:
+    skipped: false
+    result: null
+  expected_candidates:
+    - square: b8
+      score: 598.1
+    - square: f8
+      score: 594.7
+- file: test-agadmator-carlsen-svidler.png
+  orientation: white bottom
+  highlighted:
+    - f3
+    - g5
+  turn: b
+  bbox:
+    x: 148
+    'y': 119
+    width: 640
+    height: 640
+  squareSize: 80
+  expectedFen: b3r3/2bq1pkp/3pn1pN/2p1p1Nn/2B1P3/3P2P1/1P1B1P1P/2Q1R1K1
+  orientation_source: piece_count
+  expected_labels:
+    skipped: true
+    reason: piece_count
+  expected_candidates:
+    - square: g5
+      score: 114.6
+    - square: f3
+      score: 86.8
+    - square: a7
+      score: 20.6
+    - square: h7
+      score: 19
+    - square: b3
+      score: 18.9
+- file: test-agadmator-carlsen-svidler3.png
+  orientation: white bottom
+  highlighted:
+    - f8
+    - e7
+  turn: w
+  bbox:
+    x: 178
+    'y': 128
+    width: 640
+    height: 640
+  squareSize: 80
+  expectedFen: r1bqk2r/1pppbppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1
+  orientation_source: piece_count
+  expected_labels:
+    skipped: true
+    reason: piece_count
+  expected_candidates:
+    - square: e7
+      score: 116.1
+    - square: f8
+      score: 114.6
+    - square: a7
+      score: 20.9
+    - square: h7
+      score: 19
+    - square: b3
+      score: 18.9
+- file: test-agadmator-carlsen-svidler4.png
+  orientation: white bottom
+  highlighted:
+    - c3
+    - e2
+  turn: b
+  bbox:
+    x: 155
+    'y': 160
+    width: 640
+    height: 640
+  squareSize: 80
+  expectedFen: b2n1rk1/2pqbppp/3p1n2/1p2p3/4P3/1B1P1N2/1PPBNPPP/3Q1RK1
+  orientation_source: piece_count
+  expected_labels:
+    skipped: true
+    reason: piece_count
+  expected_candidates:
+    - square: g6
+      score: 836.1
+    - square: f5
+      score: 836.1
+    - square: h5
+      score: 831.2
+    - square: g3
+      score: 822.8
+    - square: g7
+      score: 118.9
+    - square: e2
+      score: 115.3
+    - square: c3
+      score: 115.1
+    - square: a7
+      score: 24.9
+    - square: b3
+      score: 21
+    - square: h7
+      score: 18.8
+- file: test-agadmator-carlsen-svidler5.png
+  orientation: white bottom
+  highlighted:
+    - e7
+    - d8
+  turn: w
+  bbox:
+    x: 182
+    'y': 146
+    width: 640
+    height: 640
+  squareSize: 80
+  expectedFen: b2b1rk1/3q1ppp/3pnn2/1pp1pN2/4P3/1B1P1N2/1PPB1PPP/3Q1RK1
+  orientation_source: piece_count
+  expected_labels:
+    skipped: true
+    reason: piece_count
+  expected_candidates:
+    - square: e7
+      score: 127.4
+    - square: d8
+      score: 118.1
+    - square: f5
+      score: 22.8
+    - square: a7
+      score: 20.9
+    - square: h7
+      score: 19
+    - square: b3
+      score: 18.9
+- file: test-carlsen-freestyle2.png
+  orientation: white top
+  highlighted:
+    - b1
+    - b3
+  turn: b
+  bbox:
+    x: 744
+    'y': 81
+    width: 663
+    height: 663
+  squareSize: 83
+  expectedFen: 1RB1KB2/1PPN1P1P/4P1R1/2Q3P1/1P4pp/3qn3/1bppppb1/1r2k1r1
+  orientation_source: piece_count
+  expected_labels:
+    skipped: true
+    reason: piece_count
+  expected_candidates:
+    - square: a7
+      score: 284.7
+    - square: b1
+      score: 237
+    - square: b3
+      score: 236.9
+    - square: a5
+      score: 155.2
+- file: test-agadmator-carlsen-niemann.png
+  orientation: white bottom
+  highlighted:
+    - f8
+    - b4
+  turn: w
+  bbox:
+    x: 126
+    'y': 120
+    width: 544
+    height: 544
+  squareSize: 68
+  expectedFen: rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR
+  orientation_source: piece_count
+  expected_labels:
+    skipped: true
+    reason: piece_count
+  expected_candidates:
+    - square: e3
+      score: 459.4
+    - square: c2
+      score: 330.4
+    - square: f8
+      score: 108.5
+    - square: b4
+      score: 103.2
+    - square: a7
+      score: 22.8
+    - square: b3
+      score: 21.5
+    - square: a8
+      score: 20.4
+    - square: a1
+      score: 19.8
+    - square: h7
+      score: 18.8

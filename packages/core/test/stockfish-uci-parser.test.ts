@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseInfoLine, parseBestMove } from '../src/stockfish-uci-parser.js';
+import { parseInfoLine, parseBestMove } from '../src/engine/stockfish-uci-parser.js';
 
 describe('parseInfoLine', () => {
   it('parses a standard info line with cp score', () => {

@@ -1,5 +1,6 @@
-import type { ArrowDescriptor, PipelineResult } from '@chessray/core';
-import { computeCurveOffsets, computePvArrows, lossToColor } from '@chessray/core';
+import type { ArrowDescriptor, PipelineResult } from '../shared/types.js';
+import type { Turn } from '@chessray/core';
+import { computeCurveOffsets, computePvArrows, lossToColor } from '../shared/arrows.js';
 import { pieceImages } from './piece-svg.js';
 
 export interface PvBoardState {
@@ -47,6 +48,7 @@ export interface OverlayState {
     workArea: { x: number; y: number; width: number; height: number };
     scaleFactor: number;
     overlayBounds?: { x: number; y: number; width: number; height: number };
+    displayBounds?: { x: number; y: number; width: number; height: number };
   } | null;
 }
 
@@ -238,7 +240,7 @@ export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
         const idx = Math.min(state.selectedLineIndex, state.currentResult!.evaluation!.top_moves.length - 1);
         const pv = state.currentResult!.evaluation!.top_moves[idx].pv;
         const turn = state.currentResult!.turn
-          ?? state.currentResult!.evaluation!.fen?.split(' ')[1] as 'w' | 'b'
+          ?? state.currentResult!.evaluation!.fen?.split(' ')[1] as Turn
           ?? 'w';
         return computePvArrows(pv, turn, state.pvDisplayDepth, state.pvWhiteColor, state.pvBlackColor);
       })()
@@ -515,9 +517,6 @@ export function renderVideoOverlay(state: OverlayState): void {
 
   const result = state.currentResult;
   if (!result?.board_detection?.found || !result.board_detection.bbox || !result.frame_dimensions) return;
-
-  const frameW = result.frame_dimensions.width;
-  const frameH = result.frame_dimensions.height;
 
   // The overlay window covers the work area (excludes menu bar/dock).
   // The captured frame covers the full display (includes menu bar).
