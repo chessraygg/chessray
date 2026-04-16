@@ -27,7 +27,7 @@ export class StockfishEngine {
   private messageHandler: ((line: string) => void) | null = null;
   private busyPromise: Promise<void> = Promise.resolve(); // serializes Stockfish access
 
-  constructor(private options: StockfishOptions = {}) {
+  constructor(options: StockfishOptions = {}) {
     this.defaultDepth = options.depth ?? 20;
     this.defaultMultiPV = options.multiPV ?? 3;
   }

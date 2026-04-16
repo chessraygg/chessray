@@ -9,15 +9,6 @@ const CLASS_TO_FEN: Record<number, string> = {
   7: 'k', 8: 'q', 9: 'r', 10: 'b', 11: 'n', 12: 'p',
 };
 
-interface Detection {
-  x: number;     // center x (0-640)
-  y: number;     // center y (0-640)
-  w: number;     // width
-  h: number;     // height
-  confidence: number;
-  classId: number;
-}
-
 /**
  * YOLO-ONNX piece recognizer.
  * Uses ONNX Runtime Web to run a YOLOv11n model that detects pieces with bounding boxes.

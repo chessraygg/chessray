@@ -156,8 +156,6 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
     maxGap >= scoreAboveGap * 0.35;
   if (!gapIsSignificant) return { highlighted: [], scores, colors, medians: { light: lightMedian, dark: darkMedian } };
 
-  const primary = scores.slice(0, cutIdx).map(s => s.idx);
-
   // Include runner-up candidates that score well above the noise floor.
   // These enable disambiguateHighlights to find valid move pairs when the
   // top 2 don't form a legal move (e.g., false positive on a nearby square).

@@ -1,7 +1,6 @@
 import type { BoardBBox } from '../types.js';
-import type { PixelBuffer } from '../board/pixel-utils.js';
 import { cropPixels } from '../board/pixel-utils.js';
-import { detectBoard, type BoardDetectionResult } from '../board/board-detect.js';
+import { detectBoard } from '../board/board-detect.js';
 import { recognizeBoard, type BoardRecognitionResult } from './recognize-board.js';
 import type { OrientationResult } from '../orientation/orientation.js';
 
@@ -52,7 +51,8 @@ export async function runDetectionPipeline(
       turn: null,
       orientationSource: 'piece_count',
       midAnimation: false,
-      labels: null,
+      labels: { skipped: false, result: null },
+      highlightCandidates: [],
       highlightColors: [],
       highlightScores: [],
       highlightMedians: { light: [0, 0, 0], dark: [0, 0, 0] },
