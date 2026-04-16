@@ -37,7 +37,6 @@ export interface OverlayState {
   sourceVisible: boolean;
   selectedLineIndex: number;
   lossThreshold: number;
-  playedLossThreshold: number;
   autoMode: boolean;
   vboardOverlayVisible: boolean;
   pvPreviewLineIndex: number | null;
@@ -249,6 +248,34 @@ export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
   return pvArrows.length ? pvArrows : moveArrows;
 }
 
+/** Draw a colored circle on a square. Used to mark the source of the played move,
+ * with color encoding centipawn loss (via lossToColor). */
+function drawSourceCircle(
+  ctx: CanvasRenderingContext2D,
+  square: string,
+  lossCp: number,
+  board: { x: number; y: number; width: number; height: number },
+  displayFlipped: boolean,
+): void {
+  const squareW = board.width / 8;
+  const squareH = board.height / 8;
+  let file = square.charCodeAt(0) - 97;
+  let rank = parseInt(square[1], 10) - 1;
+  if (displayFlipped) { file = 7 - file; rank = 7 - rank; }
+
+  const cx = board.x + (file + 0.5) * squareW;
+  const cy = board.y + (7 - rank + 0.5) * squareH;
+  const r = Math.min(squareW, squareH) * 0.32;
+
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.fillStyle = lossToColor(lossCp);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawLossLabel(
   ctx: CanvasRenderingContext2D,
   square: string,
@@ -453,19 +480,10 @@ export function renderArrows(state: OverlayState): void {
     return;
   }
 
-  // Draw played move arrow (behind engine arrows)
+  // Mark the played move's source square with a loss-colored circle (no arrow, no label)
   if (state.currentResult?.played_move) {
     const pm = state.currentResult.played_move;
-    const pmArrow: ArrowDescriptor = {
-      from: pm.from, to: pm.to,
-      color: lossToColor(pm.loss_cp),
-      width: 3, opacity: 0.5,
-      loss_cp: pm.loss_cp,
-    };
-    drawArrow(ctx, pmArrow, virtualBoard, 1, state.displayFlipped);
-    if (pm.loss_cp >= state.playedLossThreshold) {
-      drawLossLabel(ctx, pm.from, pm.loss_cp, virtualBoard, state.displayFlipped);
-    }
+    drawSourceCircle(ctx, pm.from, pm.loss_cp, virtualBoard, state.displayFlipped);
   }
 
   const targetArrows = getActiveArrows(state);
@@ -564,20 +582,10 @@ export function renderVideoOverlay(state: OverlayState): void {
     videoArrowState.animated = [];
     if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
   } else {
-    // Draw played move arrow (behind engine arrows)
+    // Mark the played move's source square with a loss-colored circle (no arrow, no label)
     if (result.played_move) {
       const pm = result.played_move;
-      const pmArrow: ArrowDescriptor = {
-        from: pm.from, to: pm.to,
-        color: lossToColor(pm.loss_cp),
-        width: 3, opacity: 0.5,
-        loss_cp: pm.loss_cp,
-      };
-      const arrowScale = (bw + bh) / 2 / 192;
-      drawArrow(ctx, pmArrow, boardRect, arrowScale, state.displayFlipped);
-      if (pm.loss_cp >= state.playedLossThreshold) {
-        drawLossLabel(ctx, pm.from, pm.loss_cp, boardRect, state.displayFlipped);
-      }
+      drawSourceCircle(ctx, pm.from, pm.loss_cp, boardRect, state.displayFlipped);
     }
 
     if (state.arrowsVisible || state.lineVisible || state.pvPreviewLineIndex !== null) {
