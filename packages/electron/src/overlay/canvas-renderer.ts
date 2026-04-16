@@ -305,13 +305,9 @@ function drawPlayedMoveMarker(
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
 
-  // Contrast-aware text
-  const hex = color.replace('#', '');
-  const lum = (parseInt(hex.substring(0, 2), 16) * 299
-    + parseInt(hex.substring(2, 4), 16) * 587
-    + parseInt(hex.substring(4, 6), 16) * 114) / 1000;
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = lum > 140 ? '#000' : '#fff';
+  // Translucent white loss text (matches checkmark style)
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = '#fff';
   ctx.font = `bold ${fontSize}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
