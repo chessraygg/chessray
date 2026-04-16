@@ -205,6 +205,23 @@ describe('end-to-end detection pipeline', () => {
       console.log(`  candidates: ${result.highlightCandidates.map((c: any) => `${c.square}(${c.score})`).join(' ')}`);
       expect(result.highlightCandidates).toEqual(tc.expected_candidates);
 
+      // Verify detected square colors (median light/dark RGB)
+      const [lr, lg, lb] = result.highlightMedians.light;
+      const [dr, dg, db] = result.highlightMedians.dark;
+      console.log(`  square_colors: light=rgb(${lr},${lg},${lb}) dark=rgb(${dr},${dg},${db})`);
+      if (tc.expected_square_colors) {
+        // Allow ±5 per channel — sampling jitter and PNG decoding can shift values slightly
+        const colorTol = 5;
+        const [elr, elg, elb] = tc.expected_square_colors.light;
+        const [edr, edg, edb] = tc.expected_square_colors.dark;
+        expect(Math.abs(lr - elr)).toBeLessThanOrEqual(colorTol);
+        expect(Math.abs(lg - elg)).toBeLessThanOrEqual(colorTol);
+        expect(Math.abs(lb - elb)).toBeLessThanOrEqual(colorTol);
+        expect(Math.abs(dr - edr)).toBeLessThanOrEqual(colorTol);
+        expect(Math.abs(dg - edg)).toBeLessThanOrEqual(colorTol);
+        expect(Math.abs(db - edb)).toBeLessThanOrEqual(colorTol);
+      }
+
     }, 120000);
   }
 });

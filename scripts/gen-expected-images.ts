@@ -299,9 +299,13 @@ for (const tc of PIPELINE_CASES) {
   const lineH = 9 * textScale;
   const panelW = Math.max(boardDisplaySize, 40 * 6 * textScale); // wide enough for ~40 char labels
 
+  // Big colored swatches for the detected light/dark square colors
+  const swatchSize = tc.expected_square_colors ? Math.floor(boardDisplaySize / 8) : 0;
+  const swatchGap = swatchSize > 0 ? 8 : 0;
+
   // Count label lines to compute minimum height
   const labelLineCount = countLabelLines(tc);
-  const minPanelH = boardDisplaySize + 8 + labelLineCount * lineH + 8;
+  const minPanelH = boardDisplaySize + 8 + swatchSize + swatchGap + labelLineCount * lineH + 8;
   const outWidth = png.width + gap + panelW;
   const outHeight = Math.max(png.height, minPanelH);
   const out = new PNG({ width: outWidth, height: outHeight });
@@ -368,9 +372,49 @@ for (const tc of PIPELINE_CASES) {
   const hlSet = new Set(tc.highlighted);
   drawVirtualBoard(out, boardX, boardY, boardDisplaySize, tc.expectedFen, hlSet, tc.orientation === 'white bottom' ? 'up' : 'down');
 
+  // Draw big colored swatches showing the expected light/dark square colors
+  let postBoardY = boardDisplaySize + 8;
+  if (tc.expected_square_colors && swatchSize > 0) {
+    const sc = tc.expected_square_colors;
+    const swatchY = postBoardY;
+    const labelTextScale = Math.max(1, Math.floor(textScale * 0.75));
+    const labelHeight = 7 * labelTextScale;
+    const innerSize = swatchSize - labelHeight - 4;
+    const lightX = boardX;
+    const darkX = boardX + swatchSize + swatchGap;
+
+    const drawSwatch = (sx: number, color: readonly [number, number, number], label: string) => {
+      // Fill swatch
+      for (let y = swatchY; y < swatchY + innerSize; y++) {
+        for (let x = sx; x < sx + swatchSize; x++) {
+          if (x >= 0 && x < outWidth && y >= 0 && y < outHeight) {
+            const i = (y * outWidth + x) * 4;
+            out.data[i] = color[0]; out.data[i + 1] = color[1]; out.data[i + 2] = color[2]; out.data[i + 3] = 255;
+          }
+        }
+      }
+      // Thin border
+      for (let x = sx; x < sx + swatchSize; x++) {
+        setPixelOnPng(out, x, swatchY, 60, 60, 60);
+        setPixelOnPng(out, x, swatchY + innerSize - 1, 60, 60, 60);
+      }
+      for (let y = swatchY; y < swatchY + innerSize; y++) {
+        setPixelOnPng(out, sx, y, 60, 60, 60);
+        setPixelOnPng(out, sx + swatchSize - 1, y, 60, 60, 60);
+      }
+      // Label below the swatch (e.g. "LIGHT 240,217,181")
+      drawText(out, `${label} ${color[0]},${color[1]},${color[2]}`, sx, swatchY + innerSize + 2, 200, 200, 200, labelTextScale);
+    };
+
+    drawSwatch(lightX, sc.light, 'LIGHT');
+    drawSwatch(darkX, sc.dark, 'DARK');
+
+    postBoardY += swatchSize + swatchGap;
+  }
+
   // Draw all annotation labels below the virtual board
   const labelX = boardX + 4;
-  let labelY = boardDisplaySize + 8;
+  let labelY = postBoardY;
   const gray = [200, 200, 200] as const;
   const dimGray = [160, 160, 160] as const;
   const cyan = [100, 220, 220] as const;
