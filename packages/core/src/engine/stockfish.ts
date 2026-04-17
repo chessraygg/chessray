@@ -1,6 +1,18 @@
 import type { EvalResult, EvalMove } from '../types.js';
 import { parseInfoLine, parseBestMove } from './stockfish-uci-parser.js';
 
+/** Minimal engine interface used by the frame pipeline. Implemented by `StockfishEngine`
+ *  and by test stubs. Keep it narrow — extending is a deliberate decision. */
+export interface EvalEngine {
+  /** Run a single-depth search. Returns null if aborted before any result. */
+  runDepth(
+    fen: string,
+    depth: number,
+    multiPV: number,
+    signal?: AbortSignal,
+  ): Promise<EvalResult | null>;
+}
+
 export interface StockfishOptions {
   depth?: number;
   multiPV?: number;
