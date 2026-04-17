@@ -11,8 +11,7 @@ import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay,
 import { preloadPieceImages } from './piece-svg.js';
 import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid } from './debug-panel.js';
 import { pieceSvg } from './piece-svg.js';
-import { GridStack, type GridStackNode } from 'gridstack';
-import 'gridstack/dist/gridstack.min.css';
+import { SplitLayout, type LayoutNode, type SectionDef } from './split-layout.js';
 
 /// <reference path="../shared/window.d.ts" />
 
@@ -134,102 +133,21 @@ function initOverlay(): void {
     }, { passive: false });
   }
 
-  // ── Gridstack layout ──
-  const gridEl = document.getElementById('cv-grid') as HTMLElement | null;
-  let grid: GridStack | null = null;
-  const hiddenSections = new Set<string>(prefs.hiddenSections);
-  // Detached elements of currently-hidden sections, kept alive so their DOM state
-  // (board grid, charts, listeners) survives a hide→show cycle.
-  const detachedSections = new Map<string, HTMLElement>();
-  let hiddenTray: HTMLDivElement | null = null;
-
-  function showSection(id: string): void {
-    if (!grid || !gridEl) return;
-    const el = detachedSections.get(id);
-    if (!el) return;
-    gridEl.appendChild(el);
-    grid.makeWidget(el);
-    attachHideButton(el);
-    detachedSections.delete(id);
-    hiddenSections.delete(id);
-    savePrefs({ hiddenSections: [...hiddenSections] });
-    renderHiddenTray();
-  }
-
-  function hideSection(item: HTMLElement): void {
-    if (!grid) return;
-    const id = item.getAttribute('gs-id');
-    if (!id) return;
-    detachedSections.set(id, item);
-    hiddenSections.add(id);
-    grid.removeWidget(item, true);
-    savePrefs({ hiddenSections: [...hiddenSections] });
-    renderHiddenTray();
-  }
-
-  function renderHiddenTray(): void {
-    if (!hiddenTray) return;
-    hiddenTray.innerHTML = '';
-    for (const id of hiddenSections) {
-      const btn = document.createElement('button');
-      btn.textContent = `+ ${id}`;
-      btn.onclick = () => showSection(id);
-      hiddenTray.appendChild(btn);
-    }
-  }
-
-  function attachHideButton(item: HTMLElement): void {
-    const header = item.querySelector('.section-header');
-    if (!header || header.querySelector('.hide-sec')) return;
-    const btn = document.createElement('button');
-    btn.className = 'hide-sec';
-    btn.textContent = '×';
-    btn.title = 'Hide section';
-    btn.addEventListener('mousedown', (e) => e.stopPropagation());
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      hideSection(item);
-    });
-    header.appendChild(btn);
-  }
-
-  if (gridEl) {
-    // Detach hidden sections before init so gridstack doesn't place them,
-    // but keep them in memory so their content is preserved across hide/show.
-    gridEl.querySelectorAll<HTMLElement>('.grid-stack-item').forEach(el => {
-      const id = el.getAttribute('gs-id');
-      if (id && hiddenSections.has(id)) {
-        detachedSections.set(id, el);
-        el.remove();
-      }
-    });
-
-    grid = GridStack.init({
-      cellHeight: 20,
-      column: 12,
-      margin: 3,
-      handle: '.section-header',
-      resizable: { handles: 'n, e, s, w, ne, se, sw, nw' },
-      float: !prefs.gravityUp,
-      animate: true,
-    }, gridEl);
-
-    // Apply saved layout if present
-    if (prefs.sectionLayout) {
-      try { grid.load(prefs.sectionLayout as GridStackNode[], false); }
-      catch { /* fall back to defaults */ }
-    }
-
-    gridEl.querySelectorAll<HTMLElement>('.grid-stack-item').forEach(attachHideButton);
-
-    hiddenTray = document.createElement('div');
-    hiddenTray.className = 'hidden-tray';
-    gridEl.parentElement?.insertBefore(hiddenTray, gridEl.nextSibling);
-    renderHiddenTray();
-
-    grid.on('change added removed resizestop dragstop', () => {
-      if (!grid) return;
-      savePrefs({ sectionLayout: grid.save(false) });
+  // ── Split-pane layout ──
+  const splitRoot = document.getElementById('cv-split-root') as HTMLElement | null;
+  const sectionLibrary = document.getElementById('cv-section-library') as HTMLElement | null;
+  if (splitRoot && sectionLibrary) {
+    const defs: SectionDef[] = [...sectionLibrary.querySelectorAll<HTMLElement>('[data-section-id]')].map(body => ({
+      id: body.dataset.sectionId!,
+      title: body.dataset.sectionTitle ?? body.dataset.sectionId!,
+      body,
+    }));
+    new SplitLayout(splitRoot, defs, {
+      initialLayout: prefs.sectionLayout as LayoutNode | null,
+      hiddenIds: prefs.hiddenSections,
+      onChange: ({ layout, hiddenIds }) => {
+        savePrefs({ sectionLayout: layout, hiddenSections: hiddenIds });
+      },
     });
   }
 
