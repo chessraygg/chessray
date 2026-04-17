@@ -133,6 +133,20 @@ function initOverlay(): void {
     }, { passive: false });
   }
 
+  // ── Fit the fixed-200px virtual board to whatever size its leaf gets ──
+  const boardFit = document.getElementById('cv-board-fit') as HTMLElement | null;
+  const boardContainer = boardFit?.querySelector<HTMLElement>('.board-container') ?? null;
+  if (boardFit && boardContainer) {
+    const observer = new ResizeObserver(entries => {
+      for (const e of entries) {
+        const { width, height } = e.contentRect;
+        const scale = Math.max(0, Math.min(width, height) / 200);
+        boardContainer.style.setProperty('--board-scale', String(scale));
+      }
+    });
+    observer.observe(boardFit);
+  }
+
   // ── Split-pane layout ──
   const splitRoot = document.getElementById('cv-split-root') as HTMLElement | null;
   const sectionLibrary = document.getElementById('cv-section-library') as HTMLElement | null;

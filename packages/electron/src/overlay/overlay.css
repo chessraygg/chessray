@@ -445,11 +445,29 @@ canvas#video-overlay {
   background: var(--bg-inset);
   border-radius: var(--radius-sm);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.board-fit {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .board-container {
   position: relative;
   width: 200px;
+  height: 200px;
+  flex-shrink: 0;
+  transform: scale(var(--board-scale, 1));
+  transform-origin: center;
 }
 
 .board-container canvas {
