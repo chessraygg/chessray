@@ -49,7 +49,9 @@ export class SplitLayout {
     this.sections = new Map(sections.map(s => [s.id, s]));
     this.hiddenIds = new Set(opts.hiddenIds ?? []);
 
-    let initial: LayoutNode | null = opts.initialLayout ?? this.defaultLayout(sections.map(s => s.id));
+    let initial: LayoutNode | null = isValidLayout(opts.initialLayout)
+      ? opts.initialLayout
+      : this.defaultLayout(sections.map(s => s.id));
     for (const id of this.hiddenIds) {
       initial = removeLeaf(initial, id);
     }
@@ -302,6 +304,21 @@ export class SplitLayout {
       this.tray.appendChild(btn);
     }
   }
+}
+
+/** Shallow structural check: reject legacy/malformed layouts so we fall back to defaults. */
+function isValidLayout(node: unknown): node is LayoutNode {
+  if (!node || typeof node !== 'object') return false;
+  const n = node as Partial<LayoutNode>;
+  if (n.type === 'leaf') return typeof (n as { id?: unknown }).id === 'string';
+  if (n.type === 'split') {
+    const s = n as Extract<LayoutNode, { type: 'split' }>;
+    return (s.dir === 'row' || s.dir === 'col')
+      && Array.isArray(s.children) && s.children.length > 0
+      && Array.isArray(s.sizes) && s.sizes.length === s.children.length
+      && s.children.every(isValidLayout);
+  }
+  return false;
 }
 
 /** Remove a leaf from the tree, flattening single-child splits. */
