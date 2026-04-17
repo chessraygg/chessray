@@ -29,7 +29,7 @@ import {
   EVAL_MULTI_PV_START, EVAL_MULTI_PV_MAX, EVAL_MULTI_PV_RAMP,
   cacheGet, cachePut,
 } from './eval-cache.js';
-import { sampleBoardPixels, boardUnchanged } from './change-detect.js';
+import { sampleBoardPixels, sampleFrameOutsideBbox, boardUnchanged } from './change-detect.js';
 import { computeArrows } from '../shared/arrows.js';
 
 /** ImageData-like shape — compatible with the real DOM `ImageData` (renderer)
@@ -78,6 +78,11 @@ export class FrameProcessor {
   private lastPlayedMove: PipelineResult['played_move'] = null;
   private cachedOrientation: { prevFen: string; orientation: { flipped: boolean; source: OrientationSource } } | null = null;
   private cachedBbox: BoardBBox | null = null;
+  /** Fingerprint of the frame outside the cached bbox; when unchanged, skip board detection. */
+  private lastFrameSample: Uint8Array | null = null;
+  /** Frames since we last ran detectBoard — forces a refresh every N frames so a drifted bbox eventually self-corrects. */
+  private framesSinceDetect = 0;
+  private static readonly DETECT_REFRESH_FRAMES = 30;
   private frameCount = 0;
   private evalAbortController: AbortController | null = null;
 
@@ -113,6 +118,8 @@ export class FrameProcessor {
   resetCaches(): void {
     this.cachedBbox = null;
     this.lastBoardSample = null;
+    this.lastFrameSample = null;
+    this.framesSinceDetect = 0;
   }
 
   resetFrameCount(): void {
@@ -151,16 +158,34 @@ export class FrameProcessor {
       let activeBbox = this.cachedBbox;
       let detectionConf = 1;
       let tDetect = 0;
+      let detectSkipped = false;
       {
-        const t0 = Date.now();
-        const detection = await detectBoard(onnxSession, ortModule, pixels.data, pixels.width, pixels.height);
-        activeBbox = detection.bbox;
-        detectionConf = detection.confidence;
-        if (detection.bbox) this.cachedBbox = detection.bbox;
-        tDetect = Date.now() - t0;
-        if (this.frameCount < 10) {
-          const bb = detection.bbox ? `bbox=${detection.bbox.x},${detection.bbox.y},${detection.bbox.width}x${detection.bbox.height}` : 'no bbox';
-          log(`Frame ${this.frameCount}: ${pixels.width}x${pixels.height} | ${bb} | found=${detection.found} conf=${detectionConf.toFixed(2)} time=${detection.elapsed_ms}ms`);
+        // Cheap fingerprint: sample the frame outside the cached bbox. When it's
+        // unchanged the UI chrome around the board hasn't moved, so the bbox is
+        // still valid — skipping detectBoard saves ~250ms/frame. Refresh
+        // periodically as a safety net against drift.
+        const frameSample = sampleFrameOutsideBbox(pixels.data, pixels.width, pixels.height, this.cachedBbox);
+        const frameUnchanged = this.lastFrameSample !== null && boardUnchanged(this.lastFrameSample, frameSample);
+        const shouldRefresh = this.framesSinceDetect >= FrameProcessor.DETECT_REFRESH_FRAMES;
+        const canSkip = this.cachedBbox !== null && frameUnchanged && !shouldRefresh;
+        this.lastFrameSample = frameSample;
+
+        if (canSkip) {
+          activeBbox = this.cachedBbox;
+          this.framesSinceDetect++;
+          detectSkipped = true;
+        } else {
+          const t0 = Date.now();
+          const detection = await detectBoard(onnxSession, ortModule, pixels.data, pixels.width, pixels.height);
+          activeBbox = detection.bbox;
+          detectionConf = detection.confidence;
+          if (detection.bbox) this.cachedBbox = detection.bbox;
+          tDetect = Date.now() - t0;
+          this.framesSinceDetect = 0;
+          if (this.frameCount < 10) {
+            const bb = detection.bbox ? `bbox=${detection.bbox.x},${detection.bbox.y},${detection.bbox.width}x${detection.bbox.height}` : 'no bbox';
+            log(`Frame ${this.frameCount}: ${pixels.width}x${pixels.height} | ${bb} | found=${detection.found} conf=${detectionConf.toFixed(2)} time=${detection.elapsed_ms}ms`);
+          }
         }
       }
       this.frameCount++;
@@ -286,7 +311,7 @@ export class FrameProcessor {
 
           if (boardResult.midAnimation) {
             detectionStatus = 'Mid-animation — piece sliding';
-            log(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms recog=${Date.now() - t}ms [mid-animation, skipped] total=${Date.now() - startTime}ms`);
+            log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms recog=${Date.now() - t}ms [mid-animation, skipped] total=${Date.now() - startTime}ms`);
             this.lastBoardSample = prevBoardSample;
             recognition = this.lastRecognitionResult;
             rawFen = this.lastRawFen;
@@ -356,7 +381,7 @@ export class FrameProcessor {
 
       if (!recognition || recognition.confidence < 0.3) {
         detectionStatus = `Low confidence: ${recognition ? (recognition.confidence * 100).toFixed(0) + '%' : 'no recognition'}`;
-        log(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [low conf] total=${Date.now() - startTime}ms`);
+        log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [low conf] total=${Date.now() - startTime}ms`);
         sendResult(makeResult({}));
         return;
       }
@@ -368,7 +393,7 @@ export class FrameProcessor {
           ? 'Invalid highlights — no legal move'
           : 'No highlights — waiting for move to complete';
         const reason = invalidHighlights ? 'invalid highlights' : 'no highlights';
-        log(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [${reason}] total=${Date.now() - startTime}ms`);
+        log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [${reason}] total=${Date.now() - startTime}ms`);
         if (this.lastPositionFen && this.lastEval) {
           sendResult(makeResult({
             evaluation: this.lastEval,
@@ -386,7 +411,7 @@ export class FrameProcessor {
       const evalTurnMismatch = highlightTurn && this.lastEval?.fen?.split(' ')[1] && this.lastEval.fen.split(' ')[1] !== highlightTurn;
       if (this.lastPositionFen && compareFen(this.lastPositionFen, positionFen) && !evalTurnMismatch) {
         detectionStatus = 'Position unchanged';
-        log(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [dedup] total=${Date.now() - startTime}ms`);
+        log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [dedup] total=${Date.now() - startTime}ms`);
         sendResult(makeResult({
           evaluation: this.lastEval,
           arrows: this.lastArrows,
@@ -405,7 +430,7 @@ export class FrameProcessor {
           highlightedSquares[0] === prevHighlightedSquares[0] &&
           highlightedSquares[1] === prevHighlightedSquares[1]) {
         detectionStatus = 'Intermediate frame — highlights unchanged';
-        log(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [intermediate, skipped] total=${Date.now() - startTime}ms`);
+        log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [intermediate, skipped] total=${Date.now() - startTime}ms`);
         this.lastBoardSample = prevBoardSample;
         sendResult(makeResult({
           evaluation: this.lastEval,
@@ -521,7 +546,7 @@ export class FrameProcessor {
         this.lastEval = cached.evaluation;
         this.lastArrows = cached.arrows;
         const cachedDepth = cached.evaluation.depth;
-        log(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms [cache d=${cachedDepth}] total=${Date.now() - startTime}ms`);
+        log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms [cache d=${cachedDepth}] total=${Date.now() - startTime}ms`);
         sendResult(makeResult({
           evaluation: cached.evaluation,
           arrows: cached.arrows,
@@ -564,7 +589,7 @@ export class FrameProcessor {
         return;
       }
 
-      log(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms [new pos] total=${Date.now() - startTime}ms`);
+      log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms [new pos] total=${Date.now() - startTime}ms`);
       sendResult(makeResult({ evaluation: staleEval, eval_max_depth: this.maxDepth, stale_eval: true }));
 
       const evalPositionFen = positionFen;
