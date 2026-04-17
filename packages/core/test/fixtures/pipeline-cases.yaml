@@ -491,3 +491,38 @@
   expected_square_colors:
     light: [199, 158, 109]
     dark: [126, 84, 52]
+- file: test-agadmator-topalov-yagiz.png
+  orientation: white bottom
+  highlighted:
+    - c6
+    - c2
+  turn: w
+  bbox:
+    x: 305
+    'y': 112
+    width: 927
+    height: 927
+  squareSize: 116
+  expectedFen: 4k3/1R6/p5p1/P3pp1p/8/1N6/1Pr3PP/6K1
+  orientation_source: label
+  expected_labels:
+    skipped: false
+    result:
+      - side: left
+        type: digit
+        chars: '7543'
+        direction: desc
+  expected_candidates:
+    - square: f2
+      score: 122.9
+    - square: c6
+      score: 76.4
+    - square: c2
+      score: 71.5
+    - square: g1
+      score: 41.8
+    - square: h1
+      score: 19.2
+  expected_square_colors:
+    light: [195, 169, 122]
+    dark: [126, 93, 61]

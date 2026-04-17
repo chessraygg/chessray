@@ -11,6 +11,8 @@ export interface DisambiguationPairCorrected {
   src: string;
   dest: string;
   piece: string;
+  srcScore: number;
+  destScore: number;
   combinedScore: number;
   srcNaturalness: number;
   destNaturalness: number;
@@ -220,6 +222,8 @@ export async function recognizeBoard(
       src: idxToSq(p.src),
       dest: idxToSq(p.dest),
       piece: p.piece,
+      srcScore: Math.round(p.srcScore * 10) / 10,
+      destScore: Math.round(p.destScore * 10) / 10,
       combinedScore: Math.round(p.combinedScore * 10) / 10,
       srcNaturalness: Math.round(p.srcNaturalness * 1000) / 1000,
       destNaturalness: Math.round(p.destNaturalness * 1000) / 1000,

@@ -161,9 +161,15 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   // These enable disambiguateHighlights to find valid move pairs when the
   // top 2 don't form a legal move (e.g., false positive on a nearby square).
   const noiseFloor = scores[Math.min(7, scores.length - 1)].dist;
-  const runnerUpThreshold = Math.max(minAbsolute * 3, noiseFloor * 10);
+  // Runner-up: well above noise (3x) and meaningfully above absolute threshold (3x).
+  // The previous 10x-noise multiplier was too aggressive when the noise floor was low —
+  // it excluded genuine sub-dominant highlights, forcing reliance on expanded search.
+  const runnerUpThreshold = Math.max(minAbsolute * 3, noiseFloor * 3);
   let extendedCount = cutIdx;
-  while (extendedCount < Math.min(6, scores.length) && scores[extendedCount].dist >= runnerUpThreshold) {
+  // Cap at 8 candidates: leaves room for real sub-dominant highlights to join
+  // even when several high-scoring annotations sit above the real pair
+  // (agadmator-style streams often have 3-5 painted squares above the true highlight).
+  while (extendedCount < Math.min(8, scores.length) && scores[extendedCount].dist >= runnerUpThreshold) {
     extendedCount++;
   }
   const highlighted = scores.slice(0, extendedCount).map(s => s.idx);
@@ -208,12 +214,24 @@ export interface DisambiguationPair {
   src: number;
   dest: number;
   piece: string;
+  srcScore: number;
+  destScore: number;
   combinedScore: number;
   srcNaturalness: number;
   destNaturalness: number;
   /** Which pass found this pair: 1=initial², 2=expanded-empty×candidate-piece,
    *  3=candidate-empty×expanded-piece, 4=expanded². */
   pass: 1 | 2 | 3 | 4;
+}
+
+/** Score balance: 0..1 where 1 = both scores equal, 0 = extreme imbalance.
+ *  Real last-move highlights tint both squares with the same overlay and tend to
+ *  score similarly; a spurious pair mixing a real highlight with a high-scoring
+ *  annotation is usually skewed. */
+function scoreBalance(p: { srcScore: number; destScore: number }): number {
+  const a = p.srcScore, b = p.destScore;
+  if (a <= 0 || b <= 0) return 0;
+  return Math.min(a, b) / Math.max(a, b);
 }
 
 export type DisambiguationReason =
@@ -306,9 +324,11 @@ export function disambiguateHighlights(
   let rejectedCount = 0;
 
   const addValid = (src: number, dest: number, piece: string, pass: 1 | 2 | 3 | 4): void => {
+    const srcScore = scoreMap.get(src) ?? 0;
+    const destScore = scoreMap.get(dest) ?? 0;
     validPairs.push({
-      src, dest, piece,
-      combinedScore: (scoreMap.get(src) ?? 0) + (scoreMap.get(dest) ?? 0),
+      src, dest, piece, srcScore, destScore,
+      combinedScore: srcScore + destScore,
       srcNaturalness: annotationPenalty(src),
       destNaturalness: annotationPenalty(dest),
       pass,
@@ -334,7 +354,14 @@ export function disambiguateHighlights(
 
   const pass1Pairs = [...validPairs];
   if (pass1Pairs.length > 0) {
-    pass1Pairs.sort((a, b) => b.combinedScore - a.combinedScore);
+    // Sort by balance first (real last-move highlights tint both squares similarly),
+    // then combined score as tiebreaker. This prevents a high-scoring annotation
+    // from hijacking a pair where the real partner scored much lower.
+    pass1Pairs.sort((a, b) => {
+      const ba = scoreBalance(a), bb = scoreBalance(b);
+      if (Math.abs(ba - bb) > 0.15) return bb - ba;
+      return b.combinedScore - a.combinedScore;
+    });
     const w = pass1Pairs[0];
     return {
       highlighted: [w.src, w.dest],
@@ -410,18 +437,17 @@ export function disambiguateHighlights(
     }
 
     if (validPairs.length > 0) {
-      // Rank by naturalness: prefer pairs without annotation-colored squares.
+      // Rank by: (1) annotation penalty (fewer annotation-tinted squares),
+      // (2) score balance (real last-move pairs tint both squares similarly),
+      // (3) combined score (higher = stronger signal).
       validPairs.sort((a, b) => {
         const penA = (a.srcNaturalness > annotationThreshold ? 1 : 0) +
                      (a.destNaturalness > annotationThreshold ? 1 : 0);
         const penB = (b.srcNaturalness > annotationThreshold ? 1 : 0) +
                      (b.destNaturalness > annotationThreshold ? 1 : 0);
         if (penA !== penB) return penA - penB;
-        const distA = Math.max(Math.abs(Math.floor(a.src / 8) - Math.floor(a.dest / 8)),
-                               Math.abs((a.src % 8) - (a.dest % 8)));
-        const distB = Math.max(Math.abs(Math.floor(b.src / 8) - Math.floor(b.dest / 8)),
-                               Math.abs((b.src % 8) - (b.dest % 8)));
-        if (distA !== distB) return distA - distB;
+        const ba = scoreBalance(a), bb = scoreBalance(b);
+        if (Math.abs(ba - bb) > 0.15) return bb - ba;
         return b.combinedScore - a.combinedScore;
       });
       const w = validPairs[0];
