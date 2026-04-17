@@ -39,141 +39,156 @@
     </div>
 
     <div class="panel-body" id="cv-panel-body">
-      <div class="tracking-content" id="cv-tracking-content">
+      <div class="grid-stack" id="cv-grid">
+
         <!-- Board -->
-        <div class="panel-section" id="sec-board">
-          <div class="section-header" data-section="board">Board</div>
-          <div class="section-body">
-            <div class="board-frame">
-              <div class="board-container">
-                <div class="piece-grid" id="cv-debug-grid"></div>
-                <canvas id="cv-arrow-canvas" width="200" height="200"></canvas>
-              </div>
-              <div class="compact-moves" id="cv-compact-moves"></div>
-              <div class="board-status">
-                  <span class="turn-dot white" id="cv-turn-dot"></span>
-                  <span id="cv-turn-text">White</span>
-                </span>
-                <span class="orientation-badge" id="cv-orientation-badge">
-                  <span class="orient-arrow" id="cv-pawn-dir"></span>
-                </span>
+        <div class="grid-stack-item" gs-id="board" gs-x="0" gs-y="0" gs-w="12" gs-h="12" gs-min-w="6" gs-min-h="6">
+          <div class="grid-stack-item-content">
+            <div class="section-header" data-section="board">Board</div>
+            <div class="section-body">
+              <div class="board-frame">
+                <div class="board-container">
+                  <div class="piece-grid" id="cv-debug-grid"></div>
+                  <canvas id="cv-arrow-canvas" width="200" height="200"></canvas>
+                </div>
+                <div class="compact-moves" id="cv-compact-moves"></div>
+                <div class="board-status">
+                    <span class="turn-dot white" id="cv-turn-dot"></span>
+                    <span id="cv-turn-text">White</span>
+                  </span>
+                  <span class="orientation-badge" id="cv-orientation-badge">
+                    <span class="orient-arrow" id="cv-pawn-dir"></span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Display -->
-        <div class="panel-section" id="sec-display">
-          <div class="section-header" data-section="display">Display</div>
-          <div class="section-body display-toggles">
-            <label class="display-toggle"><input type="checkbox" id="cv-disp-overlay" checked><span>Board overlay</span></label>
-            <label class="display-toggle"><input type="checkbox" id="cv-disp-vboard" checked><span>Virtual board</span></label>
-            <label class="display-toggle"><input type="checkbox" id="cv-disp-eval" checked><span>Eval bar</span></label>
-            <label class="display-toggle"><input type="checkbox" id="cv-disp-lines" checked><span>Lines</span></label>
-            <label class="display-toggle"><input type="checkbox" id="cv-disp-arrows"><span>Moves</span></label>
-            <label class="display-toggle"><input type="checkbox" id="cv-disp-auto"><span>Auto</span></label>
+        <div class="grid-stack-item" gs-id="display" gs-x="0" gs-y="12" gs-w="12" gs-h="4" gs-min-w="4" gs-min-h="3">
+          <div class="grid-stack-item-content">
+            <div class="section-header" data-section="display">Display</div>
+            <div class="section-body display-toggles">
+              <label class="display-toggle"><input type="checkbox" id="cv-disp-overlay" checked><span>Board overlay</span></label>
+              <label class="display-toggle"><input type="checkbox" id="cv-disp-vboard" checked><span>Virtual board</span></label>
+              <label class="display-toggle"><input type="checkbox" id="cv-disp-eval" checked><span>Eval bar</span></label>
+              <label class="display-toggle"><input type="checkbox" id="cv-disp-lines" checked><span>Lines</span></label>
+              <label class="display-toggle"><input type="checkbox" id="cv-disp-arrows"><span>Moves</span></label>
+              <label class="display-toggle"><input type="checkbox" id="cv-disp-auto"><span>Auto</span></label>
+            </div>
           </div>
         </div>
 
         <!-- Eval -->
-        <div class="panel-section" id="sec-eval">
-          <div class="section-header" data-section="eval">Eval</div>
-          <div class="section-body">
-            <div class="eval-bar">
-              <div class="eval-bar-fill" id="cv-eval-fill" style="width:50%"></div>
-              <div class="eval-bar-label" id="cv-eval-label">0.0</div>
-              <div class="eval-bar-depth" id="cv-eval-depth"></div>
+        <div class="grid-stack-item" gs-id="eval" gs-x="0" gs-y="16" gs-w="12" gs-h="2" gs-min-w="3" gs-min-h="2">
+          <div class="grid-stack-item-content">
+            <div class="section-header" data-section="eval">Eval</div>
+            <div class="section-body">
+              <div class="eval-bar">
+                <div class="eval-bar-fill" id="cv-eval-fill" style="width:50%"></div>
+                <div class="eval-bar-label" id="cv-eval-label">0.0</div>
+                <div class="eval-bar-depth" id="cv-eval-depth"></div>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Lines -->
-        <div class="panel-section" id="sec-lines">
-          <div class="section-header" data-section="lines">Lines</div>
-          <div class="section-body">
-            <div class="best-moves" id="cv-best-moves"></div>
+        <div class="grid-stack-item" gs-id="lines" gs-x="0" gs-y="18" gs-w="12" gs-h="5" gs-min-w="4" gs-min-h="3">
+          <div class="grid-stack-item-content">
+            <div class="section-header" data-section="lines">Lines</div>
+            <div class="section-body">
+              <div class="best-moves" id="cv-best-moves"></div>
+            </div>
           </div>
         </div>
 
         <!-- Lichess -->
-        <div class="panel-section" id="sec-lichess">
-          <div class="section-header" data-section="lichess">Lichess</div>
-          <div class="section-body">
-            <div class="lichess-controls">
-              <button class="toggle-btn" id="cv-lichess-btn" data-tip="Open floating Lichess analysis board">&#9816; Analysis board</button>
-              <label class="lichess-sync-label"><input type="checkbox" id="cv-lichess-sync" checked><span>Auto-sync position</span></label>
+        <div class="grid-stack-item" gs-id="lichess" gs-x="0" gs-y="23" gs-w="12" gs-h="3" gs-min-w="4" gs-min-h="3">
+          <div class="grid-stack-item-content">
+            <div class="section-header" data-section="lichess">Lichess</div>
+            <div class="section-body">
+              <div class="lichess-controls">
+                <button class="toggle-btn" id="cv-lichess-btn" data-tip="Open floating Lichess analysis board">&#9816; Analysis board</button>
+                <label class="lichess-sync-label"><input type="checkbox" id="cv-lichess-sync" checked><span>Auto-sync position</span></label>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Settings -->
-        <div class="panel-section" id="sec-settings">
-          <div class="section-header" data-section="settings">Settings</div>
-          <div class="section-body">
-            <div class="pv-depth-row">
-              <label data-tip="Max centipawn loss for showing alternative moves">CP loss</label>
-              <input type="range" id="cv-loss-threshold" min="0" max="200" value="0" step="10">
-              <span id="cv-loss-threshold-val">0</span>
-            </div>
-            <div class="pv-depth-row" id="cv-pv-depth-row">
-              <label data-tip="Number of moves to play through in the best-line piece animation">PV depth</label>
-              <input type="range" id="cv-pv-depth" min="1" max="11" value="10">
-              <span id="cv-pv-depth-val">10</span>
-            </div>
-            <div class="pv-depth-row">
-              <label data-tip="Frame capture rate (frames per second)">FPS</label>
-              <input type="range" id="cv-target-fps" min="1" max="5" value="2" step="1">
-              <span id="cv-target-fps-val">2</span>
-            </div>
-            <div class="pv-depth-row">
-              <label data-tip="Seconds between each move in the best-line piece animation">Grow</label>
-              <input type="range" id="cv-pv-grow-delay" min="1" max="10" value="3" step="1">
-              <span id="cv-pv-grow-delay-val">3</span><span style="font-size:8px;color:var(--text-faint)">s</span>
-            </div>
-            <div class="pv-depth-row">
-              <label data-tip="Seconds to wait after position stabilizes before showing moves (0 = instant)">Wait</label>
-              <input type="range" id="cv-show-moves-delay" min="0" max="10" value="0" step="1">
-              <span id="cv-show-moves-delay-val">0</span><span style="font-size:8px;color:var(--text-faint)">s</span>
-            </div>
-            <div class="pv-depth-row" id="cv-auto-delay-row">
-              <label data-tip="Seconds to show top moves before switching to best line">Delay</label>
-              <input type="range" id="cv-auto-delay" min="1" max="15" value="5" step="1">
-              <span id="cv-auto-delay-val">5</span><span style="font-size:8px;color:var(--text-faint)">s</span>
-            </div>
-            <div class="pv-depth-row">
-              <label data-tip="Maximum engine search depth (higher = stronger but slower)">Engine</label>
-              <input type="range" id="cv-max-depth" min="8" max="40" value="28" step="4">
-              <span id="cv-max-depth-val">28</span>
-            </div>
-            <div class="pv-depth-row">
-              <label data-tip="Max engine lines (starts at 2, ramps up as position stays)">Lines</label>
-              <input type="range" id="cv-multi-pv-max" min="1" max="8" value="5" step="1">
-              <span id="cv-multi-pv-max-val">5</span>
-            </div>
-            <div class="pv-depth-row">
-              <label data-tip="Depth steps before adding another engine line (higher = slower ramp)">Ramp</label>
-              <input type="range" id="cv-multi-pv-ramp" min="1" max="4" value="1" step="1">
-              <span id="cv-multi-pv-ramp-val">1</span>
-            </div>
-            <div class="pv-depth-row">
-              <label data-tip="Skip recognition when board pixels haven't changed (faster but may miss subtle changes)">Change detect</label>
-              <input type="checkbox" id="cv-change-detect" checked>
+        <div class="grid-stack-item" gs-id="settings" gs-x="0" gs-y="26" gs-w="12" gs-h="10" gs-min-w="4" gs-min-h="5">
+          <div class="grid-stack-item-content">
+            <div class="section-header" data-section="settings">Settings</div>
+            <div class="section-body">
+              <div class="pv-depth-row">
+                <label data-tip="Max centipawn loss for showing alternative moves">CP loss</label>
+                <input type="range" id="cv-loss-threshold" min="0" max="200" value="0" step="10">
+                <span id="cv-loss-threshold-val">0</span>
+              </div>
+              <div class="pv-depth-row" id="cv-pv-depth-row">
+                <label data-tip="Number of moves to play through in the best-line piece animation">PV depth</label>
+                <input type="range" id="cv-pv-depth" min="1" max="11" value="10">
+                <span id="cv-pv-depth-val">10</span>
+              </div>
+              <div class="pv-depth-row">
+                <label data-tip="Frame capture rate (frames per second)">FPS</label>
+                <input type="range" id="cv-target-fps" min="1" max="5" value="2" step="1">
+                <span id="cv-target-fps-val">2</span>
+              </div>
+              <div class="pv-depth-row">
+                <label data-tip="Seconds between each move in the best-line piece animation">Grow</label>
+                <input type="range" id="cv-pv-grow-delay" min="1" max="10" value="3" step="1">
+                <span id="cv-pv-grow-delay-val">3</span><span style="font-size:8px;color:var(--text-faint)">s</span>
+              </div>
+              <div class="pv-depth-row">
+                <label data-tip="Seconds to wait after position stabilizes before showing moves (0 = instant)">Wait</label>
+                <input type="range" id="cv-show-moves-delay" min="0" max="10" value="0" step="1">
+                <span id="cv-show-moves-delay-val">0</span><span style="font-size:8px;color:var(--text-faint)">s</span>
+              </div>
+              <div class="pv-depth-row" id="cv-auto-delay-row">
+                <label data-tip="Seconds to show top moves before switching to best line">Delay</label>
+                <input type="range" id="cv-auto-delay" min="1" max="15" value="5" step="1">
+                <span id="cv-auto-delay-val">5</span><span style="font-size:8px;color:var(--text-faint)">s</span>
+              </div>
+              <div class="pv-depth-row">
+                <label data-tip="Maximum engine search depth (higher = stronger but slower)">Engine</label>
+                <input type="range" id="cv-max-depth" min="8" max="40" value="28" step="4">
+                <span id="cv-max-depth-val">28</span>
+              </div>
+              <div class="pv-depth-row">
+                <label data-tip="Max engine lines (starts at 2, ramps up as position stays)">Lines</label>
+                <input type="range" id="cv-multi-pv-max" min="1" max="8" value="5" step="1">
+                <span id="cv-multi-pv-max-val">5</span>
+              </div>
+              <div class="pv-depth-row">
+                <label data-tip="Depth steps before adding another engine line (higher = slower ramp)">Ramp</label>
+                <input type="range" id="cv-multi-pv-ramp" min="1" max="4" value="1" step="1">
+                <span id="cv-multi-pv-ramp-val">1</span>
+              </div>
+              <div class="pv-depth-row">
+                <label data-tip="Skip recognition when board pixels haven't changed (faster but may miss subtle changes)">Change detect</label>
+                <input type="checkbox" id="cv-change-detect" checked>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Debug -->
-        <div class="panel-section" id="sec-debug">
-          <div class="section-header" data-section="debug">Debug</div>
-          <div class="section-body debug-section" id="debug-section">
-            <div class="toggle-row">
-              <button class="toggle" id="cv-border-btn">Box</button>
+        <div class="grid-stack-item" gs-id="debug" gs-x="0" gs-y="36" gs-w="12" gs-h="13" gs-min-w="4" gs-min-h="4">
+          <div class="grid-stack-item-content">
+            <div class="section-header" data-section="debug">Debug</div>
+            <div class="section-body debug-section" id="debug-section">
+              <div class="toggle-row">
+                <button class="toggle" id="cv-border-btn">Box</button>
+              </div>
+              <img id="cv-debug-img" src="" alt="Board capture">
+              <div class="fen" id="cv-debug-fen">Waiting...</div>
+              <div class="debug-orient" id="cv-orientation-info"></div>
+              <div class="meta" id="cv-debug-info"></div>
+              <div class="detection-status" id="cv-detection-status" style="display:none"></div>
             </div>
-            <img id="cv-debug-img" src="" alt="Board capture">
-            <div class="fen" id="cv-debug-fen">Waiting...</div>
-            <div class="debug-orient" id="cv-orientation-info"></div>
-            <div class="meta" id="cv-debug-info"></div>
-            <div class="detection-status" id="cv-detection-status" style="display:none"></div>
           </div>
         </div>
 

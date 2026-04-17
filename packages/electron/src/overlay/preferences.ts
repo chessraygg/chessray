@@ -23,8 +23,13 @@ export interface Prefs {
   targetFps: number;
   changeDetect: boolean;
   collapsedSections: string[];
+  hiddenSections: string[];
   panelLeft: number | null;
   panelTop: number | null;
+  panelWidth: number | null;
+  panelHeight: number | null;
+  sectionLayout: unknown | null;
+  gravityUp: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -49,8 +54,13 @@ export const DEFAULT_PREFS: Prefs = {
   panelScale: 1,
   collapsed: false,
   collapsedSections: ['debug'],
+  hiddenSections: [],
   panelLeft: null,
   panelTop: null,
+  panelWidth: null,
+  panelHeight: null,
+  sectionLayout: null,
+  gravityUp: true,
 };
 
 export function loadPrefs(): Prefs {
