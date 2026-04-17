@@ -5,10 +5,12 @@
  */
 
 import type { PixelBuffer } from '@chessray/core';
+import type { PipelineResult } from '../shared/types.js';
 import { setMultiPvMax, setMultiPvRamp } from './eval-cache.js';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
 import { initAndStartCapture, stopCapture, setTargetFps } from './frame-capture.js';
-import { FrameProcessor } from './frame-processor.js';
+import { FrameProcessor, type ImageDataLike } from './frame-processor.js';
+import { setRecording, recordFrame, recordResultSidecar, currentFrameFilename, isRecording } from './frame-recorder.js';
 
 /// <reference path="../shared/window.d.ts" />
 
@@ -37,20 +39,46 @@ function encodePreviewUrl(cropped: PixelBuffer): string {
   return previewCanvas.toDataURL('image/jpeg', 0.7);
 }
 
+// Holds the filename of the most-recently saved PNG so we can pair the
+// PipelineResult JSON sidecar with it. A closure not a module var because
+// processFrame is async and multiple frames could overlap conceptually.
+let pendingArtifactFilename: string | null = null;
+
 const processor = new FrameProcessor({
   get onnxSession() { return getOnnxSession(); },
   get ortModule() { return getOrtModule(); },
   get recognizer() { return getRecognizer(); },
   getEngine,
   reinitEngine,
-  sendResult: (r) => window.chessRay.sendFrameResult(r),
+  sendResult: (r: PipelineResult) => {
+    window.chessRay.sendFrameResult(r);
+    if (isRecording() && pendingArtifactFilename) {
+      recordResultSidecar(pendingArtifactFilename, r);
+    }
+  },
   log: debugLog,
   encodePreviewUrl,
 });
 
+async function onCapturedFrame(imageData: ImageDataLike): Promise<void> {
+  if (isRecording()) {
+    pendingArtifactFilename = currentFrameFilename();
+    // Fire and forget — PNG encoding should not block the processor.
+    void recordFrame(imageData);
+  } else {
+    pendingArtifactFilename = null;
+  }
+  await processor.processFrame(imageData);
+}
+
+window.chessRay.onRecordingStateChanged((active: boolean, sessionDir: string | null) => {
+  setRecording(active);
+  debugLog(active ? `Recording started → ${sessionDir}` : 'Recording stopped');
+});
+
 window.chessRay.onStartCapture((sourceId) => {
   processor.resetFrameCount();
-  initAndStartCapture(sourceId, (imageData) => processor.processFrame(imageData), () => processor.resetCaches());
+  initAndStartCapture(sourceId, onCapturedFrame, () => processor.resetCaches());
 });
 
 window.chessRay.onStopCapture(() => {
@@ -92,6 +120,6 @@ window.chessRay.getSourceId().then((sourceId) => {
   if (sourceId) {
     debugLog(`Got pending source ID on startup: ${sourceId.slice(0, 30)}...`);
     processor.resetFrameCount();
-    initAndStartCapture(sourceId, (imageData) => processor.processFrame(imageData), () => processor.resetCaches());
+    initAndStartCapture(sourceId, onCapturedFrame, () => processor.resetCaches());
   }
 });

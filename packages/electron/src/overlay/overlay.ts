@@ -317,6 +317,28 @@ function initOverlay(): void {
     });
   }
 
+  // Record toggle — start/stop dumping raw captured frames to disk
+  const recordBtn = document.getElementById('cv-record-btn');
+  let recordingActive = false;
+  if (recordBtn) {
+    recordBtn.addEventListener('click', () => {
+      if (recordingActive) window.chessRay.stopRecording();
+      else window.chessRay.startRecording();
+    });
+  }
+  window.chessRay.onRecordingStateChanged((active: boolean, sessionDir: string | null) => {
+    recordingActive = active;
+    if (recordBtn) {
+      recordBtn.classList.toggle('active', active);
+      recordBtn.textContent = active ? '⏺ Recording' : '● Record';
+      if (active && sessionDir) {
+        recordBtn.setAttribute('data-tip', `Recording to ${sessionDir}`);
+      } else {
+        recordBtn.setAttribute('data-tip', 'Dump raw captured frames to ~/chessray-recordings/ for test fixtures');
+      }
+    }
+  });
+
   // ── User panel toggles ──
   const arrowsBtn = document.getElementById('cv-arrows-btn');
   const lineBtn = document.getElementById('cv-line-btn');
