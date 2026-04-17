@@ -38,7 +38,6 @@ let lastHighlightTurn: Turn | null = null;
 let lastInvalidHighlights = false;
 let lastSquareColors: PipelineResult['square_colors'] | undefined;
 let lastHighlightDebug: PipelineResult['highlight_debug'] | undefined;
-let lastStableCorrectedFen: string | null = null;
 let lastArrows: ArrowDescriptor[] = [];
 let lastFullFen: string | null = null;
 let lastPlayedMove: PipelineResult['played_move'] = null;
@@ -54,60 +53,6 @@ let previewCtx: CanvasRenderingContext2D | null = null;
 function debugLog(msg: string): void {
   console.log(`[chessray] ${msg}`);
   window.chessRay.sendDebugLog(msg);
-}
-
-function parseFenToBoard(fen: string): (string | null)[] {
-  const out: (string | null)[] = new Array(64).fill(null);
-  const rows = fen.split('/');
-  for (let r = 0; r < 8; r++) {
-    let f = 0;
-    for (const ch of rows[r]) {
-      if (ch >= '1' && ch <= '8') f += parseInt(ch);
-      else { out[r * 8 + f] = ch; f++; }
-    }
-  }
-  return out;
-}
-
-/** Squares that changed between two position FENs but aren't part of the highlighted move pair.
- *  Used to detect piece-drags: if a piece moved between frames on a square that the last-move
- *  highlight doesn't cover, the frame is unreliable (the position is being manipulated off-move).
- *  Castling is handled as an exception — the rook's implicit move is expected when the king
- *  travels two files. */
-function extraneousChangedSquares(
-  prevFen: string | null,
-  currentFen: string,
-  highlighted: number[],
-): number[] {
-  if (!prevFen || prevFen === currentFen) return [];
-  const prev = parseFenToBoard(prevFen);
-  const curr = parseFenToBoard(currentFen);
-  const changed: number[] = [];
-  for (let i = 0; i < 64; i++) if (prev[i] !== curr[i]) changed.push(i);
-  const hlSet = new Set(highlighted);
-  let extraneous = changed.filter(sq => !hlSet.has(sq));
-
-  // Castling: a 2-file king move implicitly moves the rook.
-  if (highlighted.length === 2) {
-    const [a, b] = highlighted;
-    const pa = curr[a], pb = curr[b];
-    const kingDest = pa && pa.toLowerCase() === 'k' ? a : (pb && pb.toLowerCase() === 'k' ? b : -1);
-    const kingSrc = kingDest === a ? b : (kingDest === b ? a : -1);
-    if (kingDest >= 0 && kingSrc >= 0 && Math.abs((kingDest % 8) - (kingSrc % 8)) === 2) {
-      const rank = Math.floor(kingDest / 8);
-      const kingside = (kingDest % 8) > (kingSrc % 8);
-      const rookFrom = rank * 8 + (kingside ? 7 : 0);
-      const rookTo = rank * 8 + (kingside ? 5 : 3);
-      extraneous = extraneous.filter(sq => sq !== rookFrom && sq !== rookTo);
-    }
-  }
-  return extraneous;
-}
-
-function squareName(idx: number): string {
-  const file = idx % 8;
-  const rank = 8 - Math.floor(idx / 8);
-  return `${String.fromCharCode(97 + file)}${rank}`;
 }
 
 function sendResult(result: PipelineResult): void {
@@ -126,7 +71,6 @@ function resetPipelineState(): void {
   lastRecognitionResult = null;
   lastSquareColors = undefined;
   lastHighlightDebug = undefined;
-  lastStableCorrectedFen = null;
   cachedBbox = null;
   if (previewCanvas) {
     previewCanvas.width = 0;
@@ -306,21 +250,11 @@ async function processFrame(imageData: ImageData): Promise<void> {
         );
 
         // Skip mid-animation frames — piece is still sliding, FEN is inconsistent
-        const extraneous = boardResult.midAnimation
-          ? []
-          : extraneousChangedSquares(lastStableCorrectedFen, boardResult.correctedFen, boardResult.highlightedSquares);
-
-        if (boardResult.midAnimation || extraneous.length > 0) {
-          if (boardResult.midAnimation) {
-            detectionStatus = 'Mid-animation — piece sliding';
-            debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms recog=${Date.now() - t}ms [mid-animation, skipped] total=${Date.now() - startTime}ms`);
-          } else {
-            const sqList = extraneous.map(squareName).join(',');
-            detectionStatus = `Extraneous drag — ${sqList} changed outside highlight`;
-            debugLog(`drag: stable=${lastStableCorrectedFen} → current=${boardResult.correctedFen} extraneous=[${sqList}] highlight=[${boardResult.highlightedSquares.map(squareName).join(',')}] — frame skipped`);
-          }
+        if (boardResult.midAnimation) {
+          detectionStatus = 'Mid-animation — piece sliding';
+          debugLog(`Timing: detect=${tDetect}ms crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms recog=${Date.now() - t}ms [mid-animation, skipped] total=${Date.now() - startTime}ms`);
           // Restore previous board sample so next frame's change detection
-          // compares against the last good frame, not the drag one
+          // compares against the last good frame, not the mid-animation one
           lastBoardSample = prevBoardSample;
           // Reuse previous result
           recognition = lastRecognitionResult;
@@ -339,7 +273,6 @@ async function processFrame(imageData: ImageData): Promise<void> {
           invalidHighlights = boardResult.invalidHighlights;
           squareColors = boardResult.highlightMedians;
           cachedOrientation = { prevFen: rawFen, orientation: { flipped: isFlipped, source: orientationSource } };
-          lastStableCorrectedFen = boardResult.correctedFen;
           if (frameCount <= 3) {
             debugLog(`Recognition: rawFen=${rawFen} conf=${recognition.confidence.toFixed(2)}`);
           }
