@@ -24,6 +24,8 @@ export interface PipelineTestCase {
   expected_labels: { skipped: true; reason: LabelsSkipReason } | { skipped: false; result: LabelStrip[] | null };
   /** Expected highlight candidates above threshold, sorted by score descending */
   expected_candidates: Array<{ square: string; score: number }>;
+  /** Expected median RGB color of the board's light and dark squares (sampled from inner 6x6) */
+  expected_square_colors?: { light: [number, number, number]; dark: [number, number, number] };
 }
 
 const REQUIRED_FIELDS: Array<keyof PipelineTestCase> = [
@@ -101,6 +103,18 @@ function validateCase(tc: any, index: number): PipelineTestCase {
       throw new Error(`${prefix}: candidate square must be a valid chess square, got '${c.square}'`);
     if (typeof c.score !== 'number')
       throw new Error(`${prefix}: candidate score must be a number`);
+  }
+
+  // expected_square_colors (optional)
+  if (tc.expected_square_colors !== undefined) {
+    const sc = tc.expected_square_colors;
+    if (typeof sc !== 'object' || !sc.light || !sc.dark)
+      throw new Error(`${prefix}: expected_square_colors must have 'light' and 'dark'`);
+    for (const key of ['light', 'dark'] as const) {
+      const v = sc[key];
+      if (!Array.isArray(v) || v.length !== 3 || !v.every((n: any) => typeof n === 'number' && n >= 0 && n <= 255))
+        throw new Error(`${prefix}: expected_square_colors.${key} must be a [r,g,b] tuple of 0-255 integers`);
+    }
   }
 
   return tc as PipelineTestCase;

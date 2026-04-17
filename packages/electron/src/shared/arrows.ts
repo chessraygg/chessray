@@ -62,45 +62,6 @@ export function computeArrows(topMoves: EvalMove[]): ArrowDescriptor[] {
 }
 
 /**
- * Compute arrow descriptors for the principal variation (best line).
- * Shows a sequence of moves alternating white/black with numbered labels.
- * @param pv - Array of UCI move strings from Stockfish PV
- * @param turn - Whose turn it is for the first move ('w' or 'b')
- * @param maxMoves - Maximum number of PV moves to show
- */
-export function computePvArrows(
-  pv: string[], turn: Turn, maxMoves: number,
-  whiteColor = '#60a5fa', blackColor = '#f9a8d4',
-): ArrowDescriptor[] {
-  const moves = pv.slice(0, maxMoves);
-  let side = turn;
-
-  return moves.map((uci, i) => {
-    const from = uci.slice(0, 2);
-    const to = uci.slice(2, 4);
-    const isWhite = side === 'w';
-
-    // Alternate colors: green/blue for white moves, orange/red for black moves
-    const color = isWhite ? whiteColor : blackColor;
-
-    // Most recent move (last) is thickest/most opaque, earlier moves shrink
-    const distFromEnd = moves.length - 1 - i;
-    const width = Math.max(3.5, 5 - distFromEnd * 0.5);
-    const opacity = Math.max(0.35, 0.8 - distFromEnd * 0.08);
-
-    const arrow: ArrowDescriptor = {
-      from, to, color, width, opacity,
-      loss_cp: 0,
-      label: String(i + 1),
-    };
-
-    // Alternate side
-    side = side === 'w' ? 'b' : 'w';
-    return arrow;
-  });
-}
-
-/**
  * Convert algebraic square to pixel coordinates relative to a board rectangle.
  * Returns the center of the square.
  */

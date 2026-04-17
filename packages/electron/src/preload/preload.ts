@@ -78,6 +78,14 @@ const api = {
   onResetPanelPosition: (cb: () => void) =>
     ipcRenderer.on('reset-panel-position', () => cb()),
 
+  // Frame recording (test fixture capture)
+  startRecording: () => ipcRenderer.send('start-recording'),
+  stopRecording: () => ipcRenderer.send('stop-recording'),
+  onRecordingStateChanged: (cb: (active: boolean, sessionDir: string | null) => void) =>
+    ipcRenderer.on('recording-state-changed', (_e, active: boolean, dir: string | null) => cb(active, dir)),
+  saveFrameArtifact: (filename: string, buf: Uint8Array) =>
+    ipcRenderer.send('save-frame-artifact', filename, buf),
+
   // Window controls
   minimizeApp: () =>
     ipcRenderer.send('minimize-app'),

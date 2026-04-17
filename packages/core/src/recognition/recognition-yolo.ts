@@ -34,20 +34,65 @@ export class YoloPieceRecognizer implements PieceRecognizerInterface {
     // Fetch model and create session
     const response = await fetch(this.modelUrl);
     const modelBuffer = await response.arrayBuffer();
-    // Prefer WebGPU (10-50x faster than WASM), fall back to WASM
-    this.session = await this.ort.InferenceSession.create(modelBuffer, {
-      executionProviders: ['webgpu', 'wasm'],
-    });
 
-    // Log which execution provider was actually selected
-    const eps = this.session?.handler?.executionProviders
-      ?? this.session?.handler?.backendHint
-      ?? 'unknown';
-    console.log(`[YOLO] ONNX session created, EP: ${JSON.stringify(eps)}`);
+    // Explicit EP selection: try WebGPU first, only fall back to WASM on failure.
+    // ort-web's `[webgpu, wasm]` list silently picks whichever succeeds and
+    // exposes no reliable way to query which one ran — so we split the calls
+    // and log the actual path taken.
+    let selectedEp = 'webgpu';
+    try {
+      this.session = await this.ort.InferenceSession.create(modelBuffer, {
+        executionProviders: ['webgpu'],
+      });
+    } catch (err) {
+      console.log(`[YOLO] WebGPU session creation failed: ${err}. Falling back to WASM.`);
+      selectedEp = 'wasm';
+      this.session = await this.ort.InferenceSession.create(modelBuffer, {
+        executionProviders: ['wasm'],
+      });
+    }
 
-    // Check if WebGPU is available in this context
     const gpu = (globalThis as any).navigator?.gpu;
-    console.log(`[YOLO] WebGPU available in this context: ${!!gpu}`);
+    console.log(`[YOLO] ONNX session created, EP: ${selectedEp} | navigator.gpu: ${!!gpu}`);
+
+    // Warm-up + micro-benchmark: run 3 dummy inferences per EP with a zero
+    // tensor. Kernels compile on the first call; runs 2-3 show steady-state.
+    // We benchmark WebGPU (the active session) AND a separate WASM-only
+    // session so we can tell whether ort-web is actually GPU-accelerating vs
+    // silently running ops on CPU despite the requested EP.
+    const inputSize = 640;
+    const zero = new Float32Array(1 * 3 * inputSize * inputSize);
+    const runBench = async (session: any, label: string): Promise<void> => {
+      try {
+        const tensor = new this.ort.Tensor('float32', zero, [1, 3, inputSize, inputSize]);
+        const feeds: Record<string, unknown> = { [session.inputNames[0]]: tensor };
+        const timings: number[] = [];
+        for (let i = 0; i < 3; i++) {
+          const t0 = Date.now();
+          await session.run(feeds);
+          timings.push(Date.now() - t0);
+        }
+        console.log(`[YOLO bench] ${label}: ${timings.join(', ')}ms`);
+      } catch (err) {
+        console.log(`[YOLO bench] ${label}: skipped (${err})`);
+      }
+    };
+
+    await runBench(this.session, `active[${selectedEp}]`);
+
+    // Comparison WASM-only session — same model, same input. If its times
+    // match the active session's, we know the WebGPU path isn't accelerating.
+    if (selectedEp === 'webgpu') {
+      try {
+        const wasmSession = await this.ort.InferenceSession.create(modelBuffer, {
+          executionProviders: ['wasm'],
+        });
+        await runBench(wasmSession, 'wasm[reference]');
+        wasmSession.release?.();
+      } catch (err) {
+        console.log(`[YOLO bench] WASM reference skipped: ${err}`);
+      }
+    }
   }
 
   /**

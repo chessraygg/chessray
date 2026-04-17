@@ -5,10 +5,11 @@ Real-time chess position recognition and evaluation overlay. ChessRay captures y
 ## Features
 
 - Detects chess boards and pieces from screen capture using YOLOv11n
-- Detects highlighted squares and determines the last move played
+- Detects highlighted squares and determines the last move played, rendered as an arrow on the overlay
 - Determines board orientation via piece positions or OCR (optical character recognition, via Tesseract)
-- Evaluates positions with Stockfish 18 (WASM) with iterative deepening
-- Renders a transparent overlay with best-move arrows, eval bar, scores, and principal variation
+- Evaluates positions with Stockfish 18 (WASM) with iterative deepening and configurable multi-PV
+- Renders a transparent overlay with best-move arrows, eval bar, scores, principal variation, and an inline PV board preview
+- Optional Lichess analysis sync — open the current position in a floating Lichess window that updates as the board changes
 - Works with anything on screen — chess sites, streams, videos, images — purely vision-based, no DOM scraping
 
 ## Supported Platforms
@@ -19,7 +20,7 @@ Real-time chess position recognition and evaluation overlay. ChessRay captures y
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 20+
+- [Node.js](https://nodejs.org/) 22+
 - [Git LFS](https://git-lfs.github.com/) (for the YOLO model weights)
 - npm 10+
 
@@ -43,16 +44,10 @@ npm test
 ## Development
 
 ```bash
-# Start the app in dev mode (macOS/Linux)
-./app.sh start
+# Start the app in dev mode (cross-platform via electron-forge)
+npm start -w packages/electron
 
-# View logs
-./app.sh log
-
-# Stop the app
-./app.sh stop
-
-# Build and install locally
+# Build and install locally (packages, then copies into your OS app dir)
 npm run install-app -w packages/electron
 ```
 
@@ -85,8 +80,8 @@ chessray/
 4. **Highlight detection** — Detected highlighted squares determine the last move and whose turn it is
 5. **Board orientation** — Determined from piece positions or OCR of coordinate labels (Tesseract)
 6. **FEN generation** — Detected pieces are mapped to a FEN (Forsyth-Edwards Notation) string
-7. **Evaluation** — Stockfish 18 Lite (WASM, Web Worker) evaluates with iterative deepening and LRU (least recently used) caching
-8. **Overlay** — Best-move arrows, eval bar, scores, and PV (principal variation) line are rendered on a transparent, always-on-top window
+7. **Evaluation** — Stockfish 18 Lite (WASM, Web Worker) evaluates with iterative deepening, configurable multi-PV, and LRU (least recently used) caching
+8. **Overlay** — Best-move arrows, played-move arrows, eval bar, scores, PV (principal variation) line, and an inline PV board preview are rendered on a transparent, always-on-top window. An optional floating Lichess analysis window can be synced to the current FEN.
 
 ## License
 

@@ -20,6 +20,9 @@
       score: 71
     - square: f4
       score: 66.4
+  expected_square_colors:
+    light: [198, 199, 202]
+    dark: [120, 130, 139]
 - file: test-caruana-american.png
   orientation: white bottom
   highlighted:
@@ -42,6 +45,9 @@
       score: 241.1
     - square: h5
       score: 187.8
+  expected_square_colors:
+    light: [235, 213, 175]
+    dark: [184, 138, 102]
 - file: test-caruana-american4.png
   orientation: white bottom
   highlighted:
@@ -68,6 +74,9 @@
       score: 233.6
     - square: c8
       score: 233.6
+  expected_square_colors:
+    light: [241, 205, 164]
+    dark: [191, 123, 89]
 - file: test-candidates-nakamura2.png
   orientation: white bottom
   highlighted:
@@ -90,6 +99,9 @@
       score: 242.4
     - square: b6
       score: 238.9
+  expected_square_colors:
+    light: [218, 192, 158]
+    dark: [170, 120, 93]
 - file: test-carlsen-titled2.png
   orientation: white top
   highlighted:
@@ -112,6 +124,9 @@
       score: 305.4
     - square: g6
       score: 217.1
+  expected_square_colors:
+    light: [239, 208, 170]
+    dark: [180, 123, 91]
 - file: test-eric-rosen.png
   orientation: white bottom
   highlighted:
@@ -140,6 +155,9 @@
       score: 53.6
     - square: b3
       score: 19.9
+  expected_square_colors:
+    light: [207, 167, 121]
+    dark: [135, 92, 58]
 - file: test-eric-rosen3.png
   orientation: white bottom
   highlighted:
@@ -170,6 +188,9 @@
       score: 25.7
     - square: h1
       score: 22.7
+  expected_square_colors:
+    light: [208, 169, 125]
+    dark: [135, 91, 58]
 - file: test-carlsen-titled7.png
   orientation: white top
   highlighted:
@@ -194,6 +215,9 @@
       score: 236.8
     - square: g2
       score: 236.8
+  expected_square_colors:
+    light: [238, 214, 176]
+    dark: [183, 134, 98]
 - file: test-grenke-dominguez.png
   orientation: white bottom
   highlighted:
@@ -216,6 +240,9 @@
       score: 451.8
     - square: f6
       score: 445.4
+  expected_square_colors:
+    light: [243, 213, 181]
+    dark: [182, 136, 108]
 - file: test-freestyle-starting.png
   orientation: white bottom
   highlighted: null
@@ -232,6 +259,9 @@
     skipped: true
     reason: piece_count
   expected_candidates: []
+  expected_square_colors:
+    light: [237, 217, 185]
+    dark: [174, 138, 105]
 - file: test-grenke-carlsen-keymer.png
   orientation: white bottom
   highlighted:
@@ -254,6 +284,9 @@
       score: 598.1
     - square: f8
       score: 594.7
+  expected_square_colors:
+    light: [241, 208, 169]
+    dark: [179, 123, 90]
 - file: test-agadmator-carlsen-svidler.png
   orientation: white bottom
   highlighted:
@@ -282,6 +315,9 @@
       score: 19
     - square: b3
       score: 18.9
+  expected_square_colors:
+    light: [208, 168, 117]
+    dark: [141, 94, 55]
 - file: test-agadmator-carlsen-svidler3.png
   orientation: white bottom
   highlighted:
@@ -310,6 +346,9 @@
       score: 19
     - square: b3
       score: 18.9
+  expected_square_colors:
+    light: [208, 168, 117]
+    dark: [141, 95, 57]
 - file: test-agadmator-carlsen-svidler4.png
   orientation: white bottom
   highlighted:
@@ -348,6 +387,9 @@
       score: 21
     - square: h7
       score: 18.8
+  expected_square_colors:
+    light: [210, 168, 117]
+    dark: [143, 95, 55]
 - file: test-agadmator-carlsen-svidler5.png
   orientation: white bottom
   highlighted:
@@ -378,6 +420,9 @@
       score: 19
     - square: b3
       score: 18.9
+  expected_square_colors:
+    light: [208, 168, 117]
+    dark: [141, 95, 57]
 - file: test-carlsen-freestyle2.png
   orientation: white top
   highlighted:
@@ -404,6 +449,9 @@
       score: 236.9
     - square: a5
       score: 155.2
+  expected_square_colors:
+    light: [242, 214, 178]
+    dark: [189, 135, 103]
 - file: test-agadmator-carlsen-niemann.png
   orientation: white bottom
   highlighted:
@@ -440,3 +488,41 @@
       score: 19.8
     - square: h7
       score: 18.8
+  expected_square_colors:
+    light: [199, 158, 109]
+    dark: [126, 84, 52]
+- file: test-agadmator-topalov-yagiz.png
+  orientation: white bottom
+  highlighted:
+    - c6
+    - c2
+  turn: w
+  bbox:
+    x: 305
+    'y': 112
+    width: 927
+    height: 927
+  squareSize: 116
+  expectedFen: 4k3/1R6/p5p1/P3pp1p/8/1N6/1Pr3PP/6K1
+  orientation_source: label
+  expected_labels:
+    skipped: false
+    result:
+      - side: left
+        type: digit
+        chars: '7543'
+        direction: desc
+  expected_candidates:
+    - square: f2
+      score: 122.9
+    - square: c6
+      score: 76.4
+    - square: c2
+      score: 71.5
+    - square: g1
+      score: 41.8
+    - square: h1
+      score: 19.2
+  expected_square_colors:
+    light: [195, 169, 122]
+    dark: [126, 93, 61]

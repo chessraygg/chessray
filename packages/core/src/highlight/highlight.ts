@@ -161,9 +161,15 @@ export function detectHighlightedSquares(pixels: PixelBuffer): HighlightResult {
   // These enable disambiguateHighlights to find valid move pairs when the
   // top 2 don't form a legal move (e.g., false positive on a nearby square).
   const noiseFloor = scores[Math.min(7, scores.length - 1)].dist;
-  const runnerUpThreshold = Math.max(minAbsolute * 3, noiseFloor * 10);
+  // Runner-up: well above noise (3x) and meaningfully above absolute threshold (3x).
+  // The previous 10x-noise multiplier was too aggressive when the noise floor was low —
+  // it excluded genuine sub-dominant highlights, forcing reliance on expanded search.
+  const runnerUpThreshold = Math.max(minAbsolute * 3, noiseFloor * 3);
   let extendedCount = cutIdx;
-  while (extendedCount < Math.min(6, scores.length) && scores[extendedCount].dist >= runnerUpThreshold) {
+  // Cap at 8 candidates: leaves room for real sub-dominant highlights to join
+  // even when several high-scoring annotations sit above the real pair
+  // (agadmator-style streams often have 3-5 painted squares above the true highlight).
+  while (extendedCount < Math.min(8, scores.length) && scores[extendedCount].dist >= runnerUpThreshold) {
     extendedCount++;
   }
   const highlighted = scores.slice(0, extendedCount).map(s => s.idx);
@@ -203,6 +209,51 @@ function isLegalPieceMove(piece: string, fromRank: number, fromFile: number, toR
   }
 }
 
+/** One legal (source, destination) pair considered during disambiguation. */
+export interface DisambiguationPair {
+  src: number;
+  dest: number;
+  piece: string;
+  srcScore: number;
+  destScore: number;
+  combinedScore: number;
+  srcNaturalness: number;
+  destNaturalness: number;
+  /** Which pass found this pair: 1=initial², 2=expanded-empty×candidate-piece,
+   *  3=candidate-empty×expanded-piece, 4=expanded². */
+  pass: 1 | 2 | 3 | 4;
+}
+
+/** Score balance: 0..1 where 1 = both scores equal, 0 = extreme imbalance.
+ *  Real last-move highlights tint both squares with the same overlay and tend to
+ *  score similarly; a spurious pair mixing a real highlight with a high-scoring
+ *  annotation is usually skewed. */
+function scoreBalance(p: { srcScore: number; destScore: number }): number {
+  const a = p.srcScore, b = p.destScore;
+  if (a <= 0 || b <= 0) return 0;
+  return Math.min(a, b) / Math.max(a, b);
+}
+
+export type DisambiguationReason =
+  | 'initial_top_score'
+  | 'expanded_natural_pair'
+  | 'no_legal_pair';
+
+export interface DisambiguationTrace {
+  /** All legal pairs the disambiguator considered (across all passes). */
+  validPairs: DisambiguationPair[];
+  /** Count of (src, dest) combinations tested that failed legality. */
+  rejectedCount: number;
+  /** The selected pair (raw-orientation indices), or null when no legal pair found. */
+  winner: { src: number; dest: number; reason: DisambiguationReason } | null;
+}
+
+export interface DisambiguationResult {
+  /** Final highlighted square indices [src, dest] (raw orientation), or [] if no legal pair. */
+  highlighted: number[];
+  trace: DisambiguationTrace;
+}
+
 /**
  * Disambiguate highlighted squares when more than 2 are detected.
  *
@@ -213,7 +264,7 @@ function isLegalPieceMove(piece: string, fromRank: number, fromFile: number, toR
  *
  * @param candidates Raw indices sorted by detection score (descending)
  * @param fen Position-only FEN (raw image orientation)
- * @returns Exactly 2 indices [source, destination] or fewer if not enough candidates
+ * @returns Disambiguation result with final [src, dest] indices and a decision trace.
  */
 export function disambiguateHighlights(
   candidates: number[],
@@ -222,8 +273,9 @@ export function disambiguateHighlights(
   colors?: Array<[number, number, number]>,
   medians?: { light: [number, number, number]; dark: [number, number, number] },
   flipped?: boolean,
-): number[] {
-  if (candidates.length === 0) return candidates;
+): DisambiguationResult {
+  const emptyTrace: DisambiguationTrace = { validPairs: [], rejectedCount: 0, winner: null };
+  if (candidates.length === 0) return { highlighted: candidates, trace: emptyTrace };
 
   const rows = fen.split('/');
   const board: (string | null)[] = new Array(64).fill(null);
@@ -268,7 +320,20 @@ export function disambiguateHighlights(
 
   // Try to find a valid (empty_source, piece_destination) pair.
   // The source must be empty (the piece left it) and the destination has the piece.
-  const validPairs: Array<{ src: number; dest: number; combinedScore: number }> = [];
+  const validPairs: DisambiguationPair[] = [];
+  let rejectedCount = 0;
+
+  const addValid = (src: number, dest: number, piece: string, pass: 1 | 2 | 3 | 4): void => {
+    const srcScore = scoreMap.get(src) ?? 0;
+    const destScore = scoreMap.get(dest) ?? 0;
+    validPairs.push({
+      src, dest, piece, srcScore, destScore,
+      combinedScore: srcScore + destScore,
+      srcNaturalness: annotationPenalty(src),
+      destNaturalness: annotationPenalty(dest),
+      pass,
+    });
+  };
 
   for (const dest of withPiece) {
     const piece = board[dest]!;
@@ -280,16 +345,28 @@ export function disambiguateHighlights(
       const srcFile = src % 8;
       // Use piece_count orientation for pawn direction validation
       if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, flipped)) {
-        const srcScore = scoreMap.get(src) ?? 0;
-        const destScore = scoreMap.get(dest) ?? 0;
-        validPairs.push({ src, dest, combinedScore: srcScore + destScore });
+        addValid(src, dest, piece, 1);
+      } else {
+        rejectedCount++;
       }
     }
   }
 
-  if (validPairs.length > 0) {
-    validPairs.sort((a, b) => b.combinedScore - a.combinedScore);
-    return [validPairs[0].src, validPairs[0].dest];
+  const pass1Pairs = [...validPairs];
+  if (pass1Pairs.length > 0) {
+    // Sort by balance first (real last-move highlights tint both squares similarly),
+    // then combined score as tiebreaker. This prevents a high-scoring annotation
+    // from hijacking a pair where the real partner scored much lower.
+    pass1Pairs.sort((a, b) => {
+      const ba = scoreBalance(a), bb = scoreBalance(b);
+      if (Math.abs(ba - bb) > 0.15) return bb - ba;
+      return b.combinedScore - a.combinedScore;
+    });
+    const w = pass1Pairs[0];
+    return {
+      highlighted: [w.src, w.dest],
+      trace: { validPairs, rejectedCount, winner: { src: w.src, dest: w.dest, reason: 'initial_top_score' } },
+    };
   }
 
   // No valid pair among initial candidates. Expand: for each candidate piece,
@@ -310,8 +387,9 @@ export function disambiguateHighlights(
         const srcRank = Math.floor(s.idx / 8);
         const srcFile = s.idx % 8;
         if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, flipped)) {
-          const destScore = scoreMap.get(dest) ?? 0;
-          validPairs.push({ src: s.idx, dest, combinedScore: s.dist + destScore });
+          addValid(s.idx, dest, piece, 2);
+        } else {
+          rejectedCount++;
         }
       }
     }
@@ -329,8 +407,9 @@ export function disambiguateHighlights(
         const destRank = Math.floor(s.idx / 8);
         const destFile = s.idx % 8;
         if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, flipped)) {
-          const srcScore = scoreMap.get(src) ?? 0;
-          validPairs.push({ src, dest: s.idx, combinedScore: srcScore + s.dist });
+          addValid(src, s.idx, piece, 3);
+        } else {
+          rejectedCount++;
         }
       }
     }
@@ -350,32 +429,39 @@ export function disambiguateHighlights(
         const destRank = Math.floor(destEntry.idx / 8);
         const destFile = destEntry.idx % 8;
         if (isLegalPieceMove(piece, srcRank, srcFile, destRank, destFile, flipped)) {
-          validPairs.push({ src: srcEntry.idx, dest: destEntry.idx, combinedScore: srcEntry.dist + destEntry.dist });
+          addValid(srcEntry.idx, destEntry.idx, piece, 4);
+        } else {
+          rejectedCount++;
         }
       }
     }
 
     if (validPairs.length > 0) {
-      // Rank by naturalness: prefer pairs without annotation-colored squares.
+      // Rank by: (1) annotation penalty (fewer annotation-tinted squares),
+      // (2) score balance (real last-move pairs tint both squares similarly),
+      // (3) combined score (higher = stronger signal).
       validPairs.sort((a, b) => {
-        const penA = (annotationPenalty(a.src) > annotationThreshold ? 1 : 0) +
-                     (annotationPenalty(a.dest) > annotationThreshold ? 1 : 0);
-        const penB = (annotationPenalty(b.src) > annotationThreshold ? 1 : 0) +
-                     (annotationPenalty(b.dest) > annotationThreshold ? 1 : 0);
+        const penA = (a.srcNaturalness > annotationThreshold ? 1 : 0) +
+                     (a.destNaturalness > annotationThreshold ? 1 : 0);
+        const penB = (b.srcNaturalness > annotationThreshold ? 1 : 0) +
+                     (b.destNaturalness > annotationThreshold ? 1 : 0);
         if (penA !== penB) return penA - penB;
-        const distA = Math.max(Math.abs(Math.floor(a.src / 8) - Math.floor(a.dest / 8)),
-                               Math.abs((a.src % 8) - (a.dest % 8)));
-        const distB = Math.max(Math.abs(Math.floor(b.src / 8) - Math.floor(b.dest / 8)),
-                               Math.abs((b.src % 8) - (b.dest % 8)));
-        if (distA !== distB) return distA - distB;
+        const ba = scoreBalance(a), bb = scoreBalance(b);
+        if (Math.abs(ba - bb) > 0.15) return bb - ba;
         return b.combinedScore - a.combinedScore;
       });
-      return [validPairs[0].src, validPairs[0].dest];
+      const w = validPairs[0];
+      return {
+        highlighted: [w.src, w.dest],
+        trace: { validPairs, rejectedCount, winner: { src: w.src, dest: w.dest, reason: 'expanded_natural_pair' } },
+      };
     }
   }
 
-  // Fallback: pick top 2 by score
-  return candidates.slice(0, 2);
+  // No legal source/destination pair found among candidates or expanded score list.
+  // Refuse to guess — return empty so the pipeline can reject the frame as "highlights
+  // present but no legal move". Callers should treat this the same as no highlights.
+  return { highlighted: [], trace: { validPairs, rejectedCount, winner: null } };
 }
 
 /**

@@ -7,10 +7,11 @@ import type { PipelineResult } from '../shared/types.js';
 import { applyUciMoves, uciToSan } from '@chessray/core';
 import { lossToColor } from '../shared/arrows.js';
 import { loadPrefs, savePrefs } from './preferences.js';
-import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, drawArrow } from './canvas-renderer.js';
+import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow } from './canvas-renderer.js';
 import { preloadPieceImages } from './piece-svg.js';
 import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid } from './debug-panel.js';
 import { pieceSvg } from './piece-svg.js';
+import { SplitLayout, type LayoutNode, type SectionDef } from './split-layout.js';
 
 /// <reference path="../shared/window.d.ts" />
 
@@ -40,13 +41,10 @@ const state: OverlayState = {
   lineVisible: false,
   pvDepth: 10,
   pvDisplayDepth: 2,
-  pvWhiteColor: '#60a5fa',
-  pvBlackColor: '#f9a8d4',
   evalBarVisible: true,
   sourceVisible: true,
   selectedLineIndex: 0,
   lossThreshold: 50,
-  playedLossThreshold: 50,
   autoMode: false,
   vboardOverlayVisible: true,
   pvPreviewLineIndex: null,
@@ -91,7 +89,8 @@ function initOverlay(): void {
     });
   }
 
-  // Make entire panel draggable (setupDrag skips button clicks)
+  // Panel is draggable on any background (setupDrag skips buttons, inputs, and anything
+  // inside the split layout — section headers and splitters handle their own drags).
   if (userPanel) setupDrag(userPanel, userPanel);
 
   // Restore panel position
@@ -99,6 +98,11 @@ function initOverlay(): void {
     userPanel.style.left = `${prefs.panelLeft}px`;
     userPanel.style.top = `${prefs.panelTop}px`;
     userPanel.style.right = 'auto';
+  }
+  // Restore panel width/height (corner-resize)
+  if (userPanel) {
+    if (prefs.panelWidth != null) userPanel.style.width = `${prefs.panelWidth}px`;
+    if (prefs.panelHeight != null) userPanel.style.height = `${prefs.panelHeight}px`;
   }
 
   // ── Panel zoom (Cmd+scroll) ──
@@ -129,68 +133,101 @@ function initOverlay(): void {
     }, { passive: false });
   }
 
-  // ── Resize grips (drag to scale) ──
-  // anchorRight: adjust left so right edge stays fixed
-  // anchorBottom: drag up = enlarge (invert Y), adjust top so bottom edge stays fixed
+  // ── Fit the fixed-200px virtual board to whatever size its leaf gets ──
+  const boardFit = document.getElementById('cv-board-fit') as HTMLElement | null;
+  const boardContainer = boardFit?.querySelector<HTMLElement>('.board-container') ?? null;
+  if (boardFit && boardContainer) {
+    const observer = new ResizeObserver(entries => {
+      for (const e of entries) {
+        const { width, height } = e.contentRect;
+        const scale = Math.max(0, Math.min(width, height) / 200);
+        boardContainer.style.setProperty('--board-scale', String(scale));
+      }
+    });
+    observer.observe(boardFit);
+  }
+
+  // ── Split-pane layout ──
+  const splitRoot = document.getElementById('cv-split-root') as HTMLElement | null;
+  const sectionLibrary = document.getElementById('cv-section-library') as HTMLElement | null;
+  if (splitRoot && sectionLibrary) {
+    const defs: SectionDef[] = [...sectionLibrary.querySelectorAll<HTMLElement>('[data-section-id]')].map(body => ({
+      id: body.dataset.sectionId!,
+      title: body.dataset.sectionTitle ?? body.dataset.sectionId!,
+      body,
+    }));
+    new SplitLayout(splitRoot, defs, {
+      initialLayout: prefs.sectionLayout as LayoutNode | null,
+      hiddenIds: prefs.hiddenSections,
+      onChange: ({ layout, hiddenIds }) => {
+        savePrefs({ sectionLayout: layout, hiddenSections: hiddenIds });
+      },
+    });
+  }
+
+  // ── Resize grips (drag corners to resize panel width/height) ──
+  // `anchorRight`/`anchorBottom` mean the OPPOSITE edge is anchored, so dragging the grip
+  // moves the matching edge. For anchored-left/top we only change width/height; for
+  // anchored-right/bottom we also shift the panel's top-left to keep the opposite edge fixed.
+  const MIN_W = 220, MIN_H = 240;
   function setupResizeGrip(gripId: string, anchorRight: boolean, anchorBottom: boolean): void {
     const grip = document.getElementById(gripId);
     if (!grip || !userPanel) return;
 
     let resizing = false;
-    let startY = 0;
-    let startScale = 1;
-    let startLeft = 0;
-    let startTop = 0;
-    let panelWidth = 0;
-    let panelHeight = 0;
+    let startX = 0, startY = 0;
+    let startLeft = 0, startTop = 0;
+    let startW = 0, startH = 0;
 
     grip.addEventListener('mousedown', (e: MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
       resizing = true;
-      startY = e.clientY;
-      startScale = panelScale;
-      startLeft = userPanel!.offsetLeft;
-      startTop = userPanel!.offsetTop;
-      panelWidth = userPanel!.offsetWidth;
-      panelHeight = userPanel!.offsetHeight;
+      startX = e.clientX; startY = e.clientY;
+      startLeft = userPanel!.offsetLeft; startTop = userPanel!.offsetTop;
+      startW = userPanel!.offsetWidth; startH = userPanel!.offsetHeight;
       document.body.style.userSelect = 'none';
     });
 
     document.addEventListener('mousemove', (e: MouseEvent) => {
       if (!resizing) return;
       e.preventDefault();
+      const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      // Top grips: drag up = enlarge (invert), bottom grips: drag down = enlarge
-      const scaleDelta = anchorBottom ? -dy / 200 : dy / 200;
-      const newScale = Math.min(4, Math.max(0.5, startScale + scaleDelta));
 
+      let newW = anchorRight ? startW - dx : startW + dx;
+      let newH = anchorBottom ? startH - dy : startH + dy;
+      newW = Math.max(MIN_W, newW);
+      newH = Math.max(MIN_H, newH);
+
+      userPanel!.style.width = `${newW}px`;
+      userPanel!.style.height = `${newH}px`;
       if (anchorRight) {
-        const scaledWidthDiff = panelWidth * (newScale - startScale);
-        userPanel!.style.left = `${startLeft - scaledWidthDiff}px`;
+        userPanel!.style.left = `${startLeft + (startW - newW)}px`;
         userPanel!.style.right = 'auto';
       }
       if (anchorBottom) {
-        const scaledHeightDiff = panelHeight * (newScale - startScale);
-        userPanel!.style.top = `${startTop - scaledHeightDiff}px`;
+        userPanel!.style.top = `${startTop + (startH - newH)}px`;
       }
-
-      panelScale = newScale;
-      applyScale();
     });
 
     document.addEventListener('mouseup', () => {
       if (resizing) {
         resizing = false;
         document.body.style.userSelect = '';
-        savePrefs({ panelScale, panelLeft: userPanel!.offsetLeft, panelTop: userPanel!.offsetTop });
+        savePrefs({
+          panelWidth: userPanel!.offsetWidth,
+          panelHeight: userPanel!.offsetHeight,
+          panelLeft: userPanel!.offsetLeft,
+          panelTop: userPanel!.offsetTop,
+        });
       }
     });
   }
-  setupResizeGrip('cv-resize-grip-br', false, false);   // anchor top-left
-  setupResizeGrip('cv-resize-grip-bl', true, false);     // anchor top-right
-  setupResizeGrip('cv-resize-grip-tr', false, true);     // anchor bottom-left
-  setupResizeGrip('cv-resize-grip-tl', true, true);      // anchor bottom-right
+  setupResizeGrip('cv-resize-grip-br', false, false);
+  setupResizeGrip('cv-resize-grip-bl', true, false);
+  setupResizeGrip('cv-resize-grip-tr', false, true);
+  setupResizeGrip('cv-resize-grip-tl', true, true);
 
   // ── Zoom controls ──
   function setZoom(scale: number): void {
@@ -205,27 +242,8 @@ function initOverlay(): void {
   if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
   if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
 
-  // ── Section header toggles ──
-  const collapsedSections = new Set(prefs.collapsedSections);
-  document.querySelectorAll('.section-header').forEach(header => {
-    const section = (header as HTMLElement).dataset.section;
-    if (!section) return;
-    if (collapsedSections.has(section)) {
-      header.classList.add('collapsed');
-      header.nextElementSibling?.classList.add('collapsed');
-    }
-    header.addEventListener('click', () => {
-      header.classList.toggle('collapsed');
-      const body = header.nextElementSibling;
-      body?.classList.toggle('collapsed');
-      if (header.classList.contains('collapsed')) {
-        collapsedSections.add(section);
-      } else {
-        collapsedSections.delete(section);
-      }
-      savePrefs({ collapsedSections: [...collapsedSections] });
-    });
-  });
+  // Section headers are now drag handles for gridstack; hide uses the × button
+  // and re-add uses the hidden-sections tray.
 
   // ── Overlay/Box toggles (debug panel) ──
   const overlayBtn = document.getElementById('cv-overlay-btn');
@@ -278,15 +296,12 @@ function initOverlay(): void {
         renderArrows(state);
         if (state.lineVisible && !pvCycleTimer) pvCycleStart();
       } else {
-        // Clean up virtual board visuals
+        // Clean up virtual board visuals only — keep the cycle running so the
+        // actual-board piece animation continues uninterrupted.
         document.querySelectorAll('.piece-anim').forEach(el => el.remove());
         if (state.canvas) {
           const ctx = state.canvas.getContext('2d');
           if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-        }
-        // Stop animation and restore board to original state
-        if ((window as any).__chessrayPvPlaying) {
-          pvCycleStop();
         }
       }
     });
@@ -301,6 +316,28 @@ function initOverlay(): void {
       savePrefs({ borderVisible: state.borderVisible });
     });
   }
+
+  // Record toggle — start/stop dumping raw captured frames to disk
+  const recordBtn = document.getElementById('cv-record-btn');
+  let recordingActive = false;
+  if (recordBtn) {
+    recordBtn.addEventListener('click', () => {
+      if (recordingActive) window.chessRay.stopRecording();
+      else window.chessRay.startRecording();
+    });
+  }
+  window.chessRay.onRecordingStateChanged((active: boolean, sessionDir: string | null) => {
+    recordingActive = active;
+    if (recordBtn) {
+      recordBtn.classList.toggle('active', active);
+      recordBtn.textContent = active ? '⏺ Recording' : '● Record';
+      if (active && sessionDir) {
+        recordBtn.setAttribute('data-tip', `Recording to ${sessionDir}`);
+      } else {
+        recordBtn.setAttribute('data-tip', 'Dump raw captured frames to ~/chessray-recordings/ for test fixtures');
+      }
+    }
+  });
 
   // ── User panel toggles ──
   const arrowsBtn = document.getElementById('cv-arrows-btn');
@@ -476,7 +513,7 @@ function initOverlay(): void {
       // Reset virtual board if visible
       if (state.vboardOverlayVisible) {
         const grid = document.getElementById('cv-debug-grid');
-        if (grid) renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, []);
+        if (grid) renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, [], state.currentResult?.square_colors);
         if (state.canvas) {
           const ctx = state.canvas.getContext('2d');
           if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
@@ -555,6 +592,7 @@ function initOverlay(): void {
       fen: pickedUpFen,
       flipped: pvCycleFlipped,
       highlight: [fromIdx, toIdx],
+      squareColors: state.currentResult?.square_colors,
       anim: movingPiece ? {
         piece: movingPiece, fromSq, toSq, isWhite, step,
         progress: 0,
@@ -593,7 +631,7 @@ function initOverlay(): void {
     const container = grid?.parentElement;
     if (!grid || !container) { pvCycleStop(); return; }
 
-    renderBoardGrid(grid, pickedUpFen, pvCycleFlipped, [fromIdx, toIdx]);
+    renderBoardGrid(grid, pickedUpFen, pvCycleFlipped, [fromIdx, toIdx], state.currentResult?.square_colors);
 
     // Compute pixel positions for source and destination squares
     const sq = 25; // grid square size in CSS px
@@ -623,7 +661,7 @@ function initOverlay(): void {
     floater.addEventListener('transitionend', () => {
       floater.remove();
       if ((window as any).__chessrayPvPlaying) {
-        renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight);
+        renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight, state.currentResult?.square_colors);
       }
     }, { once: true });
     // Fallback if transitionend doesn't fire
@@ -631,17 +669,18 @@ function initOverlay(): void {
       if (floater.parentElement) {
         floater.remove();
         if ((window as any).__chessrayPvPlaying) {
-          renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight);
+          renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, afterPos.highlight, state.currentResult?.square_colors);
         }
       }
     }, 500);
 
     // Animate arrow following piece movement on virtual board canvas
     if (state.canvas) {
+      const ARROW_BASE_OPACITY = 0.8;
       const moveArrow = {
         from: fromSq, to: toSq,
         color: isWhite ? '#e5e5e5' : '#1a1a1a',
-        width: 3, opacity: 0.8, loss_cp: 0,
+        width: 3, opacity: ARROW_BASE_OPACITY, loss_cp: 0,
         label: String(step),
       };
       const VB_TRANSITION_MS = 350;
@@ -666,7 +705,9 @@ function initOverlay(): void {
         const ctx = state.canvas.getContext('2d')!;
         ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
         ctx.clearRect(0, 0, size, size);
-        drawArrow(ctx, moveArrow, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, progress, true);
+        // Sine-bell opacity: fade in, peak mid-movement, fade out
+        const bellOpacity = ARROW_BASE_OPACITY * Math.sin(Math.PI * progress);
+        drawArrow(ctx, { ...moveArrow, opacity: bellOpacity }, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, progress, true);
 
         if (progress < 1) requestAnimationFrame(tickArrow);
       }
@@ -763,7 +804,7 @@ function initOverlay(): void {
     document.querySelectorAll('.piece-anim').forEach(el => el.remove());
     // Restore board grid to base position (before animation moved pieces)
     if (wasPlaying && pvCycleBaseFen && grid) {
-      renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, []);
+      renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, [], state.currentResult?.square_colors);
     }
     if (wasPlaying) {
       state.pvDisplayDepth = state.pvDepth; // restore full depth
@@ -803,38 +844,6 @@ function initOverlay(): void {
     });
   }
 
-  // ── PV line colors ──
-  const pvWhiteColorInput = document.getElementById('cv-pv-white-color') as HTMLInputElement | null;
-  const pvBlackColorInput = document.getElementById('cv-pv-black-color') as HTMLInputElement | null;
-  state.pvWhiteColor = prefs.pvWhiteColor;
-  state.pvBlackColor = prefs.pvBlackColor;
-
-  function colorPickerFocus() { window.chessRay.setAlwaysOnTop(false); }
-  function colorPickerBlur() { window.chessRay.setAlwaysOnTop(true); }
-
-  if (pvWhiteColorInput) {
-    pvWhiteColorInput.value = state.pvWhiteColor;
-    pvWhiteColorInput.addEventListener('click', colorPickerFocus);
-    pvWhiteColorInput.addEventListener('blur', colorPickerBlur);
-    pvWhiteColorInput.addEventListener('input', () => {
-      state.pvWhiteColor = pvWhiteColorInput.value;
-      savePrefs({ pvWhiteColor: state.pvWhiteColor });
-      renderArrows(state);
-      renderVideoOverlay(state);
-    });
-  }
-  if (pvBlackColorInput) {
-    pvBlackColorInput.value = state.pvBlackColor;
-    pvBlackColorInput.addEventListener('click', colorPickerFocus);
-    pvBlackColorInput.addEventListener('blur', colorPickerBlur);
-    pvBlackColorInput.addEventListener('input', () => {
-      state.pvBlackColor = pvBlackColorInput.value;
-      savePrefs({ pvBlackColor: state.pvBlackColor });
-      renderArrows(state);
-      renderVideoOverlay(state);
-    });
-  }
-
   // ── Loss threshold slider ──
   const lossSlider = document.getElementById('cv-loss-threshold') as HTMLInputElement | null;
   const lossVal = document.getElementById('cv-loss-threshold-val');
@@ -846,22 +855,6 @@ function initOverlay(): void {
       state.lossThreshold = parseInt(lossSlider.value, 10);
       lossVal.textContent = String(state.lossThreshold);
       savePrefs({ lossThreshold: state.lossThreshold });
-      renderArrows(state);
-      renderVideoOverlay(state);
-    });
-  }
-
-  // ── Played move loss label threshold slider ──
-  const playedLossSlider = document.getElementById('cv-played-loss-threshold') as HTMLInputElement | null;
-  const playedLossVal = document.getElementById('cv-played-loss-threshold-val');
-  state.playedLossThreshold = prefs.playedLossThreshold;
-  if (playedLossSlider && playedLossVal) {
-    playedLossSlider.value = String(state.playedLossThreshold);
-    playedLossVal.textContent = String(state.playedLossThreshold);
-    playedLossSlider.addEventListener('input', () => {
-      state.playedLossThreshold = parseInt(playedLossSlider.value, 10);
-      playedLossVal.textContent = String(state.playedLossThreshold);
-      savePrefs({ playedLossThreshold: state.playedLossThreshold });
       renderArrows(state);
       renderVideoOverlay(state);
     });
@@ -1226,6 +1219,8 @@ function processPendingResult(): void {
   if (recogFen && recogFen !== lastRecogFen) {
     lastRecogFen = recogFen;
     (window as any).__chessrayPvPlayStop?.();
+    // Snap old PV arrows away so they don't fade out over the new position
+    resetVideoArrowAnimation();
 
     // Hold moves if showMovesDelay is configured
     if (showMovesDelaySec > 0) {

@@ -1,4 +1,4 @@
-import type { BoardBBox, RecognitionResult, EvalResult, Turn, OrientationSource } from '@chessray/core';
+import type { BoardBBox, RecognitionResult, EvalResult, Turn, OrientationSource, DisambiguationTraceCorrected } from '@chessray/core';
 
 /** Detected end-of-game state */
 export type GameOver = 'checkmate' | 'stalemate';
@@ -42,5 +42,18 @@ export interface PipelineResult {
   detection_status?: string; // human-readable detection status for debug display
   board_image_url?: string; // data URL of the cropped board for debug display
   frame_dimensions?: { width: number; height: number }; // capture frame size for coordinate mapping
+  /** Median RGB color of the board's light and dark squares, sampled from the
+   * inner 6x6 squares. Useful for theming overlays/analysis boards to match. */
+  square_colors?: { light: [number, number, number]; dark: [number, number, number] };
+  /** Detailed highlight-detection breakdown for the debug panel (no effect on rendering). */
+  highlight_debug?: {
+    /** Raw above-threshold candidates in corrected orientation, sorted by score desc. */
+    candidates: Array<{ square: string; score: number; piece: string | null }>;
+    medians: { light: [number, number, number]; dark: [number, number, number] };
+    disambiguation: DisambiguationTraceCorrected;
+    invalidHighlights: boolean;
+    midAnimation: boolean;
+    timing: { highlights_ms: number; disambiguate_ms: number };
+  };
   total_elapsed_ms: number;
 }

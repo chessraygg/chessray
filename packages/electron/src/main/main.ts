@@ -468,6 +468,50 @@ ipcMain.on('set-target-fps', (_e, fps: number) => {
   }
 });
 
+// ── Frame recording (fixture capture) ──
+// Stores raw captured frames as PNG plus per-frame PipelineResult JSON sidecars
+// under ~/chessray-recordings/<timestamp>/ for replay in the test harness.
+
+let recordingDir: string | null = null;
+
+function recordingTimestamp(): string {
+  const d = new Date();
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+function notifyRecordingState(active: boolean, dir: string | null): void {
+  if (analysisWindow && !analysisWindow.isDestroyed()) {
+    analysisWindow.webContents.send('recording-state-changed', active, dir);
+  }
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('recording-state-changed', active, dir);
+  }
+}
+
+ipcMain.on('start-recording', () => {
+  const dir = path.join(app.getPath('home'), 'chessray-recordings', recordingTimestamp());
+  fs.mkdirSync(dir, { recursive: true });
+  recordingDir = dir;
+  fs.appendFileSync(LOG, `[main] Recording started → ${dir}\n`);
+  notifyRecordingState(true, dir);
+});
+
+ipcMain.on('stop-recording', () => {
+  fs.appendFileSync(LOG, `[main] Recording stopped (was ${recordingDir})\n`);
+  recordingDir = null;
+  notifyRecordingState(false, null);
+});
+
+ipcMain.on('save-frame-artifact', (_e, filename: string, buf: Uint8Array) => {
+  if (!recordingDir) return;
+  try {
+    fs.writeFileSync(path.join(recordingDir, filename), Buffer.from(buf));
+  } catch (err) {
+    fs.appendFileSync(LOG, `[main] save-frame-artifact failed: ${err}\n`);
+  }
+});
+
 // ── App lifecycle ──
 
 // Enforce single instance — quit if another copy is already running

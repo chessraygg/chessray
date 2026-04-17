@@ -2,7 +2,7 @@
 
 ## Setup
 
-1. Install [Node.js](https://nodejs.org/) 20+ and [Git LFS](https://git-lfs.github.com/)
+1. Install [Node.js](https://nodejs.org/) 22+ and [Git LFS](https://git-lfs.github.com/)
 2. Fork the repo and clone your fork:
    ```bash
    git clone https://github.com/<your-username>/chessray.git
@@ -31,17 +31,17 @@ This project follows [Semantic Versioning](https://semver.org/):
 - **MINOR** (0.x.0) — new features, non-breaking changes
 - **MAJOR** (x.0.0) — breaking changes
 
-While at 0.x, breaking changes may occur in minor versions. Releases are created by pushing a `v*` tag (e.g. `v0.2.0`), which triggers CI to build and publish executables.
+While at 0.x, breaking changes may occur in minor versions. Releases are cut automatically when a PR merges into `main`: CI inspects the PR's labels (`major`, `minor`, or default `patch`), bumps the version, creates the `v*` tag, builds platform distributables, publishes a GitHub Release, and updates the Homebrew tap. Maintainers control the bump by labeling the PR before merge.
 
 ## Development
 
-Start the app in dev mode:
+Start the app in dev mode (cross-platform):
 
 ```bash
-./app.sh start    # start
-./app.sh log      # view logs
-./app.sh stop     # stop
+npm start -w packages/electron
 ```
+
+This launches electron-forge in the foreground and streams logs to your terminal. Stop it with Ctrl-C.
 
 ## Project Structure
 
@@ -54,7 +54,6 @@ Start the app in dev mode:
 
 ```bash
 npm test                          # run all tests
-npm run test:e2e                  # Playwright E2E tests
 npm run gen-expected              # regenerate expected test images
 npm run gen-expected -- <filter>  # regenerate specific test case
 ```

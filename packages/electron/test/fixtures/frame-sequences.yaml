@@ -1,0 +1,46 @@
+# Multi-frame capture sequences — each replays through FrameProcessor in-order
+# with a stubbed engine. Expected outputs describe per-frame FEN/highlights/turn/
+# played_move so cross-frame state-tracking bugs are caught.
+#
+# Populate by recording a live session (Record toggle in the overlay debug panel),
+# then author entries using the sidecar JSON dumped alongside each frame PNG.
+
+- name: topalov-yagiz-king-drag
+  # Agadmator stream, Topalov vs Yağız. After black plays Rxc2+, white drags the
+  # king from f2 → g1 (mid-drag visible in frame 1) → lands on f1 (frame 2).
+  # Tests that the drag frame is classified as intermediate (not accepted as a
+  # new position) and that the final landing updates the state correctly.
+  frames:
+    - file: topalov-yagiz/frame-000.png
+      expected:
+        # Base: black just played Rxc2+; white king still on f2.
+        fen: 4k3/1R6/p5p1/P3pp1p/8/1N6/1Pr2KPP/8
+        highlighted: [c6, c2]
+        turn: w
+        flipped: false
+        orientation_source: label
+        detection_status: null
+        played_move: null
+    - file: topalov-yagiz/frame-001.png
+      expected:
+        # Mid-drag: king visually moved to g1 but the last-move highlight is
+        # still c6/c2. FEN change + unchanged highlights ⇒ intermediate frame.
+        fen: 4k3/1R6/p5p1/P3pp1p/8/1N6/1Pr3PP/6K1
+        highlighted: [c6, c2]
+        turn: w
+        flipped: false
+        orientation_source: label
+        detection_status: Intermediate frame — highlights unchanged
+        played_move: null
+    - file: topalov-yagiz/frame-002.png
+      expected:
+        # Final: white king on f1; last-move highlight is now f2 → f1.
+        # Note: the c2 rook and b2 pawn are momentarily not detected by YOLO
+        # in this frame (recognition noise) — test asserts actual behavior.
+        fen: 4k3/1R6/p5p1/P3pp1p/8/1N6/6PP/5K2
+        highlighted: [f2, f1]
+        turn: b
+        flipped: false
+        orientation_source: label
+        detection_status: null
+        played_move: null

@@ -18,16 +18,14 @@
     "test:core": "cd packages/core && npx vitest run",
     "test:electron": "cd packages/electron && npx vitest run",
     "test:watch": "cd packages/core && npx vitest",
-    "test:e2e": "npx playwright test",
     "setup": "node scripts/download-vendor.js",
     "gen-expected": "tsx scripts/gen-expected-images.ts",
-    "release": "bash scripts/release.sh"
+    "gen-expected-sequences": "tsx scripts/gen-expected-sequences.ts"
   },
   "dependencies": {
     "onnxruntime-node": "^1.24.3"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
     "@resvg/resvg-js": "^2.6.2",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",

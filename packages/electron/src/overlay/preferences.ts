@@ -8,7 +8,6 @@ export interface Prefs {
   lineVisible: boolean;
   pvDepth: number;
   lossThreshold: number;
-  playedLossThreshold: number;
   maxDepth: number;
   multiPvMax: number;
   multiPvRamp: number;
@@ -23,11 +22,14 @@ export interface Prefs {
   compactMode: boolean;
   targetFps: number;
   changeDetect: boolean;
-  pvWhiteColor: string;
-  pvBlackColor: string;
   collapsedSections: string[];
+  hiddenSections: string[];
   panelLeft: number | null;
   panelTop: number | null;
+  panelWidth: number | null;
+  panelHeight: number | null;
+  sectionLayout: unknown | null;
+  gravityUp: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -43,11 +45,8 @@ export const DEFAULT_PREFS: Prefs = {
   compactMode: false,
   targetFps: 2,
   changeDetect: true,
-  pvWhiteColor: '#60a5fa',
-  pvBlackColor: '#f9a8d4',
   pvDepth: 10,
   lossThreshold: 0,
-  playedLossThreshold: 50,
   maxDepth: 28,
   multiPvMax: 5,
   multiPvRamp: 1,
@@ -55,8 +54,13 @@ export const DEFAULT_PREFS: Prefs = {
   panelScale: 1,
   collapsed: false,
   collapsedSections: ['debug'],
+  hiddenSections: [],
   panelLeft: null,
   panelTop: null,
+  panelWidth: null,
+  panelHeight: null,
+  sectionLayout: null,
+  gravityUp: true,
 };
 
 export function loadPrefs(): Prefs {

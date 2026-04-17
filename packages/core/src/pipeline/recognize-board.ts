@@ -1,10 +1,30 @@
 import type { RecognitionResult, Turn } from '../types.js';
 import type { PixelBuffer } from '../board/pixel-utils.js';
-import { detectHighlightedSquares, disambiguateHighlights, turnFromHighlight } from '../highlight/highlight.js';
+import { detectHighlightedSquares, disambiguateHighlights, turnFromHighlight, type DisambiguationTrace, type DisambiguationReason } from '../highlight/highlight.js';
 import { detectBoardFlipped, type OrientationSource } from '../orientation/orientation.js';
 import { flipFen, buildFullFen, fenSimilarity, indexToSquare } from '../fen/fen.js';
 import type { OrientationResult } from '../orientation/orientation.js';
 import { detectLabels, type LabelDetectionResult } from '../orientation/label-detect.js';
+
+/** Per-pair disambiguation entry with squares expressed in corrected orientation. */
+export interface DisambiguationPairCorrected {
+  src: string;
+  dest: string;
+  piece: string;
+  srcScore: number;
+  destScore: number;
+  combinedScore: number;
+  srcNaturalness: number;
+  destNaturalness: number;
+  pass: number;
+}
+
+/** Disambiguation trace with squares converted to corrected (user-facing) orientation. */
+export interface DisambiguationTraceCorrected {
+  validPairs: DisambiguationPairCorrected[];
+  rejectedCount: number;
+  winner: { src: string; dest: string; reason: DisambiguationReason } | null;
+}
 
 /** Why label detection was skipped */
 export type LabelsSkipReason = 'piece_count' | 'cached';
@@ -20,6 +40,9 @@ export interface BoardRecognitionResult {
   recognition: RecognitionResult;
   /** Highlighted square indices in corrected orientation (0-63) */
   highlightedSquares: number[];
+  /** True when raw highlight detection found candidates but none formed a legal
+   * move pair (so highlightedSquares ended up empty after disambiguation). */
+  invalidHighlights: boolean;
   /** Whether the board image is flipped (black at bottom in raw image) */
   flipped: boolean;
   /** Turn determined from highlights, or null if not determinable */
@@ -38,6 +61,9 @@ export interface BoardRecognitionResult {
   highlightScores: Array<{ idx: number; dist: number }>;
   /** Median colors for light and dark squares */
   highlightMedians: { light: [number, number, number]; dark: [number, number, number] };
+  /** Disambiguation decision trace (legal pairs considered, rejected count, winner reason).
+   *  Squares are in corrected (user-facing) orientation. */
+  highlightDisambiguation: DisambiguationTraceCorrected;
   /** Per-step timing breakdown (ms) */
   timing: {
     pieces_ms: number;
@@ -99,7 +125,22 @@ export async function recognizeBoard(
 
   // Step 3b: Disambiguate highlights
   t = Date.now();
-  let highlightedSquares = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians, orientation.flipped);
+  const firstAttempt = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians, orientation.flipped);
+  let highlightedSquares = firstAttempt.highlighted;
+  let disambiguationTrace: DisambiguationTrace = firstAttempt.trace;
+  // When the initial orientation guess (piece_count with low piece count) is
+  // unreliable AND no legal pair was found, retry with the flipped orientation
+  // so pawn_move refinement below can pick up the correct flip.
+  if (highlightedSquares.length === 0 && hlResult.highlighted.length > 0
+      && orientation.source === 'piece_count' && !pieceCountReliable) {
+    const flippedTry = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians, !orientation.flipped);
+    if (flippedTry.highlighted.length === 2) {
+      highlightedSquares = flippedTry.highlighted;
+      disambiguationTrace = flippedTry.trace;
+    }
+  }
+  // Raw detection found candidates but disambiguation couldn't form a legal pair
+  const invalidHighlights = hlResult.highlighted.length > 0 && highlightedSquares.length === 0;
   const tDisambiguate = Date.now() - t;
 
   // Step 4: Refine orientation using pawn move direction from highlights.
@@ -172,26 +213,47 @@ export async function recognizeBoard(
   const tTurn = Date.now() - t;
   const tTotal = Date.now() - t0;
 
+  const idxToSq = (rawIdx: number): string => {
+    const i = orientation.flipped ? 63 - rawIdx : rawIdx;
+    return indexToSquare(Math.floor(i / 8), i % 8);
+  };
+  const highlightDisambiguation: DisambiguationTraceCorrected = {
+    validPairs: disambiguationTrace.validPairs.map(p => ({
+      src: idxToSq(p.src),
+      dest: idxToSq(p.dest),
+      piece: p.piece,
+      srcScore: Math.round(p.srcScore * 10) / 10,
+      destScore: Math.round(p.destScore * 10) / 10,
+      combinedScore: Math.round(p.combinedScore * 10) / 10,
+      srcNaturalness: Math.round(p.srcNaturalness * 1000) / 1000,
+      destNaturalness: Math.round(p.destNaturalness * 1000) / 1000,
+      pass: p.pass,
+    })),
+    rejectedCount: disambiguationTrace.rejectedCount,
+    winner: disambiguationTrace.winner
+      ? { src: idxToSq(disambiguationTrace.winner.src), dest: idxToSq(disambiguationTrace.winner.dest), reason: disambiguationTrace.winner.reason }
+      : null,
+  };
+
   return {
     rawFen,
     correctedFen,
     fullFen,
     recognition: { ...recognition, fen: correctedFen },
     highlightedSquares,
+    invalidHighlights,
     flipped: orientation.flipped,
     turn,
     midAnimation,
     highlightCandidates: (hlResult.scores ?? [])
       .filter(s => s.dist >= 18)
-      .map(s => {
-        const idx = orientation.flipped ? 63 - s.idx : s.idx;
-        return { square: indexToSquare(Math.floor(idx / 8), idx % 8), score: Math.round(s.dist * 10) / 10 };
-      }),
+      .map(s => ({ square: idxToSq(s.idx), score: Math.round(s.dist * 10) / 10 })),
     orientationSource: orientation.source,
     labels: labelsResult,
     highlightColors: hlResult.colors ?? [],
     highlightScores: hlResult.scores ?? [],
     highlightMedians: hlResult.medians ?? { light: [0, 0, 0], dark: [0, 0, 0] },
+    highlightDisambiguation,
     timing: {
       pieces_ms: tPieces,
       orientation_ms: tOrientation,
