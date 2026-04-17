@@ -487,10 +487,11 @@ export function renderArrows(state: OverlayState): void {
   const animated = updateAnimatedArrows(targetArrows, vboardArrowState, () => renderArrows(state));
   const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
 
+  const isPreview = state.pvPreviewLineIndex !== null;
   const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
   for (let i = drawList.length - 1; i >= 0; i--) {
     const isLineArrow = !!drawList[i].arrow.label;
-    drawArrow(ctx, drawList[i].arrow, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow);
+    drawArrow(ctx, drawList[i].arrow, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow || isPreview);
   }
 
   // Draw played-move-style loss marker during preview mode on the selected line's target square
@@ -574,9 +575,10 @@ export function renderVideoOverlay(state: OverlayState): void {
       const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
       const arrowScale = (bw + bh) / 2 / 192;
 
+      const isPreview = state.pvPreviewLineIndex !== null;
       const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
       for (let i = drawList.length - 1; i >= 0; i--) {
-        drawArrow(ctx, drawList[i].arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress);
+        drawArrow(ctx, drawList[i].arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress, isPreview);
       }
 
       // Draw played-move-style loss marker during preview mode on the selected line's target square
