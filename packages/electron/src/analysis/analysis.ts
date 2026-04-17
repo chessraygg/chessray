@@ -37,6 +37,7 @@ let lastHighlightedSquares: number[] = [];
 let lastHighlightTurn: Turn | null = null;
 let lastInvalidHighlights = false;
 let lastSquareColors: PipelineResult['square_colors'] | undefined;
+let lastHighlightDebug: PipelineResult['highlight_debug'] | undefined;
 let lastArrows: ArrowDescriptor[] = [];
 let lastFullFen: string | null = null;
 let lastPlayedMove: PipelineResult['played_move'] = null;
@@ -69,6 +70,7 @@ function resetPipelineState(): void {
   lastBoardSample = null;
   lastRecognitionResult = null;
   lastSquareColors = undefined;
+  lastHighlightDebug = undefined;
   cachedBbox = null;
   if (previewCanvas) {
     previewCanvas.width = 0;
@@ -164,6 +166,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
     const prevHighlightedSquares = [...lastHighlightedSquares];
 
     let squareColors: PipelineResult['square_colors'] = lastSquareColors;
+    let highlightDebug: PipelineResult['highlight_debug'] = lastHighlightDebug;
     if (visuallyUnchanged && lastRecognitionResult) {
       recognition = lastRecognitionResult;
       rawFen = lastRawFen;
@@ -177,6 +180,39 @@ async function processFrame(imageData: ImageData): Promise<void> {
       if (recognizer) {
         const boardResult = await recognizeBoard(cropped, recognizer, cachedOrientation);
         brTiming = boardResult.timing;
+
+        // Always capture highlight debug info, even on mid-animation frames
+        const correctedBoard: (string | null)[] = new Array(64).fill(null);
+        {
+          const rows = boardResult.correctedFen.split('/');
+          for (let r = 0; r < 8; r++) {
+            let f = 0;
+            for (const ch of rows[r]) {
+              if (ch >= '1' && ch <= '8') f += parseInt(ch);
+              else { correctedBoard[r * 8 + f] = ch; f++; }
+            }
+          }
+        }
+        const squareToIdx = (sq: string): number => {
+          const file = sq.charCodeAt(0) - 97;
+          const rank = 8 - parseInt(sq[1], 10);
+          return rank * 8 + file;
+        };
+        highlightDebug = {
+          candidates: boardResult.highlightCandidates.map(c => ({
+            square: c.square,
+            score: c.score,
+            piece: correctedBoard[squareToIdx(c.square)],
+          })),
+          medians: boardResult.highlightMedians,
+          disambiguation: boardResult.highlightDisambiguation,
+          invalidHighlights: boardResult.invalidHighlights,
+          midAnimation: boardResult.midAnimation,
+          timing: {
+            highlights_ms: boardResult.timing.highlights_ms,
+            disambiguate_ms: boardResult.timing.disambiguate_ms,
+          },
+        };
 
         // Skip mid-animation frames — piece is still sliding, FEN is inconsistent
         if (boardResult.midAnimation) {
@@ -217,6 +253,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       lastHighlightTurn = highlightTurn;
       lastInvalidHighlights = invalidHighlights;
       lastSquareColors = squareColors;
+      lastHighlightDebug = highlightDebug;
 
     }
 
@@ -238,6 +275,7 @@ async function processFrame(imageData: ImageData): Promise<void> {
       board_image_url: boardImageUrl,
       frame_dimensions: { width: pixels.width, height: pixels.height },
       square_colors: squareColors,
+      highlight_debug: highlightDebug,
       total_elapsed_ms: Date.now() - startTime,
     });
 

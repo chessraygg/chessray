@@ -32,6 +32,9 @@ export function clearDebugPanel(
   const turnText = document.getElementById('cv-turn-text');
   if (turnDot) turnDot.className = 'turn-dot';
   if (turnText) turnText.textContent = '';
+
+  const hlDebug = document.getElementById('cv-highlight-debug');
+  if (hlDebug) hlDebug.innerHTML = '';
 }
 
 export function setupDrag(handle: HTMLElement, panel: HTMLElement): void {
@@ -327,4 +330,78 @@ export function updateDebugPanel(
       statusEl.style.display = 'none';
     }
   }
+
+  // Highlight detection debug breakdown
+  const hlDebugEl = document.getElementById('cv-highlight-debug');
+  if (hlDebugEl) renderHighlightDebug(hlDebugEl, result);
+}
+
+const reasonLabel: Record<string, string> = {
+  initial_top_score: 'top score among legal pairs in initial candidates',
+  expanded_natural_pair: 'most natural legal pair (expanded search)',
+  no_legal_pair: 'no legal pair found',
+};
+
+function rgbSwatch([r, g, b]: [number, number, number]): string {
+  return `<span class="sw" style="background:rgb(${r},${g},${b})"></span>`;
+}
+
+function renderHighlightDebug(container: HTMLElement, result: PipelineResult): void {
+  const d = result.highlight_debug;
+  if (!d) { container.innerHTML = ''; return; }
+
+  const flags: string[] = [];
+  if (d.midAnimation) flags.push('<span class="hl-flag warn">mid-animation</span>');
+  if (d.invalidHighlights) flags.push('<span class="hl-flag err">invalid (no legal pair)</span>');
+  const flagsLine = flags.length ? `<div class="hl-flags">${flags.join(' ')}</div>` : '';
+
+  const mediansLine = `<div class="hl-row"><span class="hl-k">medians</span>`
+    + ` ${rgbSwatch(d.medians.light)} light`
+    + ` ${rgbSwatch(d.medians.dark)} dark</div>`;
+
+  const timingLine = `<div class="hl-row"><span class="hl-k">timing</span>`
+    + ` detect ${d.timing.highlights_ms}ms · disamb ${d.timing.disambiguate_ms}ms</div>`;
+
+  const candHtml = d.candidates.length
+    ? d.candidates.map(c => {
+        const glyph = c.piece ?? '·';
+        return `<span class="hl-cand">${c.square}<span class="hl-score">${c.score.toFixed(0)}</span><span class="hl-glyph">${glyph}</span></span>`;
+      }).join(' ')
+    : '<span class="hl-dim">none</span>';
+  const candsLine = `<div class="hl-row"><span class="hl-k">candidates (${d.candidates.length})</span> ${candHtml}</div>`;
+
+  const disamb = d.disambiguation;
+  let pairsLine = '';
+  if (disamb.validPairs.length > 0 || disamb.rejectedCount > 0) {
+    const winnerKey = disamb.winner ? `${disamb.winner.src}${disamb.winner.dest}` : '';
+    const sorted = [...disamb.validPairs].sort((a, b) => b.combinedScore - a.combinedScore);
+    const pairHtml = sorted.map(p => {
+      const isWinner = `${p.src}${p.dest}` === winnerKey;
+      const natural = Math.max(p.srcNaturalness, p.destNaturalness) <= 0.08;
+      const tag = isWinner ? ' winner' : '';
+      const natTag = natural ? '<span class="hl-natural">natural</span>' : '<span class="hl-anno">annotation</span>';
+      return `<div class="hl-pair${tag}">`
+        + `<span class="hl-pair-move">${p.src}→${p.dest}</span>`
+        + `<span class="hl-pair-piece">${p.piece}</span>`
+        + `<span class="hl-pair-score">score ${p.combinedScore.toFixed(0)}</span>`
+        + `<span class="hl-pair-pass">p${p.pass}</span>`
+        + natTag
+        + `</div>`;
+    }).join('');
+    const rejTag = disamb.rejectedCount > 0
+      ? `<span class="hl-rejected">+${disamb.rejectedCount} rejected (illegal move)</span>`
+      : '';
+    pairsLine = `<div class="hl-row"><span class="hl-k">legal pairs (${disamb.validPairs.length})</span> ${rejTag}</div>`
+      + `<div class="hl-pairs">${pairHtml}</div>`;
+  }
+
+  let winnerLine = '';
+  if (disamb.winner) {
+    const reason = reasonLabel[disamb.winner.reason] ?? disamb.winner.reason;
+    winnerLine = `<div class="hl-row hl-winner"><span class="hl-k">winner</span> ${disamb.winner.src}→${disamb.winner.dest} — ${reason}</div>`;
+  } else if (d.candidates.length > 0) {
+    winnerLine = `<div class="hl-row hl-winner"><span class="hl-k">winner</span> none — ${reasonLabel.no_legal_pair}</div>`;
+  }
+
+  container.innerHTML = flagsLine + candsLine + mediansLine + pairsLine + winnerLine + timingLine;
 }

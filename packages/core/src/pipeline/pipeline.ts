@@ -57,6 +57,7 @@ export async function runDetectionPipeline(
       highlightColors: [],
       highlightScores: [],
       highlightMedians: { light: [0, 0, 0], dark: [0, 0, 0] },
+      highlightDisambiguation: { validPairs: [], rejectedCount: 0, winner: null },
       timing: { pieces_ms: 0, orientation_ms: 0, highlights_ms: 0, disambiguate_ms: 0, pawnRefine_ms: 0, turn_ms: 0, total_ms: detection.elapsed_ms },
     };
   }
