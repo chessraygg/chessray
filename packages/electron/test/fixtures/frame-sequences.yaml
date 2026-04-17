@@ -1,0 +1,8 @@
+# Multi-frame capture sequences — each replays through FrameProcessor in-order
+# with a stubbed engine. Expected outputs describe per-frame FEN/highlights/turn/
+# played_move so cross-frame state-tracking bugs are caught.
+#
+# Populate by recording a live session (Record toggle in the overlay debug panel),
+# then author entries using the sidecar JSON dumped alongside each frame PNG.
+
+[]
