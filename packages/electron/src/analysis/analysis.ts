@@ -73,17 +73,13 @@ function parseFenToBoard(fen: string): (string | null)[] {
  *  Used to detect piece-drags: if a piece moved between frames on a square that the last-move
  *  highlight doesn't cover, the frame is unreliable (the position is being manipulated off-move).
  *  Castling is handled as an exception — the rook's implicit move is expected when the king
- *  travels two files.
- *
- *  Only runs when there is a 2-square highlighted pair — without it we have no reference to
- *  distinguish a real (unhighlighted) move from a drag, so we trust the new FEN. */
+ *  travels two files. */
 function extraneousChangedSquares(
   prevFen: string | null,
   currentFen: string,
   highlighted: number[],
 ): number[] {
   if (!prevFen || prevFen === currentFen) return [];
-  if (highlighted.length !== 2) return [];
   const prev = parseFenToBoard(prevFen);
   const curr = parseFenToBoard(currentFen);
   const changed: number[] = [];
