@@ -214,6 +214,41 @@ async function processFrame(imageData: ImageData): Promise<void> {
           },
         };
 
+        // Log highlight detection detail for diagnosing missed highlights.
+        // One line per fresh recognition (not logged on dedup/cached frames).
+        const rawToCorrectedSq = (rawIdx: number): string => {
+          const i = boardResult.flipped ? 63 - rawIdx : rawIdx;
+          const file = i % 8;
+          const rank = 8 - Math.floor(i / 8);
+          return `${String.fromCharCode(97 + file)}${rank}`;
+        };
+        const topRaw = (boardResult.highlightScores ?? []).slice(0, 10);
+        const scoresStr = topRaw.map(s => {
+          const sq = rawToCorrectedSq(s.idx);
+          const piece = correctedBoard[squareToIdx(sq)] ?? '·';
+          const below = s.dist < 18 ? '↓' : '';
+          return `${sq}:${s.dist.toFixed(0)}${piece}${below}`;
+        }).join(' ');
+        const ml = boardResult.highlightMedians.light;
+        const md = boardResult.highlightMedians.dark;
+        const pairsStr = boardResult.highlightDisambiguation.validPairs
+          .map(p => {
+            const natural = Math.max(p.srcNaturalness, p.destNaturalness) <= 0.08 ? 'nat' : 'ann';
+            return `${p.src}→${p.dest}(${p.piece},p${p.pass},s=${p.combinedScore.toFixed(0)},${natural})`;
+          }).join(' ');
+        const w = boardResult.highlightDisambiguation.winner;
+        const winnerStr = w ? `${w.src}→${w.dest}[${w.reason}]` : 'none';
+        const flags: string[] = [];
+        if (boardResult.invalidHighlights) flags.push('invalid');
+        if (boardResult.midAnimation) flags.push('mid-anim');
+        const flagsStr = flags.length ? ` flags=${flags.join(',')}` : '';
+        debugLog(
+          `hl: scores=[${scoresStr}]`
+          + ` medians=L(${ml[0]},${ml[1]},${ml[2]})/D(${md[0]},${md[1]},${md[2]})`
+          + ` pairs=[${pairsStr}]+${boardResult.highlightDisambiguation.rejectedCount}rej`
+          + ` winner=${winnerStr}${flagsStr}`
+        );
+
         // Skip mid-animation frames — piece is still sliding, FEN is inconsistent
         if (boardResult.midAnimation) {
           detectionStatus = 'Mid-animation — piece sliding';
