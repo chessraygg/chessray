@@ -89,9 +89,9 @@ function initOverlay(): void {
     });
   }
 
-  // Panel is draggable only via the top-bar (sections use their own header as handle)
-  const topBar = document.getElementById('cv-main-toggles') as HTMLElement | null;
-  if (userPanel && topBar) setupDrag(topBar, userPanel);
+  // Panel is draggable on any background (setupDrag skips buttons, inputs, and anything
+  // inside the split layout — section headers and splitters handle their own drags).
+  if (userPanel) setupDrag(userPanel, userPanel);
 
   // Restore panel position
   if (userPanel && prefs.panelLeft != null && prefs.panelTop != null) {
@@ -151,68 +151,69 @@ function initOverlay(): void {
     });
   }
 
-  // ── Resize grips (drag to scale) ──
-  // anchorRight: adjust left so right edge stays fixed
-  // anchorBottom: drag up = enlarge (invert Y), adjust top so bottom edge stays fixed
+  // ── Resize grips (drag corners to resize panel width/height) ──
+  // `anchorRight`/`anchorBottom` mean the OPPOSITE edge is anchored, so dragging the grip
+  // moves the matching edge. For anchored-left/top we only change width/height; for
+  // anchored-right/bottom we also shift the panel's top-left to keep the opposite edge fixed.
+  const MIN_W = 220, MIN_H = 240;
   function setupResizeGrip(gripId: string, anchorRight: boolean, anchorBottom: boolean): void {
     const grip = document.getElementById(gripId);
     if (!grip || !userPanel) return;
 
     let resizing = false;
-    let startY = 0;
-    let startScale = 1;
-    let startLeft = 0;
-    let startTop = 0;
-    let panelWidth = 0;
-    let panelHeight = 0;
+    let startX = 0, startY = 0;
+    let startLeft = 0, startTop = 0;
+    let startW = 0, startH = 0;
 
     grip.addEventListener('mousedown', (e: MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
       resizing = true;
-      startY = e.clientY;
-      startScale = panelScale;
-      startLeft = userPanel!.offsetLeft;
-      startTop = userPanel!.offsetTop;
-      panelWidth = userPanel!.offsetWidth;
-      panelHeight = userPanel!.offsetHeight;
+      startX = e.clientX; startY = e.clientY;
+      startLeft = userPanel!.offsetLeft; startTop = userPanel!.offsetTop;
+      startW = userPanel!.offsetWidth; startH = userPanel!.offsetHeight;
       document.body.style.userSelect = 'none';
     });
 
     document.addEventListener('mousemove', (e: MouseEvent) => {
       if (!resizing) return;
       e.preventDefault();
+      const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      // Top grips: drag up = enlarge (invert), bottom grips: drag down = enlarge
-      const scaleDelta = anchorBottom ? -dy / 200 : dy / 200;
-      const newScale = Math.min(4, Math.max(0.5, startScale + scaleDelta));
 
+      let newW = anchorRight ? startW - dx : startW + dx;
+      let newH = anchorBottom ? startH - dy : startH + dy;
+      newW = Math.max(MIN_W, newW);
+      newH = Math.max(MIN_H, newH);
+
+      userPanel!.style.width = `${newW}px`;
+      userPanel!.style.height = `${newH}px`;
       if (anchorRight) {
-        const scaledWidthDiff = panelWidth * (newScale - startScale);
-        userPanel!.style.left = `${startLeft - scaledWidthDiff}px`;
+        userPanel!.style.left = `${startLeft + (startW - newW)}px`;
         userPanel!.style.right = 'auto';
       }
       if (anchorBottom) {
-        const scaledHeightDiff = panelHeight * (newScale - startScale);
-        userPanel!.style.top = `${startTop - scaledHeightDiff}px`;
+        userPanel!.style.top = `${startTop + (startH - newH)}px`;
       }
-
-      panelScale = newScale;
-      applyScale();
     });
 
     document.addEventListener('mouseup', () => {
       if (resizing) {
         resizing = false;
         document.body.style.userSelect = '';
-        savePrefs({ panelScale, panelLeft: userPanel!.offsetLeft, panelTop: userPanel!.offsetTop });
+        savePrefs({
+          panelWidth: userPanel!.offsetWidth,
+          panelHeight: userPanel!.offsetHeight,
+          panelLeft: userPanel!.offsetLeft,
+          panelTop: userPanel!.offsetTop,
+        });
       }
     });
   }
-  setupResizeGrip('cv-resize-grip-br', false, false);   // anchor top-left
-  setupResizeGrip('cv-resize-grip-bl', true, false);     // anchor top-right
-  setupResizeGrip('cv-resize-grip-tr', false, true);     // anchor bottom-left
-  setupResizeGrip('cv-resize-grip-tl', true, true);      // anchor bottom-right
+  setupResizeGrip('cv-resize-grip-br', false, false);
+  setupResizeGrip('cv-resize-grip-bl', true, false);
+  setupResizeGrip('cv-resize-grip-tr', false, true);
+  setupResizeGrip('cv-resize-grip-tl', true, true);
 
   // ── Zoom controls ──
   function setZoom(scale: number): void {

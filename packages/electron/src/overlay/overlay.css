@@ -150,22 +150,33 @@ canvas#video-overlay {
 .split.col { flex-direction: column; }
 
 .splitter {
-  flex: 0 0 4px;
+  flex: 0 0 6px;
   background: transparent;
   position: relative;
-  z-index: 2;
+  z-index: 3;
 }
 .split.row > .splitter { cursor: col-resize; }
 .split.col > .splitter { cursor: row-resize; }
+/* Expanded hit-area pseudo (overhangs ±3px beyond the visible 6px bar) */
 .splitter::before {
   content: '';
   position: absolute;
-  inset: 0;
   background: transparent;
   transition: background 0.12s;
 }
-.splitter:hover::before,
-.splitter.dragging::before { background: var(--accent); }
+.split.row > .splitter::before { top: 0; bottom: 0; left: -3px; right: -3px; }
+.split.col > .splitter::before { left: 0; right: 0; top: -3px; bottom: -3px; }
+/* Visible gripline */
+.splitter::after {
+  content: '';
+  position: absolute;
+  background: var(--border);
+  transition: background 0.12s;
+}
+.split.row > .splitter::after { top: 25%; bottom: 25%; left: 2px; right: 2px; }
+.split.col > .splitter::after { left: 25%; right: 25%; top: 2px; bottom: 2px; }
+.splitter:hover::after,
+.splitter.dragging::after { background: var(--accent); }
 
 .leaf {
   flex: 1;

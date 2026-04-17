@@ -42,8 +42,9 @@ export function setupDrag(handle: HTMLElement, panel: HTMLElement): void {
   let startTop = 0;
 
   handle.addEventListener('mousedown', (e: MouseEvent) => {
-    // Don't drag when clicking interactive elements
-    if ((e.target as HTMLElement).closest('button, input, select, textarea, .move-line')) return;
+    // Don't drag when clicking interactive elements or anything inside the split layout
+    // (which has its own drag handles on section headers and splitters).
+    if ((e.target as HTMLElement).closest('button, input, select, textarea, .move-line, .split-root, .hidden-tray, .resize-grip')) return;
     isDragging = true;
     startX = e.clientX;
     startY = e.clientY;
