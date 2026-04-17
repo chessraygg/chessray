@@ -284,6 +284,9 @@ canvas#video-overlay {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
 /* Hidden-sections tray (re-add hidden blocks) */
