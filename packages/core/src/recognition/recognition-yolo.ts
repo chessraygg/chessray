@@ -34,20 +34,45 @@ export class YoloPieceRecognizer implements PieceRecognizerInterface {
     // Fetch model and create session
     const response = await fetch(this.modelUrl);
     const modelBuffer = await response.arrayBuffer();
-    // Prefer WebGPU (10-50x faster than WASM), fall back to WASM
-    this.session = await this.ort.InferenceSession.create(modelBuffer, {
-      executionProviders: ['webgpu', 'wasm'],
-    });
 
-    // Log which execution provider was actually selected
-    const eps = this.session?.handler?.executionProviders
-      ?? this.session?.handler?.backendHint
-      ?? 'unknown';
-    console.log(`[YOLO] ONNX session created, EP: ${JSON.stringify(eps)}`);
+    // Explicit EP selection: try WebGPU first, only fall back to WASM on failure.
+    // ort-web's `[webgpu, wasm]` list silently picks whichever succeeds and
+    // exposes no reliable way to query which one ran — so we split the calls
+    // and log the actual path taken.
+    let selectedEp = 'webgpu';
+    try {
+      this.session = await this.ort.InferenceSession.create(modelBuffer, {
+        executionProviders: ['webgpu'],
+      });
+    } catch (err) {
+      console.log(`[YOLO] WebGPU session creation failed: ${err}. Falling back to WASM.`);
+      selectedEp = 'wasm';
+      this.session = await this.ort.InferenceSession.create(modelBuffer, {
+        executionProviders: ['wasm'],
+      });
+    }
 
-    // Check if WebGPU is available in this context
     const gpu = (globalThis as any).navigator?.gpu;
-    console.log(`[YOLO] WebGPU available in this context: ${!!gpu}`);
+    console.log(`[YOLO] ONNX session created, EP: ${selectedEp} | navigator.gpu: ${!!gpu}`);
+
+    // Warm-up + micro-benchmark: run 3 dummy inferences with a zero tensor
+    // so the first real frame isn't slower (kernels get compiled), and so we
+    // have a ground-truth timing number to verify the EP claim.
+    try {
+      const inputSize = 640;
+      const zero = new Float32Array(1 * 3 * inputSize * inputSize);
+      const tensor = new this.ort.Tensor('float32', zero, [1, 3, inputSize, inputSize]);
+      const feeds: Record<string, unknown> = { [this.session.inputNames[0]]: tensor };
+      const timings: number[] = [];
+      for (let i = 0; i < 3; i++) {
+        const t0 = Date.now();
+        await this.session.run(feeds);
+        timings.push(Date.now() - t0);
+      }
+      console.log(`[YOLO] Warm-up inferences: ${timings.join(', ')}ms (EP=${selectedEp})`);
+    } catch (err) {
+      console.log(`[YOLO] Warm-up skipped: ${err}`);
+    }
   }
 
   /**
