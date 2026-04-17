@@ -19,7 +19,8 @@
     "test:electron": "cd packages/electron && npx vitest run",
     "test:watch": "cd packages/core && npx vitest",
     "setup": "node scripts/download-vendor.js",
-    "gen-expected": "tsx scripts/gen-expected-images.ts"
+    "gen-expected": "tsx scripts/gen-expected-images.ts",
+    "gen-expected-sequences": "tsx scripts/gen-expected-sequences.ts"
   },
   "dependencies": {
     "onnxruntime-node": "^1.24.3"
