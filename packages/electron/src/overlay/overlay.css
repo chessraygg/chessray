@@ -541,6 +541,8 @@ canvas#video-overlay {
   display: flex;
   gap: 2px;
   padding: 3px 0 0;
+  min-height: 35px;
+  flex-shrink: 0;
 }
 
 .compact-move {
