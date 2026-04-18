@@ -387,6 +387,7 @@ function initOverlay(): void {
   let pvCycleMovesTimer: ReturnType<typeof setTimeout> | null = null;
   let pvCyclePreviewTimer: ReturnType<typeof setTimeout> | null = null;
   let pvCycleLineIndex = 0;
+  let pvPaused = false;
 
   /** Get line indices eligible for cycling (filtered by loss threshold) */
   function getCycleLineIndices(): number[] {
@@ -709,6 +710,7 @@ function initOverlay(): void {
   /** Start the unified cycle from the selected line */
   function pvCycleStart(): void {
     pvCycleStop();
+    pvPaused = false;
     pvCycleLineIndex = state.selectedLineIndex;
     pvCycleStartCurrentLine();
   }
@@ -759,6 +761,98 @@ function initOverlay(): void {
       renderArrows(state);
       renderVideoOverlay(state);
     }
+    pvPaused = false;
+  }
+
+  /** Snap the virtual+actual board to PV step `n` without animation. */
+  function renderPvAtStep(step: number): void {
+    if (!pvCyclePv.length || !pvCycleBaseFen) return;
+    state.pvDisplayDepth = step;
+    (window as any).__chessrayPvPlaying = step > 0;
+    document.querySelectorAll('.piece-anim').forEach(el => el.remove());
+    const grid = document.getElementById('cv-debug-grid');
+    grid?.classList.toggle('analysis', step > 0 && state.vboardOverlayVisible);
+    if (state.canvas) {
+      const ctx = state.canvas.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+    }
+
+    if (step === 0) {
+      state.pvBoardState = null;
+      renderVideoOverlay(state);
+      renderArrows(state);
+      if (state.vboardOverlayVisible && grid) {
+        renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, [], state.currentResult?.square_colors);
+      }
+      return;
+    }
+
+    const afterPos = applyUciMoves(pvCycleBaseFen, pvCyclePv, step);
+    if (!afterPos) return;
+    const uci = pvCyclePv[step - 1];
+    const fromFile = uci.charCodeAt(0) - 97;
+    const fromRank = 8 - parseInt(uci[1]);
+    const toFile = uci.charCodeAt(2) - 97;
+    const toRank = 8 - parseInt(uci[3]);
+    const fromIdx = fromRank * 8 + fromFile;
+    const toIdx = toRank * 8 + toFile;
+
+    state.pvBoardState = {
+      fen: afterPos.fen,
+      flipped: pvCycleFlipped,
+      highlight: [fromIdx, toIdx],
+      squareColors: state.currentResult?.square_colors,
+      anim: null,
+    };
+    renderVideoOverlay(state);
+    renderArrows(state);
+    if (state.vboardOverlayVisible && grid) {
+      renderBoardGrid(grid, afterPos.fen, pvCycleFlipped, [fromIdx, toIdx], state.currentResult?.square_colors);
+    }
+  }
+
+  function stopPvTimers(): void {
+    if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
+    if (pvCyclePreviewTimer !== null) {
+      clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null;
+      state.pvPreviewLineIndex = null;
+    }
+  }
+
+  function pvCycleTogglePause(): void {
+    if (pvPaused) {
+      pvPaused = false;
+      if (pvCycleTimer === null && pvCyclePv.length && state.lineVisible) {
+        pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
+      }
+    } else {
+      pvPaused = true;
+      stopPvTimers();
+    }
+    updateCompactMoves();
+  }
+
+  function pvCycleManualNext(): void {
+    stopPvTimers();
+    pvPaused = true;
+    if (state.pvDisplayDepth >= state.pvDepth || state.pvDisplayDepth >= pvCyclePv.length) { updateCompactMoves(); return; }
+    pvCycleStep();
+    updateCompactMoves();
+  }
+
+  function pvCycleManualPrev(): void {
+    stopPvTimers();
+    pvPaused = true;
+    if (state.pvDisplayDepth <= 0) { updateCompactMoves(); return; }
+    renderPvAtStep(state.pvDisplayDepth - 1);
+    updateCompactMoves();
+  }
+
+  function pvCycleManualReset(): void {
+    stopPvTimers();
+    pvPaused = true;
+    renderPvAtStep(0);
+    updateCompactMoves();
   }
 
   (window as any).__chessrayPvGrowStart = pvCycleStart;
@@ -992,11 +1086,23 @@ function initOverlay(): void {
       const cb = parseInt(hex.slice(5, 7), 16);
       const bg = `rgba(${cr},${cg},${cb},0.25)`;
       const lossHtml = move.loss_cp < 5 ? '' : `<span class="compact-loss">−${(move.loss_cp / 100).toFixed(1)}</span>`;
-      html += `<div class="compact-move${cls}" data-line="${i}" style="background:${bg}"><span class="compact-label">${label}</span>${lossHtml}</div>`;
+      const showControls = i === state.selectedLineIndex && state.lineVisible;
+      const playIcon = pvPaused ? '▶' : '❚❚';
+      const controlsHtml = showControls
+        ? `<span class="compact-controls">
+             <button class="cm-ctrl" data-act="reset" data-tip="Reset to move 1">↺</button>
+             <button class="cm-ctrl" data-act="prev" data-tip="Previous move">‹</button>
+             <button class="cm-ctrl cm-ctrl-play" data-act="pause" data-tip="${pvPaused ? 'Play' : 'Pause'}">${playIcon}</button>
+             <button class="cm-ctrl" data-act="next" data-tip="Next move">›</button>
+           </span>`
+        : '';
+      html += `<div class="compact-move${cls}" data-line="${i}" style="background:${bg}"><span class="compact-label">${label}</span>${lossHtml}${controlsHtml}</div>`;
     }
     compactMovesEl.innerHTML = html;
     compactMovesEl.querySelectorAll('.compact-move').forEach(el => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (e) => {
+        // Ignore clicks that originated in playback controls
+        if ((e.target as HTMLElement).closest('.cm-ctrl')) return;
         const idx = parseInt((el as HTMLElement).dataset.line!, 10);
         // Toggle lock: click same = unlock, click different = lock
         if (userLockedLine === idx) {
@@ -1007,6 +1113,17 @@ function initOverlay(): void {
           selectLine(idx);
           updateCompactMoves();
         }
+      });
+      el.querySelectorAll<HTMLElement>('.cm-ctrl').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          switch (btn.dataset.act) {
+            case 'reset': pvCycleManualReset(); break;
+            case 'prev': pvCycleManualPrev(); break;
+            case 'pause': pvCycleTogglePause(); break;
+            case 'next': pvCycleManualNext(); break;
+          }
+        });
       });
       // Fit text to container width
       const label = el.querySelector('.compact-label') as HTMLElement;
