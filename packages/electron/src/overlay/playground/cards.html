@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ChessRay UI — Cards</title>
+  <link rel="stylesheet" href="./shared.css">
+  <style>
+    .cards-panel {
+      width: 520px;
+      height: 640px;
+    }
+    .cards-panel { overflow: hidden; }
+    .panel-body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      grid-template-rows: 1fr auto;
+      gap: 1px;
+      background: var(--border);
+      overflow: hidden;
+    }
+    .card {
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      min-width: 0;
+    }
+    .card.span-2 { grid-column: span 2; }
+
+    .card .section-body { padding: 10px; }
+
+    /* Position card */
+    .position-body { display: flex; flex-direction: column; gap: 8px; padding: 10px !important; }
+    .position-body .virtual-board { max-height: 240px; align-self: center; width: 240px; }
+    .position-meta { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+
+    /* Analysis card */
+    .analysis-body { display: flex; flex-direction: column; gap: 10px; padding: 10px !important; }
+    .analysis-eval-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+    .analysis-eval-row .big-score {
+      font-size: 22px; font-weight: 700; color: #fff;
+      font-feature-settings: 'tnum';
+    }
+    .analysis-eval-row .eval-bar { height: 14px; }
+    .analysis-meta {
+      display: flex; gap: 8px;
+      font-size: 10px; color: var(--text-faint);
+      letter-spacing: 0.05em;
+    }
+
+    /* Tuning card with subtabs */
+    .tune-tabs-body { padding: 0 !important; display: flex; flex-direction: column; }
+    .tune-tabs-body > .tabs { border-top: 0; border-bottom: 1px solid var(--border); }
+    .tune-content { padding: 8px 10px; flex: 1; overflow: auto; }
+
+    /* Compact mode */
+    .cards-panel.compact { width: 260px; height: 280px; }
+    .cards-panel.compact .top-bar { display: none; }
+    .cards-panel.compact .panel-body {
+      grid-template-columns: 1fr; grid-template-rows: 1fr;
+    }
+    .cards-panel.compact .card:not(.card-position) { display: none; }
+    .cards-panel.compact .section-header { display: none; }
+    .cards-panel.compact .position-meta { display: none; }
+
+    /* Hover affordance */
+    .card:hover .section-header .actions { opacity: 1; }
+    .section-header .actions { opacity: 0.4; transition: opacity 0.15s; }
+  </style>
+</head>
+<body>
+  <div class="playground-label">
+    Cards · Polished split-layout
+    <a href="./index.html">← all variants</a>
+    <a href="#" id="toggle-compact" style="margin-left:20px">toggle compact</a>
+  </div>
+
+  <div class="panel cards-panel" id="panel">
+    <!-- Top bar: full-coverage menu -->
+    <div class="top-bar">
+      <span class="status-dot"></span>
+      <span class="status-text">LIVE</span>
+
+      <div class="group">
+        <button class="icon-btn" id="menu-sections-btn" title="Sections (show/hide)">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg>
+          <span class="caret">▾</span>
+        </button>
+        <button class="icon-btn" id="menu-display-btn" title="On-screen display">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8s3-5.5 7-5.5S15 8 15 8s-3 5.5-7 5.5S1 8 1 8z"/><circle cx="8" cy="8" r="2.5"/></svg>
+          <span class="caret">▾</span>
+        </button>
+        <button class="icon-btn" id="menu-mode-btn" title="PV mode">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8a5 5 0 019-3M13 8a5 5 0 01-9 3"/><path d="M11 5h2V3M5 11H3v2"/></svg>
+          <span class="caret">▾</span>
+        </button>
+        <button class="icon-btn" id="menu-tools-btn" title="Tools">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.5 9.5l-3 3a1.5 1.5 0 002 2l3-3M9.5 6.5l3-3a1.5 1.5 0 00-2-2l-3 3"/></svg>
+          <span class="caret">▾</span>
+        </button>
+      </div>
+
+      <div class="group">
+        <span class="badge"><span class="dot"></span>White</span>
+        <span class="badge" style="margin-left:4px">d24 · mpv 4</span>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="group">
+        <button class="icon-btn" title="Compact" id="topbar-compact">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="9" rx="1"/><line x1="4" y1="13.5" x2="12" y2="13.5"/></svg>
+        </button>
+        <button class="icon-btn" title="Zoom out">−</button>
+        <button class="icon-btn" title="Zoom in">+</button>
+        <button class="icon-btn" title="Collapse">▼</button>
+        <button class="icon-btn danger" title="Close">×</button>
+      </div>
+
+      <!-- Popovers -->
+      <div class="menu" id="menu-sections">
+        <div class="menu-label">Visible sections</div>
+        <label class="menu-item"><input type="checkbox" checked>Position</label>
+        <label class="menu-item"><input type="checkbox" checked>Analysis</label>
+        <label class="menu-item"><input type="checkbox" checked>Tuning</label>
+        <label class="menu-item"><input type="checkbox">Tools</label>
+        <label class="menu-item"><input type="checkbox">Diagnostics</label>
+        <div class="menu-divider"></div>
+        <div class="menu-item">Reset layout</div>
+      </div>
+      <div class="menu" id="menu-display">
+        <div class="menu-label">On-screen overlay</div>
+        <label class="menu-item"><input type="checkbox" checked>Board overlay</label>
+        <label class="menu-item"><input type="checkbox" checked>Virtual board</label>
+        <label class="menu-item"><input type="checkbox" checked>Eval bar</label>
+      </div>
+      <div class="menu" id="menu-mode">
+        <div class="menu-label">PV display mode</div>
+        <label class="menu-item"><input type="radio" name="mode" checked>Lines (animation)</label>
+        <label class="menu-item"><input type="radio" name="mode">Moves (arrows)</label>
+        <label class="menu-item"><input type="radio" name="mode">Auto (cycle)</label>
+      </div>
+      <div class="menu" id="menu-tools">
+        <div class="menu-label">External</div>
+        <div class="menu-item">♞ Open in Lichess</div>
+        <label class="menu-item"><input type="checkbox" checked>Auto-sync to Lichess</label>
+        <div class="menu-divider"></div>
+        <div class="menu-label">Clipboard</div>
+        <div class="menu-item">⎘ Copy FEN</div>
+        <div class="menu-item">⎘ Copy PV (PGN)</div>
+      </div>
+    </div>
+
+    <!-- Body: cards in a 2x2 grid -->
+    <div class="panel-body">
+      <div class="card card-position">
+        <div class="section-header">
+          Position
+          <div class="actions">
+            <button class="icon-btn" title="Hide">×</button>
+          </div>
+        </div>
+        <div class="position-body">
+          <div class="virtual-board" id="board"></div>
+          <div class="position-meta">
+            <span class="badge"><span class="dot"></span>White to move</span>
+            <span class="badge">↑ White at bottom</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-analysis">
+        <div class="section-header">
+          Analysis
+          <div class="actions">
+            <button class="icon-btn" title="Hide">×</button>
+          </div>
+        </div>
+        <div class="analysis-body">
+          <div class="analysis-eval-row">
+            <div class="big-score">+0.32</div>
+            <div>
+              <div class="eval-bar" style="background:linear-gradient(to right, #fff 0%, #fff 56%, #000 56%, #000 100%);"></div>
+              <div class="analysis-meta" style="margin-top:4px">
+                <span>DEPTH 24</span>
+                <span>·</span>
+                <span>4 LINES</span>
+                <span>·</span>
+                <span>320 ms</span>
+              </div>
+            </div>
+          </div>
+          <div class="lines" id="lines"></div>
+        </div>
+      </div>
+
+      <div class="card card-tuning span-2">
+        <div class="section-header">
+          Tuning
+          <div class="actions">
+            <button class="icon-btn" title="Hide">×</button>
+          </div>
+        </div>
+        <div class="tune-tabs-body">
+          <div class="tabs" data-tabs="tune">
+            <div class="tab active" data-tab="engine">Engine</div>
+            <div class="tab" data-tab="anim">Animation</div>
+            <div class="tab" data-tab="filter">Filtering</div>
+          </div>
+          <div class="tune-content">
+            <div data-tab-pane="engine" style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">
+              <div class="row"><label>Max depth</label><input type="range" min="8" max="40" value="28"><span class="val">28</span></div>
+              <div class="row"><label>Lines max</label><input type="range" min="1" max="8" value="5"><span class="val">5</span></div>
+              <div class="row"><label>Ramp</label><input type="range" min="1" max="4" value="1"><span class="val">1</span></div>
+              <div class="row"><label>Change det.</label><input type="checkbox" checked><span></span></div>
+            </div>
+            <div data-tab-pane="anim" style="display:none;grid-template-columns:1fr 1fr;gap:0 16px">
+              <div class="row"><label>Capture FPS</label><input type="range" min="1" max="5" value="2"><span class="val">2</span></div>
+              <div class="row"><label>Grow delay</label><input type="range" min="1" max="10" value="3"><span class="val">3s</span></div>
+              <div class="row"><label>Wait delay</label><input type="range" min="0" max="10" value="0"><span class="val">0s</span></div>
+              <div class="row"><label>Auto delay</label><input type="range" min="1" max="15" value="5"><span class="val">5s</span></div>
+            </div>
+            <div data-tab-pane="filter" style="display:none;grid-template-columns:1fr 1fr;gap:0 16px">
+              <div class="row"><label>CP loss</label><input type="range" min="0" max="200" value="50"><span class="val">50</span></div>
+              <div class="row"><label>PV depth</label><input type="range" min="1" max="11" value="10"><span class="val">10</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { renderBoard, renderLines, attachMenuToggle, setupTabs, bindSliders } from './mock.js';
+
+    renderBoard(document.getElementById('board'));
+    renderLines(document.getElementById('lines'));
+    setupTabs('.tune-tabs-body');
+    bindSliders();
+
+    attachMenuToggle('menu-sections-btn', 'menu-sections');
+    attachMenuToggle('menu-display-btn', 'menu-display');
+    attachMenuToggle('menu-mode-btn', 'menu-mode');
+    attachMenuToggle('menu-tools-btn', 'menu-tools');
+
+    // anchor each menu under its button (relative to top-bar)
+    ['sections','display','mode','tools'].forEach((id) => {
+      const btn = document.getElementById('menu-' + id + '-btn');
+      const menu = document.getElementById('menu-' + id);
+      menu.style.left = btn.offsetLeft + 'px';
+    });
+
+    const panel = document.getElementById('panel');
+    document.getElementById('toggle-compact').addEventListener('click', (e) => {
+      e.preventDefault();
+      panel.classList.toggle('compact');
+    });
+    document.getElementById('topbar-compact').addEventListener('click', () => {
+      panel.classList.toggle('compact');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ChessRay UI — HUD</title>
+  <link rel="stylesheet" href="./shared.css">
+  <style>
+    .hud-panel {
+      width: 280px;
+      max-height: 720px;
+    }
+    .hud-body {
+      display: flex;
+      flex-direction: column;
+      padding: 8px;
+      gap: 8px;
+    }
+
+    /* Hero section: board + side eval bar always visible */
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr 18px;
+      gap: 8px;
+    }
+    .hero .virtual-board { width: 100%; }
+    .hero .eval-bar.vertical { width: 18px; height: 100%; }
+
+    .hero-status {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10.5px; color: var(--text-dim);
+      padding: 0 2px;
+    }
+    .hero-status .big {
+      font-size: 16px; font-weight: 700; color: #fff;
+      font-feature-settings: 'tnum';
+      margin-right: auto;
+    }
+    .hero-status .meta { font-size: 9px; color: var(--text-faint); }
+
+    /* Lines: minimal, always visible */
+    .hud-lines { padding: 0 2px; }
+    .hud-lines .line { padding: 4px 6px; }
+
+    /* Drawer */
+    .drawer-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      background: rgba(0,0,0,0.2);
+      border-top: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .drawer-toggle:hover { color: var(--text-dim); }
+    .drawer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.25s ease;
+      border-top: 1px solid var(--border);
+    }
+    .drawer.open { max-height: 400px; }
+    .drawer-content { padding: 10px; }
+
+    .quick-chips {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      margin-bottom: 8px;
+    }
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 8px; font-size: 10px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      cursor: pointer;
+      background: var(--bg-elev);
+    }
+    .chip:hover { border-color: var(--border-strong); color: var(--text); }
+    .chip.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+    /* Compact: hide everything except hero board */
+    .hud-panel.compact { width: 240px; max-height: 280px; }
+    .hud-panel.compact .top-bar { display: none; }
+    .hud-panel.compact .hud-lines,
+    .hud-panel.compact .drawer-toggle,
+    .hud-panel.compact .drawer { display: none; }
+    .hud-panel.compact .hero-status .meta { display: none; }
+  </style>
+</head>
+<body>
+  <div class="playground-label">
+    HUD · Minimal heads-up
+    <a href="./index.html">← all variants</a>
+    <a href="#" id="toggle-compact" style="margin-left:20px">toggle compact</a>
+  </div>
+
+  <div class="panel hud-panel" id="panel">
+    <!-- Top bar: maximally minimal, just menu icons -->
+    <div class="top-bar">
+      <span class="status-dot"></span>
+
+      <div class="group" style="border-left:0; margin-left:0; padding-left:0">
+        <button class="icon-btn" id="menu-sections-btn" title="Sections">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg>
+        </button>
+        <button class="icon-btn" id="menu-display-btn" title="Display">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8s3-5.5 7-5.5S15 8 15 8s-3 5.5-7 5.5S1 8 1 8z"/><circle cx="8" cy="8" r="2.5"/></svg>
+        </button>
+        <button class="icon-btn" id="menu-tools-btn" title="Tools">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.5 9.5l-3 3a1.5 1.5 0 002 2l3-3M9.5 6.5l3-3a1.5 1.5 0 00-2-2l-3 3"/></svg>
+        </button>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="group">
+        <button class="icon-btn" title="Compact" id="topbar-compact">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="9" rx="1"/><line x1="4" y1="13.5" x2="12" y2="13.5"/></svg>
+        </button>
+        <button class="icon-btn" title="Collapse">▼</button>
+        <button class="icon-btn danger" title="Close">×</button>
+      </div>
+
+      <!-- Menus anchored at top-bar -->
+      <div class="menu" id="menu-sections" style="left: 28px;">
+        <div class="menu-label">Show in HUD</div>
+        <label class="menu-item"><input type="checkbox" checked>Lines</label>
+        <label class="menu-item"><input type="checkbox">Diagnostics</label>
+      </div>
+      <div class="menu" id="menu-display" style="left: 56px;">
+        <div class="menu-label">On-screen overlay</div>
+        <label class="menu-item"><input type="checkbox" checked>Board overlay</label>
+        <label class="menu-item"><input type="checkbox" checked>Virtual board</label>
+        <label class="menu-item"><input type="checkbox" checked>Eval bar</label>
+        <div class="menu-divider"></div>
+        <div class="menu-label">PV mode</div>
+        <label class="menu-item"><input type="radio" name="m" checked>Lines</label>
+        <label class="menu-item"><input type="radio" name="m">Moves</label>
+        <label class="menu-item"><input type="radio" name="m">Auto</label>
+      </div>
+      <div class="menu" id="menu-tools" style="left: 84px;">
+        <div class="menu-label">External</div>
+        <div class="menu-item">♞ Open in Lichess</div>
+        <label class="menu-item"><input type="checkbox" checked>Auto-sync</label>
+        <div class="menu-divider"></div>
+        <div class="menu-item">⎘ Copy FEN</div>
+        <div class="menu-item">⎘ Copy PV</div>
+      </div>
+    </div>
+
+    <div class="hud-body">
+      <div class="hero">
+        <div class="virtual-board" id="board"></div>
+        <div class="eval-bar vertical" style="background:linear-gradient(to top, #fff 0%, #fff 56%, #000 56%, #000 100%);"></div>
+      </div>
+      <div class="hero-status">
+        <span class="big">+0.32</span>
+        <span class="meta">d24 · 4 lines · ↑ White</span>
+      </div>
+      <div class="hud-lines lines" id="lines"></div>
+    </div>
+
+    <!-- Drawer: tuning -->
+    <div class="drawer-toggle" id="drawer-toggle">
+      <span>⚙ Tuning</span>
+      <span style="margin-left:auto" id="drawer-caret">▾</span>
+    </div>
+    <div class="drawer" id="drawer">
+      <div class="drawer-content">
+        <div class="quick-chips">
+          <span class="chip active" data-chip="engine">Engine</span>
+          <span class="chip" data-chip="anim">Animation</span>
+          <span class="chip" data-chip="filter">Filtering</span>
+        </div>
+        <div data-chip-pane="engine">
+          <div class="row"><label>Depth</label><input type="range" min="8" max="40" value="28"><span class="val">28</span></div>
+          <div class="row"><label>Lines max</label><input type="range" min="1" max="8" value="5"><span class="val">5</span></div>
+          <div class="row"><label>Ramp</label><input type="range" min="1" max="4" value="1"><span class="val">1</span></div>
+          <div class="row"><label>Change det.</label><input type="checkbox" checked><span></span></div>
+        </div>
+        <div data-chip-pane="anim" style="display:none">
+          <div class="row"><label>FPS</label><input type="range" min="1" max="5" value="2"><span class="val">2</span></div>
+          <div class="row"><label>Grow</label><input type="range" min="1" max="10" value="3"><span class="val">3s</span></div>
+          <div class="row"><label>Wait</label><input type="range" min="0" max="10" value="0"><span class="val">0s</span></div>
+          <div class="row"><label>Auto delay</label><input type="range" min="1" max="15" value="5"><span class="val">5s</span></div>
+        </div>
+        <div data-chip-pane="filter" style="display:none">
+          <div class="row"><label>CP loss</label><input type="range" min="0" max="200" value="50"><span class="val">50</span></div>
+          <div class="row"><label>PV depth</label><input type="range" min="1" max="11" value="10"><span class="val">10</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { renderBoard, renderLines, attachMenuToggle, bindSliders } from './mock.js';
+
+    renderBoard(document.getElementById('board'));
+    renderLines(document.getElementById('lines'));
+    bindSliders();
+
+    attachMenuToggle('menu-sections-btn', 'menu-sections');
+    attachMenuToggle('menu-display-btn', 'menu-display');
+    attachMenuToggle('menu-tools-btn', 'menu-tools');
+
+    // chip switch
+    document.querySelectorAll('.chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const id = chip.dataset.chip;
+        document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c === chip));
+        document.querySelectorAll('[data-chip-pane]').forEach((p) => p.style.display = p.dataset.chipPane === id ? '' : 'none');
+      });
+    });
+
+    // drawer
+    const drawer = document.getElementById('drawer');
+    const caret = document.getElementById('drawer-caret');
+    document.getElementById('drawer-toggle').addEventListener('click', () => {
+      drawer.classList.toggle('open');
+      caret.textContent = drawer.classList.contains('open') ? '▴' : '▾';
+    });
+
+    const panel = document.getElementById('panel');
+    document.getElementById('toggle-compact').addEventListener('click', (e) => {
+      e.preventDefault();
+      panel.classList.toggle('compact');
+    });
+    document.getElementById('topbar-compact').addEventListener('click', () => {
+      panel.classList.toggle('compact');
+    });
+  </script>
+</body>
+</html>
