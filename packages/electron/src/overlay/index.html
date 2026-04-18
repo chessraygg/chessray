@@ -20,15 +20,6 @@
       <button class="toggle icon-toggle active" id="cv-eval-btn" data-tip="Show eval bar next to detected board">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="1" width="6" height="14" rx="1"/><rect x="5" y="7" width="6" height="8" rx="0" fill="currentColor" stroke="none"/></svg>
       </button>
-      <button class="toggle icon-toggle active" id="cv-line-btn" data-tip="Replay engine's best line as piece animation on the board">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="14" x2="4" y2="3"/><polygon points="4,1 2,4 6,4" fill="currentColor" stroke="none"/><line x1="12" y1="2" x2="12" y2="13"/><polygon points="12,15 10,12 14,12" fill="currentColor" stroke="none"/></svg>
-      </button>
-      <button class="toggle icon-toggle" id="cv-arrows-btn" data-tip="Show top engine moves as arrows on board">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="13" x2="2" y2="4"/><polygon points="2,2 0.5,5 3.5,5" fill="currentColor" stroke="none"/><line x1="2" y1="13" x2="9" y2="6"/><polygon points="10.5,4.5 7,5.5 8.5,8" fill="currentColor" stroke="none"/><line x1="2" y1="13" x2="13" y2="13"/><polygon points="15,13 12,11.5 12,14.5" fill="currentColor" stroke="none"/></svg>
-      </button>
-      <button class="toggle icon-toggle" id="cv-auto-btn" data-tip="Auto: show top moves then switch to best line">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><polyline points="8,4 8,8 11,10"/></svg>
-      </button>
       <button class="toggle icon-toggle" id="cv-compact-btn" data-tip="Compact mode: board + top moves only">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="9" rx="1"/><line x1="4" y1="13.5" x2="12" y2="13.5"/></svg>
       </button>
@@ -70,9 +61,6 @@
         <label class="display-toggle"><input type="checkbox" id="cv-disp-overlay" checked><span>Board overlay</span></label>
         <label class="display-toggle"><input type="checkbox" id="cv-disp-vboard" checked><span>Virtual board</span></label>
         <label class="display-toggle"><input type="checkbox" id="cv-disp-eval" checked><span>Eval bar</span></label>
-        <label class="display-toggle"><input type="checkbox" id="cv-disp-lines" checked><span>Lines</span></label>
-        <label class="display-toggle"><input type="checkbox" id="cv-disp-arrows"><span>Moves</span></label>
-        <label class="display-toggle"><input type="checkbox" id="cv-disp-auto"><span>Auto</span></label>
       </div>
 
       <div class="section-body" data-section-id="eval" data-section-title="Eval">

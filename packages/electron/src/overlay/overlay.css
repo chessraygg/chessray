@@ -91,11 +91,6 @@ canvas#video-overlay {
 .color-pick::-webkit-color-swatch-wrapper { padding: 1px; }
 .color-pick::-webkit-color-swatch { border: none; border-radius: 2px; }
 
-.toggle.auto-disabled {
-  opacity: 0.25;
-  pointer-events: none;
-}
-
 .resize-grip {
   position: absolute;
   width: 14px;

@@ -4,8 +4,6 @@ const PREFS_KEY = 'chessray-prefs';
 export interface Prefs {
   overlayVisible: boolean;
   borderVisible: boolean;
-  arrowsVisible: boolean;
-  lineVisible: boolean;
   pvDepth: number;
   lossThreshold: number;
   maxDepth: number;
@@ -14,7 +12,6 @@ export interface Prefs {
   evalBarVisible: boolean;
   panelScale: number;
   collapsed: boolean;
-  autoMode: boolean;
   autoDelaySec: number;
   pvGrowDelaySec: number;
   showMovesDelaySec: number;
@@ -35,9 +32,6 @@ export interface Prefs {
 export const DEFAULT_PREFS: Prefs = {
   overlayVisible: true,
   borderVisible: false,
-  arrowsVisible: false,
-  lineVisible: true,
-  autoMode: false,
   autoDelaySec: 5,
   pvGrowDelaySec: 3,
   showMovesDelaySec: 0,

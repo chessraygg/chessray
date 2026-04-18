@@ -37,7 +37,6 @@ export interface OverlayState {
   sourceVisible: boolean;
   selectedLineIndex: number;
   lossThreshold: number;
-  autoMode: boolean;
   vboardOverlayVisible: boolean;
   pvPreviewLineIndex: number | null;
   pvBoardState: PvBoardState | null;

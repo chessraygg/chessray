@@ -45,7 +45,6 @@ const state: OverlayState = {
   sourceVisible: true,
   selectedLineIndex: 0,
   lossThreshold: 50,
-  autoMode: false,
   vboardOverlayVisible: true,
   pvPreviewLineIndex: null,
   pvBoardState: null,
@@ -61,8 +60,8 @@ function initOverlay(): void {
   const prefs = loadPrefs();
   state.overlayVisible = prefs.overlayVisible;
   state.borderVisible = prefs.borderVisible;
-  state.arrowsVisible = prefs.arrowsVisible;
-  state.lineVisible = prefs.lineVisible;
+  state.arrowsVisible = true;
+  state.lineVisible = false;
   state.pvDepth = prefs.pvDepth;
   state.evalBarVisible = prefs.evalBarVisible;
 
@@ -247,7 +246,7 @@ function initOverlay(): void {
 
   // ── Overlay/Box toggles (debug panel) ──
   const overlayBtn = document.getElementById('cv-overlay-btn');
-  const childToggles = document.querySelectorAll('#cv-eval-btn, #cv-line-btn, #cv-arrows-btn');
+  const childToggles = document.querySelectorAll('#cv-eval-btn');
 
   function updateChildToggles(): void {
     childToggles.forEach(btn => btn.classList.toggle('parent-hidden', !state.overlayVisible));
@@ -339,9 +338,6 @@ function initOverlay(): void {
     }
   });
 
-  // ── User panel toggles ──
-  const arrowsBtn = document.getElementById('cv-arrows-btn');
-  const lineBtn = document.getElementById('cv-line-btn');
   const pvDepthSlider = document.getElementById('cv-pv-depth') as HTMLInputElement | null;
   const pvDepthVal = document.getElementById('cv-pv-depth-val');
 
@@ -349,57 +345,16 @@ function initOverlay(): void {
   const dispOverlay = document.getElementById('cv-disp-overlay') as HTMLInputElement | null;
   const dispVboard = document.getElementById('cv-disp-vboard') as HTMLInputElement | null;
   const dispEval = document.getElementById('cv-disp-eval') as HTMLInputElement | null;
-  const dispLines = document.getElementById('cv-disp-lines') as HTMLInputElement | null;
-  const dispArrows = document.getElementById('cv-disp-arrows') as HTMLInputElement | null;
-  const dispAuto = document.getElementById('cv-disp-auto') as HTMLInputElement | null;
 
   function syncDisplayToggles(): void {
     if (dispOverlay) dispOverlay.checked = state.overlayVisible;
     if (dispVboard) dispVboard.checked = state.vboardOverlayVisible;
     if (dispEval) dispEval.checked = state.evalBarVisible;
-    if (dispLines) dispLines.checked = state.lineVisible;
-    if (dispArrows) dispArrows.checked = state.arrowsVisible;
-    if (dispAuto) dispAuto.checked = state.autoMode;
   }
 
-  // Wire checkboxes to click the corresponding top bar button (use getElementById
-  // to avoid TDZ issues with const declarations further down)
   dispOverlay?.addEventListener('change', () => document.getElementById('cv-overlay-btn')?.click());
   dispVboard?.addEventListener('change', () => document.getElementById('cv-vboard-btn')?.click());
   dispEval?.addEventListener('change', () => document.getElementById('cv-eval-btn')?.click());
-  dispLines?.addEventListener('change', () => document.getElementById('cv-line-btn')?.click());
-  dispArrows?.addEventListener('change', () => document.getElementById('cv-arrows-btn')?.click());
-  dispAuto?.addEventListener('change', () => document.getElementById('cv-auto-btn')?.click());
-
-  function syncModeButtons(): void {
-    arrowsBtn?.classList.toggle('active', state.arrowsVisible);
-    lineBtn?.classList.toggle('active', state.lineVisible);
-    syncDisplayToggles();
-  }
-
-  if (arrowsBtn) {
-    arrowsBtn.classList.toggle('active', state.arrowsVisible);
-    arrowsBtn.addEventListener('click', () => {
-      if (state.autoMode) return;
-      state.arrowsVisible = !state.arrowsVisible;
-      syncModeButtons();
-      savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
-      renderArrows(state);
-    });
-  }
-
-  if (lineBtn) {
-    lineBtn.classList.toggle('active', state.lineVisible);
-    lineBtn.addEventListener('click', () => {
-      if (state.autoMode) return;
-      state.lineVisible = !state.lineVisible;
-      // Reset grow on mode change
-      if (state.lineVisible) { pvCycleStart(); } else { pvCycleStop(); }
-      syncModeButtons();
-      savePrefs({ arrowsVisible: state.arrowsVisible, lineVisible: state.lineVisible });
-      renderArrows(state);
-    });
-  }
 
   if (pvDepthSlider && pvDepthVal) {
     const PV_ALL = 999;
@@ -471,7 +426,6 @@ function initOverlay(): void {
     pvCycleArrowsWas = state.arrowsVisible;
     state.arrowsVisible = true;
     state.lineVisible = false;
-    syncModeButtons();
     renderArrows(state);
     renderVideoOverlay(state);
     updateCompactMoves();
@@ -480,7 +434,6 @@ function initOverlay(): void {
       pvCycleMovesTimer = null;
       state.arrowsVisible = pvCycleArrowsWas;
       state.lineVisible = true;
-      syncModeButtons();
       pvCycleStartCurrentLine();
     }, autoDelaySec * 1000);
   }
@@ -788,12 +741,7 @@ function initOverlay(): void {
     }
     if (pvCycleMovesTimer !== null) {
       clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null;
-      // Restore mode state if stopped during interlude
       state.arrowsVisible = pvCycleArrowsWas;
-      if (!state.autoMode) {
-        state.lineVisible = true;
-      }
-      syncModeButtons();
     }
     const wasPlaying = (window as any).__chessrayPvPlaying;
     (window as any).__chessrayPvPlaying = false;
@@ -944,58 +892,38 @@ function initOverlay(): void {
     });
   }
 
-  // ── Auto mode ──
-  const autoBtn = document.getElementById('cv-auto-btn');
+  // ── Auto cycle: always show moves, then switch to PV animation after delay ──
   const autoDelaySlider = document.getElementById('cv-auto-delay') as HTMLInputElement | null;
   const autoDelayVal = document.getElementById('cv-auto-delay-val');
 
-  state.autoMode = prefs.autoMode;
   let autoDelaySec = prefs.autoDelaySec;
   let autoTimer: ReturnType<typeof setTimeout> | null = null;
 
   function resetAutoTimer(): void {
     if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
-    if (!state.autoMode || (!state.overlayVisible && !state.vboardOverlayVisible)) return;
+    if (!state.overlayVisible && !state.vboardOverlayVisible) return;
 
-    // Show top moves immediately
     state.arrowsVisible = true;
     state.lineVisible = false;
     pvCycleStop();
-    syncModeButtons();
     renderArrows(state);
     renderVideoOverlay(state);
 
-    // Switch to line after delay (hide moves)
     autoTimer = setTimeout(() => {
       autoTimer = null;
       state.arrowsVisible = false;
       state.lineVisible = true;
       pvCycleStart();
-      syncModeButtons();
       renderArrows(state);
       renderVideoOverlay(state);
     }, autoDelaySec * 1000);
   }
 
-  // Expose resetAutoTimer for processPendingResult
   (window as any).__chessrayResetAutoTimer = resetAutoTimer;
   (window as any).__chessrayClearAutoTimer = () => {
     if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
   };
 
-  function applyAutoMode(): void {
-    autoBtn?.classList.toggle('active', state.autoMode);
-    arrowsBtn?.classList.toggle('auto-disabled', state.autoMode);
-    lineBtn?.classList.toggle('auto-disabled', state.autoMode);
-    syncDisplayToggles();
-  }
-
-  applyAutoMode();
-  // Set correct initial visual state for auto mode (arrows first)
-  if (state.autoMode) {
-    state.arrowsVisible = true;
-    syncModeButtons();
-  }
   if (autoDelaySlider && autoDelayVal) {
     autoDelaySlider.value = String(autoDelaySec);
     autoDelayVal.textContent = String(autoDelaySec);
@@ -1006,18 +934,6 @@ function initOverlay(): void {
       resetAutoTimer();
     });
   }
-
-  autoBtn?.addEventListener('click', () => {
-    state.autoMode = !state.autoMode;
-    applyAutoMode();
-    if (state.autoMode) {
-      resetAutoTimer();
-    } else {
-      if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
-      pvCycleStop();
-    }
-    savePrefs({ autoMode: state.autoMode });
-  });
 
 
   // ── Collapse panel ──
@@ -1257,13 +1173,6 @@ function processPendingResult(): void {
     // Same position, same or deeper eval — continue grow if displayed moves still match
     lastEvalDepth = evalDepth;
     if (!movesHeld && state.lineVisible) (window as any).__chessrayPvGrowContinue?.();
-  }
-
-  // Update arrows tooltip with actual multiPV count from engine
-  if (result.evaluation?.top_moves?.length) {
-    const n = result.evaluation.top_moves.length;
-    const arrowsBtn = document.getElementById('cv-arrows-btn');
-    if (arrowsBtn) arrowsBtn.setAttribute('data-tip', `Show top ${n} engine moves as arrows on board`);
   }
 
   updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine);
