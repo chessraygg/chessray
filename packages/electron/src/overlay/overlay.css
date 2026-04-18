@@ -574,26 +574,6 @@ canvas#video-overlay {
 }
 .compact-move:hover { filter: brightness(1.2); }
 .compact-move.locked { border: 1px solid rgba(255, 255, 255, 0.3); }
-.compact-move .compact-controls {
-  display: flex;
-  gap: 1px;
-  margin-top: 2px;
-  justify-content: center;
-}
-.compact-move .cm-ctrl {
-  appearance: none;
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  color: var(--text);
-  font-size: 9px;
-  line-height: 1;
-  padding: 2px 3px;
-  border-radius: 2px;
-  cursor: pointer;
-  min-width: 12px;
-}
-.compact-move .cm-ctrl:hover { background: rgba(255, 255, 255, 0.25); }
-.compact-move .cm-ctrl-play { font-size: 8px; }
 .compact-move.selected::after {
   content: '';
   position: absolute;
