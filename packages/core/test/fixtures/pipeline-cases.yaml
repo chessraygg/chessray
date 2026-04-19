@@ -526,3 +526,28 @@
   expected_square_colors:
     light: [195, 169, 122]
     dark: [126, 93, 61]
+- file: test-csquared-sindarov.png
+  orientation: white bottom
+  highlighted:
+    - g4
+    - h5
+  turn: b
+  bbox:
+    x: 761
+    'y': 523
+    width: 535
+    height: 535
+  squareSize: 67
+  expectedFen: 8/4R1p1/1r2bpk1/4p2P/2p5/2N2P2/P3PK1P/8
+  orientation_source: piece_count
+  expected_labels:
+    skipped: false
+    result: null
+  expected_candidates:
+    - square: g4
+      score: 129.8
+    - square: h5
+      score: 122.9
+  expected_square_colors:
+    light: [221, 231, 238]
+    dark: [163, 180, 191]
