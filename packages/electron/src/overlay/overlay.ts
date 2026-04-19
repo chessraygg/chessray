@@ -562,6 +562,9 @@ function initOverlay(): void {
   const pvGrowSlider = document.getElementById('cv-pv-grow-delay') as HTMLInputElement | null;
   const pvGrowVal = document.getElementById('cv-pv-grow-delay-val');
   let pvGrowDelaySec = prefs.pvGrowDelaySec;
+  const pvPreviewSlider = document.getElementById('cv-pv-preview-sec') as HTMLInputElement | null;
+  const pvPreviewVal = document.getElementById('cv-pv-preview-sec-val');
+  let pvPreviewSec = prefs.pvPreviewSec;
   let pvCycleTimer: ReturnType<typeof setInterval> | null = null;
   let pvCycleLastPv: string[] = [];
   let pvCycleBaseFen = '';
@@ -887,7 +890,7 @@ function initOverlay(): void {
       // First step immediately, then continue on interval
       pvCycleStep();
       pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
-    }, pvGrowDelaySec * 1000);
+    }, pvPreviewSec * 1000);
   }
 
   /** Start the unified cycle from the selected line */
@@ -958,6 +961,17 @@ function initOverlay(): void {
       pvGrowVal.textContent = String(pvGrowDelaySec);
       savePrefs({ pvGrowDelaySec });
       pvCycleStart();
+    });
+  }
+
+  if (pvPreviewSlider && pvPreviewVal) {
+    pvPreviewSlider.value = String(pvPreviewSec);
+    pvPreviewVal.textContent = String(pvPreviewSec);
+    pvPreviewSlider.addEventListener('input', () => {
+      pvPreviewSec = parseInt(pvPreviewSlider.value, 10);
+      pvPreviewVal.textContent = String(pvPreviewSec);
+      savePrefs({ pvPreviewSec });
+      // No need to restart the cycle — the new value picks up on the next preview phase.
     });
   }
 

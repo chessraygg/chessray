@@ -14,6 +14,9 @@ export interface Prefs {
   collapsed: boolean;
   autoDelaySec: number;
   pvGrowDelaySec: number;
+  /** Seconds the PV preview phase (single highlighted move, others hidden)
+   *  stays visible before the per-step PV animation starts. */
+  pvPreviewSec: number;
   showMovesDelaySec: number;
   vboardOverlayVisible: boolean;
   compactMode: boolean;
@@ -41,6 +44,7 @@ export const DEFAULT_PREFS: Prefs = {
   borderVisible: false,
   autoDelaySec: 5,
   pvGrowDelaySec: 3,
+  pvPreviewSec: 1,
   showMovesDelaySec: 0,
   vboardOverlayVisible: true,
   compactMode: false,

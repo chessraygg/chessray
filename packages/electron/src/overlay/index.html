@@ -109,6 +109,11 @@
           <span id="cv-pv-grow-delay-val">3</span><span style="font-size:8px;color:var(--text-faint)">s</span>
         </div>
         <div class="pv-depth-row">
+          <label data-tip="Seconds the preview phase stays visible (selected move highlighted, others hidden) before the per-step PV piece animation begins.">Preview</label>
+          <input type="range" id="cv-pv-preview-sec" min="0" max="5" value="1" step="1">
+          <span id="cv-pv-preview-sec-val">1</span><span style="font-size:8px;color:var(--text-faint)">s</span>
+        </div>
+        <div class="pv-depth-row">
           <label data-tip="Seconds to wait after position stabilizes before showing moves (0 = instant)">Wait</label>
           <input type="range" id="cv-show-moves-delay" min="0" max="10" value="0" step="1">
           <span id="cv-show-moves-delay-val">0</span><span style="font-size:8px;color:var(--text-faint)">s</span>
