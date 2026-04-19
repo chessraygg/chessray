@@ -781,6 +781,16 @@ function initOverlay(): void {
       dstFile = 7 - dstFile; dstRank = 7 - dstRank;
     }
 
+    // Fade the captured piece on the destination square in lockstep with the
+    // floating piece's slide so the new piece doesn't appear to land on top
+    // of it. If the destination is empty (non-capture), this is a no-op.
+    const dstSq = grid.children[dstRank * 8 + dstFile] as HTMLElement | undefined;
+    const capturedSvg = dstSq?.querySelector('svg') as SVGElement | null;
+    if (capturedSvg) {
+      capturedSvg.style.transition = 'opacity 350ms linear';
+      requestAnimationFrame(() => { capturedSvg.style.opacity = '0'; });
+    }
+
     // Create floating piece at source
     const floater = document.createElement('div');
     floater.className = 'piece-anim';

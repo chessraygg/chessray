@@ -245,18 +245,43 @@ function drawAnalysisBoard(
   }
   const pieceSize = Math.min(sqW, sqH) * 0.88;
 
+  // Identify the captured piece (if any) so we can skip it in the static draw
+  // and overlay it with a fade-out opacity tied to animation progress.
+  let capturedSqRank = -1, capturedSqFile = -1, capturedPieceCh = '';
+  if (pvBoard.anim) {
+    let dstFileRaw = pvBoard.anim.toSq.charCodeAt(0) - 97;
+    let dstRankRaw = 8 - parseInt(pvBoard.anim.toSq[1]);
+    if (pvBoard.flipped) { dstFileRaw = 7 - dstFileRaw; dstRankRaw = 7 - dstRankRaw; }
+    const row = fenRows[dstRankRaw];
+    if (row) {
+      let f = 0;
+      for (const ch of row) {
+        if (ch >= '1' && ch <= '8') { f += parseInt(ch); }
+        else {
+          if (f === dstFileRaw) { capturedPieceCh = ch; capturedSqRank = dstRankRaw; capturedSqFile = dstFileRaw; }
+          f++;
+        }
+      }
+    }
+  }
+
   for (let rank = 0; rank < fenRows.length; rank++) {
     let file = 0;
     for (const ch of fenRows[rank]) {
       if (ch >= '1' && ch <= '8') {
         file += parseInt(ch);
       } else {
-        const img = pieceImages.get(ch);
-        if (img) {
-          ctx.drawImage(img,
-            boardRect.x + file * sqW + (sqW - pieceSize) / 2,
-            boardRect.y + rank * sqH + (sqH - pieceSize) / 2,
-            pieceSize, pieceSize);
+        // Skip the captured piece here — it's drawn separately below with a
+        // fade-out alpha so the new piece doesn't appear to land on top of it.
+        const isCaptured = rank === capturedSqRank && file === capturedSqFile && ch === capturedPieceCh;
+        if (!isCaptured) {
+          const img = pieceImages.get(ch);
+          if (img) {
+            ctx.drawImage(img,
+              boardRect.x + file * sqW + (sqW - pieceSize) / 2,
+              boardRect.y + rank * sqH + (sqH - pieceSize) / 2,
+              pieceSize, pieceSize);
+          }
         }
         file++;
       }
@@ -276,6 +301,21 @@ function drawAnalysisBoard(
     }
 
     const t = a.progress;
+
+    // Captured piece fades out linearly with the slide.
+    if (capturedPieceCh) {
+      const capImg = pieceImages.get(capturedPieceCh);
+      if (capImg) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 1 - t);
+        ctx.drawImage(capImg,
+          boardRect.x + capturedSqFile * sqW + (sqW - pieceSize) / 2,
+          boardRect.y + capturedSqRank * sqH + (sqH - pieceSize) / 2,
+          pieceSize, pieceSize);
+        ctx.restore();
+      }
+    }
+
     const px = boardRect.x + (srcFile + t * (dstFile - srcFile)) * sqW + (sqW - pieceSize) / 2;
     const py = boardRect.y + (srcRank + t * (dstRank - srcRank)) * sqH + (sqH - pieceSize) / 2;
     const img = pieceImages.get(a.piece);
