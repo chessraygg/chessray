@@ -448,7 +448,7 @@ export class FrameProcessor {
       if (!recognition || recognition.confidence < 0.3) {
         detectionStatus = `Low confidence: ${recognition ? (recognition.confidence * 100).toFixed(0) + '%' : 'no recognition'}`;
         log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [low conf] total=${Date.now() - startTime}ms`);
-        sendResult(makeResult({}));
+        sendResult(makeResult(this.lastEval ? { evaluation: this.lastEval, arrows: this.lastArrows, eval_depth: this.lastEval.depth, stale_eval: true } : {}));
         return;
       }
 
@@ -507,18 +507,25 @@ export class FrameProcessor {
         return;
       }
 
+      // Helper: opts that keep the previous eval visible (transparent / stale)
+      // for transient bad-frame branches below. Without this the eval bar would
+      // disappear entirely between glitchy frames.
+      const staleEvalOpts = this.lastEval
+        ? { evaluation: this.lastEval, arrows: this.lastArrows, eval_depth: this.lastEval.depth, stale_eval: true as const }
+        : {};
+
       const whiteKings = (positionFen.match(/K/g) || []).length;
       const blackKings = (positionFen.match(/k/g) || []).length;
       if (whiteKings !== 1 || blackKings !== 1) {
         detectionStatus = `Invalid: ${whiteKings}K ${blackKings}k`;
-        sendResult(makeResult({}));
+        sendResult(makeResult(staleEvalOpts));
         return;
       }
 
       const fenRanks = positionFen.split('/');
       if (fenRanks.length !== 8) {
         detectionStatus = 'Invalid FEN structure';
-        sendResult(makeResult({}));
+        sendResult(makeResult(staleEvalOpts));
         return;
       }
       const rank1 = fenRanks[7];
@@ -526,12 +533,12 @@ export class FrameProcessor {
       if (/[pP]/.test(rank1) || /[pP]/.test(rank8)) {
         detectionStatus = 'Pawns on rank 1/8 — invalid';
         log(`Skipping eval: pawns on rank 1/8 in FEN ${positionFen}`);
-        sendResult(makeResult({}));
+        sendResult(makeResult(staleEvalOpts));
         return;
       }
 
       if (!engine) {
-        sendResult(makeResult({}));
+        sendResult(makeResult(staleEvalOpts));
         return;
       }
 
