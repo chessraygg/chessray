@@ -693,6 +693,7 @@ export class FrameProcessor {
           updatePlayedMoveLoss(result);
           const arrows = computeArrows(result.top_moves);
           this.lastEval = result;
+          this.lastDisplayEval = result;
           this.lastArrows = arrows;
           cachePut(fullFen, { evaluation: result, arrows });
           log(`Eval depth ${result.depth}/${this.maxDepth} in ${result.elapsed_ms}ms score=${result.top_moves[0]?.score_cp}cp pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
