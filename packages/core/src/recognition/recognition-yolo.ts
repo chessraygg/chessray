@@ -55,43 +55,21 @@ export class YoloPieceRecognizer implements PieceRecognizerInterface {
     const gpu = (globalThis as any).navigator?.gpu;
     console.log(`[YOLO] ONNX session created, EP: ${selectedEp} | navigator.gpu: ${!!gpu}`);
 
-    // Warm-up + micro-benchmark: run 3 dummy inferences per EP with a zero
-    // tensor. Kernels compile on the first call; runs 2-3 show steady-state.
-    // We benchmark WebGPU (the active session) AND a separate WASM-only
-    // session so we can tell whether ort-web is actually GPU-accelerating vs
-    // silently running ops on CPU despite the requested EP.
-    const inputSize = 640;
-    const zero = new Float32Array(1 * 3 * inputSize * inputSize);
-    const runBench = async (session: any, label: string): Promise<void> => {
-      try {
-        const tensor = new this.ort.Tensor('float32', zero, [1, 3, inputSize, inputSize]);
-        const feeds: Record<string, unknown> = { [session.inputNames[0]]: tensor };
-        const timings: number[] = [];
-        for (let i = 0; i < 3; i++) {
-          const t0 = Date.now();
-          await session.run(feeds);
-          timings.push(Date.now() - t0);
-        }
-        console.log(`[YOLO bench] ${label}: ${timings.join(', ')}ms`);
-      } catch (err) {
-        console.log(`[YOLO bench] ${label}: skipped (${err})`);
-      }
-    };
-
-    await runBench(this.session, `active[${selectedEp}]`);
-
-    // Comparison WASM-only session — same model, same input. If its times
-    // match the active session's, we know the WebGPU path isn't accelerating.
-    if (selectedEp === 'webgpu') {
-      try {
-        const wasmSession = await this.ort.InferenceSession.create(modelBuffer, {
-          executionProviders: ['wasm'],
-        });
-        await runBench(wasmSession, 'wasm[reference]');
-        wasmSession.release?.();
-      } catch (err) {
-        console.log(`[YOLO bench] WASM reference skipped: ${err}`);
-      }
+    // Single warm-up inference: kernel compilation (the only fixed cost we
+    // need to pay before the first real frame). One zero-tensor run is enough
+    // to trigger compilation; further benchmark runs and a WASM-reference
+    // session were dropped — together they added ~6 s to cold start without
+    // affecting steady-state performance.
+    try {
+      const inputSize = 640;
+      const zero = new Float32Array(1 * 3 * inputSize * inputSize);
+      const tensor = new this.ort.Tensor('float32', zero, [1, 3, inputSize, inputSize]);
+      const feeds: Record<string, unknown> = { [this.session.inputNames[0]]: tensor };
+      const t0 = Date.now();
+      await this.session.run(feeds);
+      console.log(`[YOLO warmup] ${selectedEp}: ${Date.now() - t0}ms`);
+    } catch (err) {
+      console.log(`[YOLO warmup] skipped (${err})`);
     }
   }
 
