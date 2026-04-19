@@ -202,15 +202,22 @@ export function updateDebugPanel(
   lineVisible: boolean,
   lossThreshold: number,
   onSelectLine: (index: number) => void,
+  /** When set, debug-section elements (image, fen, meta, status, highlight)
+   *  render this snapshot instead of `result`. Live elements (board grid,
+   *  eval bar, best moves) always render `result`. Used for slow-frame
+   *  history navigation. */
+  debugSnapshot?: PipelineResult | null,
 ): void {
-  if (debugImg && result.board_image_url) {
-    debugImg.src = result.board_image_url;
+  const dbg = debugSnapshot ?? result;
+
+  if (debugImg && dbg.board_image_url) {
+    debugImg.src = dbg.board_image_url;
     debugImg.style.display = '';
   }
 
   if (debugFen) {
     // Show full FEN (with turn, castling rights) if available, else position-only
-    debugFen.textContent = result.evaluation?.fen || result.recognition?.fen || 'No recognition';
+    debugFen.textContent = dbg.evaluation?.fen || dbg.recognition?.fen || 'No recognition';
   }
 
   // Update virtual board grid (user panel) — skip while PV playback is animating
@@ -239,13 +246,13 @@ export function updateDebugPanel(
   // Debug orientation info
   const orientInfo = document.getElementById('cv-orientation-info');
   if (orientInfo) {
-    const orientation = result.flipped ? 'white top' : 'white bottom';
+    const orientation = dbg.flipped ? 'white top' : 'white bottom';
     const sourceNames: Record<string, string> = {
       label: 'coord labels',
       pawn_move: 'pawn move',
       piece_count: 'piece positions',
     };
-    const sourceLabel = sourceNames[result.orientation_source ?? ''] ?? '?';
+    const sourceLabel = sourceNames[dbg.orientation_source ?? ''] ?? '?';
     orientInfo.textContent = `${orientation} · ${sourceLabel}`;
   }
 
@@ -312,14 +319,14 @@ export function updateDebugPanel(
 
   // Debug meta info — confidence + frame loop timing breakdown
   if (debugInfo) {
-    renderFrameTiming(debugInfo, result);
+    renderFrameTiming(debugInfo, dbg);
   }
 
   // Detection status
   const statusEl = document.getElementById('cv-detection-status');
   if (statusEl) {
-    if (result.detection_status) {
-      statusEl.textContent = result.detection_status;
+    if (dbg.detection_status) {
+      statusEl.textContent = dbg.detection_status;
       statusEl.style.display = '';
     } else {
       statusEl.style.display = 'none';
@@ -328,7 +335,7 @@ export function updateDebugPanel(
 
   // Highlight detection debug breakdown
   const hlDebugEl = document.getElementById('cv-highlight-debug');
-  if (hlDebugEl) renderHighlightDebug(hlDebugEl, result);
+  if (hlDebugEl) renderHighlightDebug(hlDebugEl, dbg);
 }
 
 const reasonLabel: Record<string, string> = {
@@ -406,6 +413,63 @@ function renderHighlightDebug(container: HTMLElement, result: PipelineResult): v
 
   container.innerHTML = flagsLine + candsLine + mediansLine + pairsLine + winnerLine;
 }
+
+/** Per-frame FPS budget (ms = 1000 / targetFps). Mutated by the overlay when
+ *  the FPS slider changes; used by renderFrameTiming to flag slow frames. */
+let currentFpsBudgetMs = 0;
+export function setFpsBudgetMs(ms: number): void { currentFpsBudgetMs = ms; }
+
+export interface DebugHistoryNavState {
+  /** Total slow-frame snapshots stored. */
+  count: number;
+  /** Currently viewed snapshot index (0..count-1) or null when viewing live. */
+  index: number | null;
+  /** Snapshot age string for the currently viewed entry (e.g. "12s ago"). */
+  ageLabel?: string;
+  /** Snapshot total ms for the currently viewed entry. */
+  totalMs?: number;
+}
+
+export function renderDebugHistoryNav(
+  container: HTMLElement,
+  state: DebugHistoryNavState,
+  on: { prev: () => void; next: () => void; live: () => void; clear: () => void },
+): void {
+  if (state.count === 0) {
+    container.innerHTML = '';
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = '';
+  const inHistory = state.index !== null;
+  const liveActive = !inHistory ? ' active' : '';
+  const idxText = inHistory ? `${state.index! + 1}/${state.count}` : `${state.count}/${state.count}`;
+  const meta = inHistory && state.totalMs != null
+    ? `<span class="hist-meta">${state.totalMs}ms${state.ageLabel ? ` · ${state.ageLabel}` : ''}</span>`
+    : '';
+  container.innerHTML =
+    `<button class="hist-btn hist-prev" data-act="prev" data-tip="Previous slow frame in history" data-tip-pos="left"${inHistory && state.index! === 0 ? ' disabled' : ''}>◀</button>`
+    + `<span class="hist-idx" data-tip="Slow-frame snapshots (${state.count} of ${MAX_ENTRIES_HINT} max)">${idxText}</span>`
+    + `<button class="hist-btn hist-next" data-act="next" data-tip="Next slow frame in history"${inHistory && state.index! === state.count - 1 ? ' disabled' : ''}>▶</button>`
+    + `<button class="hist-btn hist-live${liveActive}" data-act="live" data-tip="Return to live frame">Live</button>`
+    + meta
+    + `<button class="hist-btn hist-clear" data-act="clear" data-tip="Discard all stored slow-frame snapshots" data-tip-pos="right">Clear</button>`;
+
+  container.querySelectorAll('button[data-act]').forEach(b => {
+    const act = (b as HTMLElement).dataset.act;
+    b.addEventListener('click', () => {
+      if (act === 'prev') on.prev();
+      else if (act === 'next') on.next();
+      else if (act === 'live') on.live();
+      else if (act === 'clear') on.clear();
+    });
+  });
+}
+
+/** Mirror of debug-history MAX_ENTRIES — duplicated as a literal so this file
+ *  doesn't import from debug-history (keeping render concerns split from
+ *  storage). Update both if the cap changes. */
+const MAX_ENTRIES_HINT = 10;
 
 /** Color level for a duration. Used to tint timing bars and the total bar.
  *  Per-section uses the tighter scale; the total bar uses the wider scale
@@ -518,6 +582,11 @@ function renderFrameTiming(container: HTMLElement, result: PipelineResult): void
   const renderMs = ft.render_ms ?? 0;
   const total = ft.capture_ms + ft.pipeline_ms + ipcMs + renderMs;
   const totalLevel = levelForTotal(total);
+  const budgetMs = currentFpsBudgetMs;
+  const slow = budgetMs > 0 && total > budgetMs;
+  const slowBadge = slow
+    ? `<span class="ft-slow-badge" data-tip="Frame total ${total}ms exceeded the FPS budget (${budgetMs}ms at ${Math.round(1000 / budgetMs)} FPS). The next captured frame is dropped because this one was still processing. Snapshot saved to debug history." data-tip-pos="right">⚠ slow</span>`
+    : '';
 
   const conf = result.recognition ? `${(result.recognition.confidence * 100).toFixed(0)}%` : '—';
   const evalText = ft.eval_depth != null && ft.eval_ms != null
@@ -553,6 +622,7 @@ function renderFrameTiming(container: HTMLElement, result: PipelineResult): void
     `<div class="ft-total ft-${totalLevel}"${tip(FT_TIPS.total)} data-tip-pos="left">`
       + `<span class="ft-total-label">frame</span>`
       + `<span class="ft-total-ms">${total}ms</span>`
+      + slowBadge
       + `<span class="ft-meta">`
         + `<span${tip(FT_TIPS.conf)} data-tip-pos="right">conf ${conf}</span>`
         + (evalText ? ` · <span class="ft-eval"${tip(FT_TIPS.eval)} data-tip-pos="right">${evalText}</span>` : '')

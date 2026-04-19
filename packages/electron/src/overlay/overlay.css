@@ -317,6 +317,64 @@ canvas#video-overlay {
 
 .debug-section.hidden { display: none; }
 
+.debug-history-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  background: rgba(245,158,11,0.10);
+  border: 1px solid rgba(245,158,11,0.25);
+  font: 9px/1.2 var(--mono);
+  color: var(--text-dim);
+}
+.debug-history-nav .hist-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: 9px/1 var(--mono);
+  padding: 3px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.debug-history-nav .hist-btn:hover { background: rgba(255,255,255,0.10); }
+.debug-history-nav .hist-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.debug-history-nav .hist-btn.hist-live.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0a0a0a;
+}
+.debug-history-nav .hist-idx {
+  min-width: 36px;
+  text-align: center;
+  color: #f59e0b;
+  font-weight: 600;
+}
+.debug-history-nav .hist-meta {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 8px;
+}
+.debug-history-nav .hist-clear {
+  margin-left: 4px;
+  color: var(--text-faint);
+}
+
+/* Slow-frame badge on the total bar */
+.ft-total .ft-slow-badge {
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--ft-over);
+  color: #0a0a0a;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .debug-img-wrap {
   display: flex;
   justify-content: center;

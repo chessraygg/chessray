@@ -9,7 +9,8 @@ import { lossToColor } from '../shared/arrows.js';
 import { loadPrefs, savePrefs } from './preferences.js';
 import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow } from './canvas-renderer.js';
 import { preloadPieceImages } from './piece-svg.js';
-import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid } from './debug-panel.js';
+import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid, setFpsBudgetMs, renderDebugHistoryNav, type DebugHistoryNavState } from './debug-panel.js';
+import { loadHistory, pushSlowFrame, clearHistory, snapshotToResult, type DebugSnapshot } from './debug-history.js';
 import { pieceSvg } from './piece-svg.js';
 import { SplitLayout, type LayoutNode, type SectionDef } from './split-layout.js';
 
@@ -902,13 +903,20 @@ function initOverlay(): void {
     fpsSlider.value = String(fps);
     fpsVal.textContent = String(fps);
     window.chessRay.setTargetFps(fps);
+    updateFpsBudget(fps);
     fpsSlider.addEventListener('input', () => {
       const v = parseInt(fpsSlider.value, 10);
       fpsVal.textContent = String(v);
       savePrefs({ targetFps: v });
       window.chessRay.setTargetFps(v);
+      updateFpsBudget(v);
     });
+  } else {
+    updateFpsBudget(prefs.targetFps);
   }
+
+  // Initial render of the history nav (shows nothing until the first slow frame).
+  refreshHistoryNav(document.getElementById('cv-debug-history-nav'));
 
   // ── Auto cycle: always show moves, then switch to PV animation after delay ──
   const autoDelaySlider = document.getElementById('cv-auto-delay') as HTMLInputElement | null;
@@ -1114,6 +1122,87 @@ let rafScheduled = false;
 /** Wall time of the previous frame's render (DOM update) — fed back into the
  *  next frame's frame_timing so the panel shows last-frame render cost. */
 let lastRenderMs = 0;
+
+// ── Slow-frame history ──
+let debugHistory: DebugSnapshot[] = loadHistory();
+/** null = viewing live; otherwise an index into debugHistory. */
+let historyIndex: number | null = null;
+/** Latest known FPS budget (ms = 1000 / targetFps). Updated when the FPS
+ *  slider changes; used to decide whether the current frame is "slow". */
+let fpsBudgetMs = 500;
+
+function updateFpsBudget(fps: number): void {
+  fpsBudgetMs = 1000 / Math.max(1, fps);
+  setFpsBudgetMs(fpsBudgetMs);
+}
+
+function frameTotalMs(r: PipelineResult): number {
+  const ft = r.frame_timing;
+  if (!ft) return r.total_elapsed_ms;
+  return ft.capture_ms + ft.pipeline_ms + (ft.ipc_ms ?? 0) + (ft.render_ms ?? 0);
+}
+
+function ageLabel(ts: number): string {
+  const sec = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+}
+
+function refreshHistoryNav(navEl: HTMLElement | null): void {
+  if (!navEl) return;
+  const idx = historyIndex;
+  const entry = idx !== null ? debugHistory[idx] : null;
+  const navState: DebugHistoryNavState = {
+    count: debugHistory.length,
+    index: idx,
+    ageLabel: entry ? ageLabel(entry.captured_at) : undefined,
+    totalMs: entry?.total_ms,
+  };
+  renderDebugHistoryNav(navEl, navState, {
+    prev: () => {
+      if (debugHistory.length === 0) return;
+      historyIndex = historyIndex === null
+        ? debugHistory.length - 1
+        : Math.max(0, historyIndex - 1);
+      rerenderForHistoryChange();
+    },
+    next: () => {
+      if (debugHistory.length === 0) return;
+      if (historyIndex === null) return;
+      if (historyIndex >= debugHistory.length - 1) {
+        historyIndex = null; // past the end → return to live
+      } else {
+        historyIndex++;
+      }
+      rerenderForHistoryChange();
+    },
+    live: () => {
+      historyIndex = null;
+      rerenderForHistoryChange();
+    },
+    clear: () => {
+      clearHistory();
+      debugHistory = [];
+      historyIndex = null;
+      rerenderForHistoryChange();
+    },
+  });
+}
+
+function rerenderForHistoryChange(): void {
+  // Re-run updateDebugPanel against the current live result with the new
+  // historical override (or none, if back to live). Cheap because the live
+  // result hasn't changed.
+  const navEl = document.getElementById('cv-debug-history-nav');
+  refreshHistoryNav(navEl);
+  if (!state.currentResult) return;
+  const snap = historyIndex !== null ? snapshotToResult(debugHistory[historyIndex]) : null;
+  updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine, snap);
+}
 let userLockedLine = -1; // -1 = cycle all, >= 0 = locked to that line
 let lastEvalFen: string | null = null;
 let lastRecogFen: string | null = null;
@@ -1124,7 +1213,8 @@ function selectLine(index: number): void {
   if (state.currentResult) {
     // Restart grow from 2 when a different line is selected
     if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
-    updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine);
+    const snap = historyIndex !== null ? snapshotToResult(debugHistory[historyIndex]) : null;
+    updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine, snap);
     renderArrows(state);
     renderVideoOverlay(state);
   }
@@ -1197,7 +1287,8 @@ function processPendingResult(): void {
     if (!movesHeld && state.lineVisible) (window as any).__chessrayPvGrowContinue?.();
   }
 
-  updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine);
+  const snap = historyIndex !== null ? snapshotToResult(debugHistory[historyIndex]) : null;
+  updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine, snap);
   (window as any).__chessrayUpdateCompactMoves?.();
   state.currentArrows = movesHeld ? [] : (result.arrows?.length > 0 ? result.arrows : []);
   renderArrows(state);
@@ -1228,6 +1319,17 @@ window.chessRay.onFrameResult((result) => {
     // latest measurable values (current frame's render_ms isn't known until
     // after the DOM update completes).
     r.frame_timing.render_ms = lastRenderMs;
+  }
+  // Slow-frame capture: end-to-end > FPS budget → snapshot to persisted history.
+  // Skip when no frame_timing (e.g. board-not-found early return) and when no
+  // image — those snapshots wouldn't be useful to inspect later.
+  if (r.frame_timing && r.board_image_url && fpsBudgetMs > 0) {
+    const total = frameTotalMs(r);
+    if (total > fpsBudgetMs) {
+      debugHistory = pushSlowFrame(debugHistory, r, total, fpsBudgetMs);
+      // Stay on Live by default — user opts into history via the nav buttons.
+      refreshHistoryNav(document.getElementById('cv-debug-history-nav'));
+    }
   }
   pendingResult = r;
   if (!rafScheduled) {
