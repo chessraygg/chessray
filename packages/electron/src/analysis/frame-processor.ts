@@ -69,6 +69,10 @@ export class FrameProcessor {
   private lastPositionFen: string | null = null;
   private prevPositionFen: string | null = null;
   private lastEval: EvalResult | null = null;
+  /** Last eval we'd want to show in the bar — survives the brief `lastEval = null`
+   *  window between detecting a new position and the first depth completing,
+   *  so the eval bar can fall back to it (marked stale) instead of disappearing. */
+  private lastDisplayEval: EvalResult | null = null;
   private lastBoardSample: Uint8Array | null = null;
   private lastRecognitionResult: RecognitionResult | null = null;
   private lastRawFen: string = '';
@@ -109,6 +113,7 @@ export class FrameProcessor {
     this.lastPositionFen = null;
     this.prevPositionFen = null;
     this.lastEval = null;
+    this.lastDisplayEval = null;
     this.lastArrows = [];
     this.lastFullFen = null;
     this.lastPlayedMove = null;
@@ -448,11 +453,41 @@ export class FrameProcessor {
       if (!recognition || recognition.confidence < 0.3) {
         detectionStatus = `Low confidence: ${recognition ? (recognition.confidence * 100).toFixed(0) + '%' : 'no recognition'}`;
         log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [low conf] total=${Date.now() - startTime}ms`);
-        sendResult(makeResult(this.lastEval ? { evaluation: this.lastEval, arrows: this.lastArrows, eval_depth: this.lastEval.depth, stale_eval: true } : {}));
+        // Use the same display fallback as the rest of the function so the bar
+        // doesn't disappear on a transient low-confidence frame.
+        const fallbackEval = this.lastEval ?? this.lastDisplayEval;
+        sendResult(makeResult(fallbackEval
+          ? { evaluation: fallbackEval, arrows: this.lastEval ? this.lastArrows : [], eval_depth: fallbackEval.depth, stale_eval: true }
+          : {}));
         return;
       }
 
       const positionFen = recognition.fen;
+
+      // Helper: opts that prefer the current `lastEval`, falling back to the
+      // last-displayed eval (marked stale) so the bar doesn't disappear in the
+      // gap between [new pos] resetting `lastEval` and the first depth
+      // completing.
+      const evalDisplayOpts = (): Parameters<typeof makeResult>[0] => {
+        if (this.lastEval) {
+          return {
+            evaluation: this.lastEval,
+            arrows: this.lastArrows,
+            eval_depth: this.lastEval.depth,
+            eval_max_depth: this.lastEval.depth < this.maxDepth ? this.maxDepth : undefined,
+          };
+        }
+        if (this.lastDisplayEval) {
+          return {
+            evaluation: this.lastDisplayEval,
+            arrows: [],
+            stale_eval: true,
+            eval_depth: this.lastDisplayEval.depth,
+            eval_max_depth: this.lastDisplayEval.depth < this.maxDepth ? this.maxDepth : undefined,
+          };
+        }
+        return {};
+      };
 
       if (highlightedSquares.length === 0 && !isStartingPosition(positionFen)) {
         detectionStatus = invalidHighlights
@@ -460,16 +495,7 @@ export class FrameProcessor {
           : 'No highlights — waiting for move to complete';
         const reason = invalidHighlights ? 'invalid highlights' : 'no highlights';
         log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [${reason}] total=${Date.now() - startTime}ms`);
-        if (this.lastPositionFen && this.lastEval) {
-          sendResult(makeResult({
-            evaluation: this.lastEval,
-            arrows: this.lastArrows,
-            eval_depth: this.lastEval.depth,
-            eval_max_depth: this.lastEval.depth < this.maxDepth ? this.maxDepth : undefined,
-          }));
-        } else {
-          sendResult(makeResult({}));
-        }
+        sendResult(makeResult(evalDisplayOpts()));
         return;
       }
 
@@ -478,12 +504,7 @@ export class FrameProcessor {
       if (this.lastPositionFen && compareFen(this.lastPositionFen, positionFen) && !evalTurnMismatch) {
         detectionStatus = 'Position unchanged';
         log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [dedup] total=${Date.now() - startTime}ms`);
-        sendResult(makeResult({
-          evaluation: this.lastEval,
-          arrows: this.lastArrows,
-          eval_depth: this.lastEval?.depth,
-          eval_max_depth: this.lastEval && this.lastEval.depth < this.maxDepth ? this.maxDepth : undefined,
-        }));
+        sendResult(makeResult(evalDisplayOpts()));
         return;
       }
       if (evalTurnMismatch) {
@@ -498,34 +519,22 @@ export class FrameProcessor {
         detectionStatus = 'Intermediate frame — highlights unchanged';
         log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [intermediate, skipped] total=${Date.now() - startTime}ms`);
         this.lastBoardSample = prevBoardSample;
-        sendResult(makeResult({
-          evaluation: this.lastEval,
-          arrows: this.lastArrows,
-          eval_depth: this.lastEval?.depth,
-          eval_max_depth: this.lastEval && this.lastEval.depth < this.maxDepth ? this.maxDepth : undefined,
-        }));
+        sendResult(makeResult(evalDisplayOpts()));
         return;
       }
-
-      // Helper: opts that keep the previous eval visible (transparent / stale)
-      // for transient bad-frame branches below. Without this the eval bar would
-      // disappear entirely between glitchy frames.
-      const staleEvalOpts = this.lastEval
-        ? { evaluation: this.lastEval, arrows: this.lastArrows, eval_depth: this.lastEval.depth, stale_eval: true as const }
-        : {};
 
       const whiteKings = (positionFen.match(/K/g) || []).length;
       const blackKings = (positionFen.match(/k/g) || []).length;
       if (whiteKings !== 1 || blackKings !== 1) {
         detectionStatus = `Invalid: ${whiteKings}K ${blackKings}k`;
-        sendResult(makeResult(staleEvalOpts));
+        sendResult(makeResult(evalDisplayOpts()));
         return;
       }
 
       const fenRanks = positionFen.split('/');
       if (fenRanks.length !== 8) {
         detectionStatus = 'Invalid FEN structure';
-        sendResult(makeResult(staleEvalOpts));
+        sendResult(makeResult(evalDisplayOpts()));
         return;
       }
       const rank1 = fenRanks[7];
@@ -533,12 +542,12 @@ export class FrameProcessor {
       if (/[pP]/.test(rank1) || /[pP]/.test(rank8)) {
         detectionStatus = 'Pawns on rank 1/8 — invalid';
         log(`Skipping eval: pawns on rank 1/8 in FEN ${positionFen}`);
-        sendResult(makeResult(staleEvalOpts));
+        sendResult(makeResult(evalDisplayOpts()));
         return;
       }
 
       if (!engine) {
-        sendResult(makeResult(staleEvalOpts));
+        sendResult(makeResult(evalDisplayOpts()));
         return;
       }
 
@@ -617,6 +626,7 @@ export class FrameProcessor {
       if (cached) {
         updatePlayedMoveLoss(cached.evaluation);
         this.lastEval = cached.evaluation;
+        this.lastDisplayEval = cached.evaluation;
         this.lastArrows = cached.arrows;
         const cachedDepth = cached.evaluation.depth;
         log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms [cache d=${cachedDepth}] total=${Date.now() - startTime}ms`);
@@ -647,6 +657,7 @@ export class FrameProcessor {
               updatePlayedMoveLoss(result);
               const arrows = computeArrows(result.top_moves);
               this.lastEval = result;
+              this.lastDisplayEval = result;
               this.lastArrows = arrows;
               cachePut(fullFen, { evaluation: result, arrows });
               log(`Eval depth ${result.depth}/${this.maxDepth} in ${result.elapsed_ms}ms score=${result.top_moves[0]?.score_cp}cp pv=${result.top_moves[0]?.pv?.slice(0, 4).join(' ')}`);
