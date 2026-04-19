@@ -551,3 +551,32 @@
   expected_square_colors:
     light: [221, 231, 238]
     dark: [163, 180, 191]
+# Freestyle (chess960) castle: both highlighted squares have pieces of the
+# same color (rook + king on the back rank). The disambiguator must recognize
+# this king↔rook same-color pair as a castle move rather than rejecting it
+# for having no empty source square.
+- file: test-take-take-take-magnus-freestyle-castle.png
+  orientation: white bottom
+  highlighted:
+    - f8
+    - g8
+  turn: w
+  bbox:
+    x: 985
+    'y': 87
+    width: 931
+    height: 931
+  squareSize: 116
+  expectedFen: 4qrk1/p1Qn1pp1/1p1p1b1p/3b1N2/5PP1/1P1P3R/P7/B2B1K2
+  orientation_source: piece_count
+  expected_labels:
+    skipped: true
+    reason: piece_count
+  expected_candidates:
+    - square: f8
+      score: 248.6
+    - square: g8
+      score: 175.4
+  expected_square_colors:
+    light: [231, 215, 178]
+    dark: [173, 137, 103]

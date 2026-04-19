@@ -297,6 +297,54 @@ export function disambiguateHighlights(
   const withPiece = candidates.filter(idx => board[idx] !== null);
   const empty = candidates.filter(idx => board[idx] === null);
 
+  // Freestyle (chess960) castle: both highlighted squares hold pieces of the
+  // same color where one is a king and the other a rook, on the same back rank.
+  // Standard disambiguation can't pair these (no empty source), so detect the
+  // pattern up-front and accept both squares as the move.
+  if (withPiece.length === 2 && empty.length === 0) {
+    const [aIdx, bIdx] = withPiece;
+    const aPiece = board[aIdx]!;
+    const bPiece = board[bIdx]!;
+    const aWhite = aPiece === aPiece.toUpperCase();
+    const bWhite = bPiece === bPiece.toUpperCase();
+    const aType = aPiece.toLowerCase();
+    const bType = bPiece.toLowerCase();
+    const sameColor = aWhite === bWhite;
+    const kingRook = (aType === 'k' && bType === 'r') || (aType === 'r' && bType === 'k');
+    const aRank = Math.floor(aIdx / 8);
+    const bRank = Math.floor(bIdx / 8);
+    const sameRank = aRank === bRank;
+    // After castling the king sits on its destination back rank — file 0 in
+    // raw orientation when board is from white's perspective for black, and
+    // file 7 for white. Since orientation handling is upstream, just allow
+    // either back rank (raw row 0 or 7) here.
+    const onBackRank = sameRank && (aRank === 0 || aRank === 7);
+    if (sameColor && kingRook && onBackRank) {
+      // Convention: source = king position, destination = rook position
+      // (matches how UCI encodes 960 castling as king→own-rook).
+      const kingIdx = aType === 'k' ? aIdx : bIdx;
+      const rookIdx = aType === 'r' ? aIdx : bIdx;
+      const piece = board[kingIdx]!;
+      const srcScore = scoreMap.get(kingIdx) ?? 0;
+      const destScore = scoreMap.get(rookIdx) ?? 0;
+      const winnerPair: DisambiguationPair = {
+        src: kingIdx, dest: rookIdx, piece,
+        srcScore, destScore,
+        combinedScore: srcScore + destScore,
+        srcNaturalness: 0, destNaturalness: 0,
+        pass: 1,
+      };
+      return {
+        highlighted: [kingIdx, rookIdx],
+        trace: {
+          validPairs: [winnerPair],
+          rejectedCount: 0,
+          winner: { src: kingIdx, dest: rookIdx, reason: 'initial_top_score' },
+        },
+      };
+    }
+  }
+
   // Compute highlight "naturalness" for a square: how board-like is its color?
   // Real highlights tint the board color uniformly (low channel-ratio variance).
   // Annotations replace the board color entirely (high channel-ratio variance).
@@ -484,9 +532,25 @@ export function turnFromHighlight(
   }
 
   // A valid last-move highlight has one empty square (source) and one occupied (destination).
-  // If both squares have pieces, it's likely a false positive — return null.
   const pieces = highlightedIndices.filter(idx => board[idx] !== null);
   const empties = highlightedIndices.filter(idx => board[idx] === null);
+
+  // Freestyle castle: both highlighted squares have same-color king + rook.
+  // The side that just moved is whoever owns those pieces.
+  if (pieces.length === 2 && empties.length === 0) {
+    const [a, b] = pieces;
+    const aP = board[a]!;
+    const bP = board[b]!;
+    const aType = aP.toLowerCase();
+    const bType = bP.toLowerCase();
+    const aWhite = aP === aP.toUpperCase();
+    const bWhite = bP === bP.toUpperCase();
+    const isCastle = aWhite === bWhite &&
+      ((aType === 'k' && bType === 'r') || (aType === 'r' && bType === 'k'));
+    if (isCastle) return aWhite ? 'b' : 'w';
+    return null;
+  }
+
   if (pieces.length === 0 || empties.length === 0) return null;
 
   // The piece on the destination is the one that just moved.

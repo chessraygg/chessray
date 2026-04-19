@@ -519,6 +519,17 @@ export class FrameProcessor {
         detectionStatus = 'Intermediate frame — highlights unchanged';
         log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [intermediate, skipped] total=${Date.now() - startTime}ms`);
         this.lastBoardSample = prevBoardSample;
+        // Restore the previous recognition so the in-progress (mid-animation)
+        // FEN doesn't leak to the overlay's virtual board grid. Without this,
+        // the grid + best-moves panel re-render every intermediate frame with
+        // the partially-moved position, which the user sees as flicker.
+        recognition = this.lastRecognitionResult;
+        rawFen = this.lastRawFen;
+        isFlipped = this.lastIsFlipped;
+        orientationSource = this.lastOrientationSource;
+        highlightedSquares = this.lastHighlightedSquares;
+        highlightTurn = this.lastHighlightTurn;
+        squareColors = this.lastSquareColors;
         sendResult(makeResult(evalDisplayOpts()));
         return;
       }
