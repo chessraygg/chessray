@@ -27,6 +27,8 @@ export interface Prefs {
   panelHeight: number | null;
   sectionLayout: unknown | null;
   gravityUp: boolean;
+  /** Debug section's board-preview image scale, percent of panel width (25..200). */
+  debugImgScale: number;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -55,6 +57,7 @@ export const DEFAULT_PREFS: Prefs = {
   panelHeight: null,
   sectionLayout: null,
   gravityUp: true,
+  debugImgScale: 100,
 };
 
 export function loadPrefs(): Prefs {

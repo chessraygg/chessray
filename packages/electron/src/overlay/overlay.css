@@ -317,8 +317,19 @@ canvas#video-overlay {
 
 .debug-section.hidden { display: none; }
 
+.debug-img-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  /* Cap visible area so a >100% scale doesn't blow out the panel — the image
+   * scrolls horizontally inside the wrap when it overflows. */
+  max-width: 100%;
+  overflow: auto;
+}
+
 .debug-section img {
   width: 100%;
+  max-width: none;
   border-radius: var(--radius-sm);
   display: block;
   object-fit: cover;
