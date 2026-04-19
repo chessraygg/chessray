@@ -65,6 +65,26 @@ const FADE_STEP = 16; // ~60fps
 const videoArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
 const vboardArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
 
+// ── Eval bar disappearance trace ──
+// Logs ONLY when the visible state changes (drawn → gone or gone → drawn) so
+// the log isn't spammed. Each transition records why the bar wasn't drawn.
+let lastVideoEvalDrawn: boolean | null = null;
+let lastVboardEvalDrawn: boolean | null = null;
+function logEvalBarTransition(
+  scope: 'video' | 'vboard',
+  drawn: boolean,
+  reason: string,
+): void {
+  const prev = scope === 'video' ? lastVideoEvalDrawn : lastVboardEvalDrawn;
+  if (prev === drawn) return;
+  if (scope === 'video') lastVideoEvalDrawn = drawn; else lastVboardEvalDrawn = drawn;
+  const msg = `eval-bar[${scope}]: ${drawn ? 'DRAWN' : 'GONE'} (${reason})`;
+  try {
+    (window as any).chessRay?.sendDebugLog?.(msg);
+  } catch { /* ignore */ }
+  console.log(`[chessray] ${msg}`);
+}
+
 // ── Video-overlay eval bar tween ──
 // The bar's winProb is animated from current → target over EVAL_BAR_TWEEN_MS
 // using a cubic ease-out. Without this the bar snaps as eval depths arrive.
@@ -618,10 +638,20 @@ export function renderVideoOverlay(state: OverlayState): void {
 
   ctx.clearRect(0, 0, state.videoCanvas.width, state.videoCanvas.height);
 
-  if (!state.sourceVisible) return;
+  if (!state.sourceVisible) {
+    logEvalBarTransition('video', false, 'sourceVisible=false (overlay canvas cleared)');
+    return;
+  }
 
   const result = state.currentResult;
-  if (!result?.board_detection?.found || !result.board_detection.bbox || !result.frame_dimensions) return;
+  if (!result?.board_detection?.found || !result.board_detection.bbox || !result.frame_dimensions) {
+    const why = !result ? 'no result'
+      : !result.board_detection?.found ? 'board not found'
+      : !result.board_detection.bbox ? 'bbox=null'
+      : 'frame_dimensions=null';
+    logEvalBarTransition('video', false, `early return: ${why}`);
+    return;
+  }
 
   // The overlay window covers the work area (excludes menu bar/dock).
   // The captured frame covers the full display (includes menu bar).
@@ -714,6 +744,20 @@ export function renderVideoOverlay(state: OverlayState): void {
   }
 
   // Eval bar (semi-transparent when showing stale eval from previous position)
+  // Disappearance trace: log only the transition when the bar's visibility
+  // actually flips so we can see exactly why it went missing.
+  {
+    const drawable = !!(state.evalBarVisible && result.evaluation?.top_moves?.length);
+    if (!drawable) {
+      const reason = !state.evalBarVisible ? 'evalBarVisible=false'
+        : !result.evaluation ? 'evaluation=null'
+        : `top_moves=${result.evaluation.top_moves?.length ?? 0}`;
+      logEvalBarTransition('video', false, `${reason} status=${result.detection_status ?? '-'} stale=${!!result.stale_eval}`);
+    } else {
+      logEvalBarTransition('video', true, `stale=${!!result.stale_eval} depth=${result.eval_depth ?? '-'} status=${result.detection_status ?? '-'}`);
+    }
+  }
+
   if (state.evalBarVisible && result.evaluation?.top_moves?.length) {
     const isStale = !!result.stale_eval;
     ctx.save();
