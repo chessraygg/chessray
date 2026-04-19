@@ -370,8 +370,14 @@ export class FrameProcessor {
       let tFenBuild = 0;
       let tGameOver = 0;
       let tSeqMove = 0;
+      // Pipeline duration is frozen at the first sendResult. makeResult is also
+      // reused by the async eval-depth loop seconds later — without freezing,
+      // `Date.now() - startTime` would balloon to include the eval wait, even
+      // though no pipeline work happened in that interval.
+      let frozenPipelineMs: number | null = null;
       const makeResult = (opts: { evaluation?: EvalResult | null; arrows?: ArrowDescriptor[]; eval_depth?: number; eval_max_depth?: number; game_over?: GameOver; stale_eval?: boolean }): PipelineResult => {
         const now = Date.now();
+        if (frozenPipelineMs === null) frozenPipelineMs = now - startTime;
         const evalRes = opts.evaluation ?? null;
         const evalMs = evalRes?.elapsed_ms ?? lastEvalMs;
         const evalDepth = opts.eval_depth ?? lastEvalDepth;
@@ -420,12 +426,12 @@ export class FrameProcessor {
             fen_build_ms: tFenBuild,
             game_over_ms: tGameOver,
             seq_move_ms: tSeqMove,
-            pipeline_ms: now - startTime,
+            pipeline_ms: frozenPipelineMs,
             sent_at: now,
             eval_ms: evalMs,
             eval_depth: evalDepth,
           },
-          total_elapsed_ms: now - startTime,
+          total_elapsed_ms: frozenPipelineMs,
         };
       };
 
