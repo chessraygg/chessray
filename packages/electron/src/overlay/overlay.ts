@@ -53,6 +53,86 @@ const state: OverlayState = {
   displayInfo: null,
 };
 
+// ── Slow-frame history (declared before initOverlay so the FPS slider setup
+//    inside initOverlay can call updateFpsBudget without hitting TDZ on the
+//    `let` bindings) ──
+let debugHistory: DebugSnapshot[] = loadHistory();
+/** null = viewing live; otherwise an index into debugHistory. */
+let historyIndex: number | null = null;
+/** Latest known FPS budget (ms = 1000 / targetFps). Updated when the FPS
+ *  slider changes; used to decide whether the current frame is "slow". */
+let fpsBudgetMs = 500;
+
+function updateFpsBudget(fps: number): void {
+  fpsBudgetMs = 1000 / Math.max(1, fps);
+  setFpsBudgetMs(fpsBudgetMs);
+}
+
+function frameTotalMs(r: PipelineResult): number {
+  const ft = r.frame_timing;
+  if (!ft) return r.total_elapsed_ms;
+  return ft.capture_ms + ft.pipeline_ms + (ft.ipc_ms ?? 0) + (ft.render_ms ?? 0);
+}
+
+function ageLabel(ts: number): string {
+  const sec = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+}
+
+function refreshHistoryNav(navEl: HTMLElement | null): void {
+  if (!navEl) return;
+  const idx = historyIndex;
+  const entry = idx !== null ? debugHistory[idx] : null;
+  const navState: DebugHistoryNavState = {
+    count: debugHistory.length,
+    index: idx,
+    ageLabel: entry ? ageLabel(entry.captured_at) : undefined,
+    totalMs: entry?.total_ms,
+  };
+  renderDebugHistoryNav(navEl, navState, {
+    prev: () => {
+      if (debugHistory.length === 0) return;
+      historyIndex = historyIndex === null
+        ? debugHistory.length - 1
+        : Math.max(0, historyIndex - 1);
+      rerenderForHistoryChange();
+    },
+    next: () => {
+      if (debugHistory.length === 0) return;
+      if (historyIndex === null) return;
+      if (historyIndex >= debugHistory.length - 1) {
+        historyIndex = null; // past the end → return to live
+      } else {
+        historyIndex++;
+      }
+      rerenderForHistoryChange();
+    },
+    live: () => {
+      historyIndex = null;
+      rerenderForHistoryChange();
+    },
+    clear: () => {
+      clearHistory();
+      debugHistory = [];
+      historyIndex = null;
+      rerenderForHistoryChange();
+    },
+  });
+}
+
+function rerenderForHistoryChange(): void {
+  const navEl = document.getElementById('cv-debug-history-nav');
+  refreshHistoryNav(navEl);
+  if (!state.currentResult) return;
+  const snap = historyIndex !== null ? snapshotToResult(debugHistory[historyIndex]) : null;
+  updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine, snap);
+}
+
 // ── Init ──
 
 function initOverlay(): void {
@@ -1123,86 +1203,6 @@ let rafScheduled = false;
  *  next frame's frame_timing so the panel shows last-frame render cost. */
 let lastRenderMs = 0;
 
-// ── Slow-frame history ──
-let debugHistory: DebugSnapshot[] = loadHistory();
-/** null = viewing live; otherwise an index into debugHistory. */
-let historyIndex: number | null = null;
-/** Latest known FPS budget (ms = 1000 / targetFps). Updated when the FPS
- *  slider changes; used to decide whether the current frame is "slow". */
-let fpsBudgetMs = 500;
-
-function updateFpsBudget(fps: number): void {
-  fpsBudgetMs = 1000 / Math.max(1, fps);
-  setFpsBudgetMs(fpsBudgetMs);
-}
-
-function frameTotalMs(r: PipelineResult): number {
-  const ft = r.frame_timing;
-  if (!ft) return r.total_elapsed_ms;
-  return ft.capture_ms + ft.pipeline_ms + (ft.ipc_ms ?? 0) + (ft.render_ms ?? 0);
-}
-
-function ageLabel(ts: number): string {
-  const sec = Math.max(0, Math.round((Date.now() - ts) / 1000));
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  return `${Math.floor(hr / 24)}d ago`;
-}
-
-function refreshHistoryNav(navEl: HTMLElement | null): void {
-  if (!navEl) return;
-  const idx = historyIndex;
-  const entry = idx !== null ? debugHistory[idx] : null;
-  const navState: DebugHistoryNavState = {
-    count: debugHistory.length,
-    index: idx,
-    ageLabel: entry ? ageLabel(entry.captured_at) : undefined,
-    totalMs: entry?.total_ms,
-  };
-  renderDebugHistoryNav(navEl, navState, {
-    prev: () => {
-      if (debugHistory.length === 0) return;
-      historyIndex = historyIndex === null
-        ? debugHistory.length - 1
-        : Math.max(0, historyIndex - 1);
-      rerenderForHistoryChange();
-    },
-    next: () => {
-      if (debugHistory.length === 0) return;
-      if (historyIndex === null) return;
-      if (historyIndex >= debugHistory.length - 1) {
-        historyIndex = null; // past the end → return to live
-      } else {
-        historyIndex++;
-      }
-      rerenderForHistoryChange();
-    },
-    live: () => {
-      historyIndex = null;
-      rerenderForHistoryChange();
-    },
-    clear: () => {
-      clearHistory();
-      debugHistory = [];
-      historyIndex = null;
-      rerenderForHistoryChange();
-    },
-  });
-}
-
-function rerenderForHistoryChange(): void {
-  // Re-run updateDebugPanel against the current live result with the new
-  // historical override (or none, if back to live). Cheap because the live
-  // result hasn't changed.
-  const navEl = document.getElementById('cv-debug-history-nav');
-  refreshHistoryNav(navEl);
-  if (!state.currentResult) return;
-  const snap = historyIndex !== null ? snapshotToResult(debugHistory[historyIndex]) : null;
-  updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine, snap);
-}
 let userLockedLine = -1; // -1 = cycle all, >= 0 = locked to that line
 let lastEvalFen: string | null = null;
 let lastRecogFen: string | null = null;
