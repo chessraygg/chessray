@@ -422,6 +422,7 @@ export class FrameProcessor {
             preview_ms: tPreview,
             change_detect_ms: tChangeDetect,
             recog_ms: tRecog,
+            recog_cached: brTiming === null,
             recog_breakdown: recogBreakdown,
             fen_build_ms: tFenBuild,
             game_over_ms: tGameOver,

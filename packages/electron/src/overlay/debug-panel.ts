@@ -417,10 +417,16 @@ function renderHighlightDebug(container: HTMLElement, result: PipelineResult): v
   container.innerHTML = flagsLine + candsLine + mediansLine + pairsLine + winnerLine;
 }
 
-/** Per-frame FPS budget (ms = 1000 / targetFps). Mutated by the overlay when
- *  the FPS slider changes; used by renderFrameTiming to flag slow frames. */
+/** Per-frame FPS budget (ms = 1000 / activeFps). Mutated by the overlay when
+ *  the FPS controller changes activeFps; used by renderFrameTiming to flag
+ *  slow frames. */
 let currentFpsBudgetMs = 0;
 export function setFpsBudgetMs(ms: number): void { currentFpsBudgetMs = ms; }
+
+/** Active FPS the controller is currently targeting. Shown as a pill on the
+ *  total bar. Updated whenever the controller steps up/down. */
+let currentActiveFps = 0;
+export function setActiveFpsDisplay(fps: number): void { currentActiveFps = fps; }
 
 export interface DebugHistoryNavState {
   /** Total slow-frame snapshots stored. */
@@ -730,6 +736,13 @@ function renderFrameTiming(container: HTMLElement, result: PipelineResult): void
   const slowBadge = slow
     ? `<span class="ft-slow-badge" data-tip="Frame total ${total}ms exceeded the FPS budget (${budgetMs}ms at ${Math.round(1000 / budgetMs)} FPS). The next captured frame is dropped because this one was still processing. Snapshot saved to debug history." data-tip-pos="right">⚠ slow</span>`
     : '';
+  const cached = ft.recog_cached;
+  const cacheBadge = cached
+    ? `<span class="ft-cache-badge ft-cache-cached" data-tip="Recognition was reused from the previous frame (board pixels were unchanged). Cached frames are ignored by the auto-FPS controller because they don't measure real pipeline cost." data-tip-pos="left">cached</span>`
+    : `<span class="ft-cache-badge ft-cache-fresh" data-tip="Fresh frame: recognition (YOLO + orientation + highlights) actually ran. The auto-FPS controller uses these as evidence of available headroom." data-tip-pos="left">fresh</span>`;
+  const fpsBadge = currentActiveFps > 0
+    ? `<span class="ft-fps-badge" data-tip="Active FPS the auto-tuner is currently targeting (capture rate). Adjusts within the [min, max] range based on observed frame cost." data-tip-pos="right">${currentActiveFps} fps</span>`
+    : '';
 
   const conf = result.recognition ? `${(result.recognition.confidence * 100).toFixed(0)}%` : '—';
   const evalText = ft.eval_depth != null && ft.eval_ms != null
@@ -765,8 +778,11 @@ function renderFrameTiming(container: HTMLElement, result: PipelineResult): void
     `<div class="ft-total ft-${totalLevel}"${tip(FT_TIPS.total)} data-tip-pos="left">`
       + `<span class="ft-total-label">frame</span>`
       + `<span class="ft-total-ms">${total}ms</span>`
+      + cacheBadge
       + slowBadge
       + `<span class="ft-meta">`
+        + fpsBadge
+        + (fpsBadge ? ' · ' : '')
         + `<span${tip(FT_TIPS.conf)} data-tip-pos="right">conf ${conf}</span>`
         + (evalText ? ` · <span class="ft-eval"${tip(FT_TIPS.eval)} data-tip-pos="right">${evalText}</span>` : '')
       + `</span>`

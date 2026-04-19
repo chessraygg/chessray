@@ -72,6 +72,10 @@ export interface PipelineResult {
     change_detect_ms: number;
     /** Total recognition wall time (covers the breakdown below). */
     recog_ms: number;
+    /** True when recognition was reused from a previous frame (visuallyUnchanged
+     *  fast path). Auto-tune ignores cached frames as a signal to step UP
+     *  because they don't exercise the real pipeline cost. */
+    recog_cached: boolean;
     /** Recognition sub-stage breakdown. Null when recognition was cached/skipped. */
     recog_breakdown: {
       yolo_prep_ms: number;

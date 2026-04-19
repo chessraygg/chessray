@@ -9,7 +9,7 @@ import { lossToColor } from '../shared/arrows.js';
 import { loadPrefs, savePrefs } from './preferences.js';
 import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow } from './canvas-renderer.js';
 import { preloadPieceImages } from './piece-svg.js';
-import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid, setFpsBudgetMs, renderDebugHistoryNav, formatDebugReport, type DebugHistoryNavState } from './debug-panel.js';
+import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid, setFpsBudgetMs, setActiveFpsDisplay, renderDebugHistoryNav, formatDebugReport, type DebugHistoryNavState } from './debug-panel.js';
 import { loadHistory, pushSlowFrame, clearHistory, snapshotToResult, type DebugSnapshot } from './debug-history.js';
 import { pieceSvg } from './piece-svg.js';
 import { SplitLayout, type LayoutNode, type SectionDef } from './split-layout.js';
@@ -53,19 +53,73 @@ const state: OverlayState = {
   displayInfo: null,
 };
 
-// ── Slow-frame history (declared before initOverlay so the FPS slider setup
-//    inside initOverlay can call updateFpsBudget without hitting TDZ on the
-//    `let` bindings) ──
+// ── Slow-frame history + FPS auto-tune state (declared before initOverlay so
+//    the FPS slider setup inside initOverlay can call setActiveFps /
+//    updateFpsBudget without hitting TDZ on the `let` bindings) ──
 let debugHistory: DebugSnapshot[] = loadHistory();
 /** null = viewing live; otherwise an index into debugHistory. */
 let historyIndex: number | null = null;
-/** Latest known FPS budget (ms = 1000 / targetFps). Updated when the FPS
- *  slider changes; used to decide whether the current frame is "slow". */
+/** Latest known FPS budget (ms = 1000 / activeFps). Recomputed whenever the
+ *  controller changes activeFps; used to flag slow frames. */
 let fpsBudgetMs = 500;
+/** User-configured FPS bounds (mutated by the min/max sliders). */
+const fpsRange = { min: 1, max: 5 };
+/** Current FPS the controller is targeting. Lives in [fpsRange.min, fpsRange.max]. */
+let activeFps = 2;
+/** Controller state: count of consecutive fresh-and-comfortably-under-budget
+ *  frames. When it hits the streak threshold the controller steps UP. */
+let freshOnBudgetStreak = 0;
+/** Frames remaining after a DOWN step before we'll consider stepping UP again
+ *  (prevents oscillation if a slow frame was a transient stall). */
+let slowGracePeriod = 0;
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
 
 function updateFpsBudget(fps: number): void {
   fpsBudgetMs = 1000 / Math.max(1, fps);
   setFpsBudgetMs(fpsBudgetMs);
+}
+
+function setActiveFps(fps: number): void {
+  const next = clamp(fps, fpsRange.min, fpsRange.max);
+  if (next === activeFps) return;
+  activeFps = next;
+  freshOnBudgetStreak = 0;
+  updateFpsBudget(activeFps);
+  setActiveFpsDisplay(activeFps);
+  window.chessRay.setTargetFps(activeFps);
+  savePrefs({ targetFps: activeFps });
+}
+
+/** Per-frame AIMD controller. Called from onFrameResult.
+ *  - Any slow frame (cached or fresh) → step DOWN.
+ *  - Cached frame under budget → no signal (cache doesn't prove capacity).
+ *  - Fresh frame under 60% budget → grow streak; UP after 3 in a row.
+ *  - Fresh frame between 60% and 100% budget → hold (thin headroom). */
+function tickFpsController(r: PipelineResult): void {
+  const ft = r.frame_timing;
+  if (!ft) return;
+  const total = ft.capture_ms + ft.pipeline_ms + (ft.ipc_ms ?? 0) + (ft.render_ms ?? 0);
+
+  if (total > fpsBudgetMs) {
+    if (activeFps > fpsRange.min) setActiveFps(activeFps - 1);
+    freshOnBudgetStreak = 0;
+    slowGracePeriod = 3;
+    return;
+  }
+  if (ft.recog_cached) return;
+  if (slowGracePeriod > 0) { slowGracePeriod--; return; }
+  if (total < fpsBudgetMs * 0.6) {
+    freshOnBudgetStreak++;
+    if (freshOnBudgetStreak >= 3 && activeFps < fpsRange.max) {
+      setActiveFps(activeFps + 1);
+    }
+  } else {
+    // Fresh frame, under budget but using > 60% — too thin to risk stepping up.
+    freshOnBudgetStreak = 0;
+  }
 }
 
 function frameTotalMs(r: PipelineResult): number {
@@ -1006,24 +1060,46 @@ function initOverlay(): void {
     });
   }
 
-  // ── Frame rate slider ──
-  const fpsSlider = document.getElementById('cv-target-fps') as HTMLInputElement | null;
-  const fpsVal = document.getElementById('cv-target-fps-val');
-  if (fpsSlider && fpsVal) {
-    const fps = prefs.targetFps;
-    fpsSlider.value = String(fps);
-    fpsVal.textContent = String(fps);
-    window.chessRay.setTargetFps(fps);
-    updateFpsBudget(fps);
-    fpsSlider.addEventListener('input', () => {
-      const v = parseInt(fpsSlider.value, 10);
-      fpsVal.textContent = String(v);
-      savePrefs({ targetFps: v });
-      window.chessRay.setTargetFps(v);
-      updateFpsBudget(v);
+  // ── Frame rate range (auto-tuned within [min, max]) ──
+  const fpsMinSlider = document.getElementById('cv-fps-min') as HTMLInputElement | null;
+  const fpsMinVal = document.getElementById('cv-fps-min-val');
+  const fpsMaxSlider = document.getElementById('cv-fps-max') as HTMLInputElement | null;
+  const fpsMaxVal = document.getElementById('cv-fps-max-val');
+  // Migration: if a user had a fixed targetFps, preserve it as the active
+  // starting point inside the new range.
+  fpsRange.min = Math.max(1, prefs.fpsMin ?? 1);
+  fpsRange.max = Math.max(fpsRange.min, prefs.fpsMax ?? 5);
+  setActiveFps(clamp(prefs.targetFps ?? fpsRange.min, fpsRange.min, fpsRange.max));
+  if (fpsMinSlider && fpsMinVal) {
+    fpsMinSlider.value = String(fpsRange.min);
+    fpsMinVal.textContent = String(fpsRange.min);
+    fpsMinSlider.addEventListener('input', () => {
+      const v = parseInt(fpsMinSlider.value, 10);
+      fpsRange.min = v;
+      if (fpsRange.max < v) {
+        fpsRange.max = v;
+        if (fpsMaxSlider && fpsMaxVal) { fpsMaxSlider.value = String(v); fpsMaxVal.textContent = String(v); }
+      }
+      fpsMinVal.textContent = String(v);
+      savePrefs({ fpsMin: fpsRange.min, fpsMax: fpsRange.max });
+      // Re-clamp active FPS into the new range
+      setActiveFps(clamp(activeFps, fpsRange.min, fpsRange.max));
     });
-  } else {
-    updateFpsBudget(prefs.targetFps);
+  }
+  if (fpsMaxSlider && fpsMaxVal) {
+    fpsMaxSlider.value = String(fpsRange.max);
+    fpsMaxVal.textContent = String(fpsRange.max);
+    fpsMaxSlider.addEventListener('input', () => {
+      const v = parseInt(fpsMaxSlider.value, 10);
+      fpsRange.max = v;
+      if (fpsRange.min > v) {
+        fpsRange.min = v;
+        if (fpsMinSlider && fpsMinVal) { fpsMinSlider.value = String(v); fpsMinVal.textContent = String(v); }
+      }
+      fpsMaxVal.textContent = String(v);
+      savePrefs({ fpsMin: fpsRange.min, fpsMax: fpsRange.max });
+      setActiveFps(clamp(activeFps, fpsRange.min, fpsRange.max));
+    });
   }
 
   // Initial render of the history nav (shows nothing until the first slow frame).
@@ -1362,6 +1438,8 @@ window.chessRay.onFrameResult((result) => {
       refreshHistoryNav(document.getElementById('cv-debug-history-nav'));
     }
   }
+  // Auto-tune the FPS within the user-set range based on this frame's outcome.
+  tickFpsController(r);
   pendingResult = r;
   if (!rafScheduled) {
     rafScheduled = true;

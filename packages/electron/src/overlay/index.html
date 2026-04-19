@@ -94,9 +94,14 @@
           <span id="cv-pv-depth-val">10</span>
         </div>
         <div class="pv-depth-row">
-          <label data-tip="Frame capture rate (frames per second)">FPS</label>
-          <input type="range" id="cv-target-fps" min="1" max="5" value="2" step="1">
-          <span id="cv-target-fps-val">2</span>
+          <label data-tip="Lower bound of the auto-tuned frame capture rate. The system can drop to this floor when frames consistently exceed the budget.">FPS min</label>
+          <input type="range" id="cv-fps-min" min="1" max="5" value="1" step="1">
+          <span id="cv-fps-min-val">1</span>
+        </div>
+        <div class="pv-depth-row">
+          <label data-tip="Upper bound of the auto-tuned frame capture rate. The system can climb to this ceiling when fresh (non-cached) frames stay well under budget.">FPS max</label>
+          <input type="range" id="cv-fps-max" min="1" max="5" value="5" step="1">
+          <span id="cv-fps-max-val">5</span>
         </div>
         <div class="pv-depth-row">
           <label data-tip="Seconds between each move in the best-line piece animation">Grow</label>

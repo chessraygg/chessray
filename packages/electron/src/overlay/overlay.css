@@ -375,6 +375,31 @@ canvas#video-overlay {
   letter-spacing: 0.5px;
 }
 
+/* Recognition cache pill (fresh = pipeline ran, cached = result reused) */
+.ft-total .ft-cache-badge {
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid currentColor;
+  background: transparent;
+}
+.ft-total .ft-cache-fresh  { color: var(--ft-fast); }
+.ft-total .ft-cache-cached { color: var(--text-faint); }
+
+/* Active FPS pill (set by the auto-tuner) */
+.ft-total .ft-fps-badge {
+  font-size: 9px;
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
 .debug-img-wrap {
   display: flex;
   justify-content: center;

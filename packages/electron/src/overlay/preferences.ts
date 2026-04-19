@@ -17,7 +17,12 @@ export interface Prefs {
   showMovesDelaySec: number;
   vboardOverlayVisible: boolean;
   compactMode: boolean;
+  /** @deprecated kept for migration only — superseded by fpsMin/fpsMax. */
   targetFps: number;
+  /** Lower bound of the auto-tuned FPS range. */
+  fpsMin: number;
+  /** Upper bound of the auto-tuned FPS range. */
+  fpsMax: number;
   changeDetect: boolean;
   collapsedSections: string[];
   hiddenSections: string[];
@@ -40,6 +45,8 @@ export const DEFAULT_PREFS: Prefs = {
   vboardOverlayVisible: true,
   compactMode: false,
   targetFps: 2,
+  fpsMin: 1,
+  fpsMax: 5,
   changeDetect: true,
   pvDepth: 10,
   lossThreshold: 0,
