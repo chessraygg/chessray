@@ -238,15 +238,22 @@ function drawAnalysisBoard(
   }
 }
 
-/** Arrows to display. In preview mode all arrows render normally; the
- *  previewed line is drawn separately on top with bell + pulse emphasis. */
+/** Arrows to display. In preview mode all arrows render normally EXCEPT the
+ *  previewed move — that one is drawn separately on top with bell + pulse
+ *  emphasis (no arrowhead, since the loss circle anchors the destination).
+ *  Filtering it out here prevents the underlying arrow's arrowhead from
+ *  showing through the bell-gradient overlay. */
 export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
+  const filtered = state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold);
   if (state.pvPreviewLineIndex !== null && state.currentResult?.evaluation?.top_moves?.length) {
-    return state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold);
+    const moves = state.currentResult.evaluation.top_moves;
+    const idx = Math.min(state.pvPreviewLineIndex, moves.length - 1);
+    const previewMove = moves[idx].move;
+    const previewFrom = previewMove.slice(0, 2);
+    const previewTo = previewMove.slice(2, 4);
+    return filtered.filter(a => !(a.from === previewFrom && a.to === previewTo));
   }
-  return state.arrowsVisible
-    ? state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold)
-    : [];
+  return state.arrowsVisible ? filtered : [];
 }
 
 /** Resolve the previewed move's arrow (always returned regardless of
