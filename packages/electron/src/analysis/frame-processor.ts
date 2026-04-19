@@ -73,6 +73,14 @@ export class FrameProcessor {
    *  window between detecting a new position and the first depth completing,
    *  so the eval bar can fall back to it (marked stale) instead of disappearing. */
   private lastDisplayEval: EvalResult | null = null;
+  /** Tracks how long the same "new" FEN has been classified as intermediate.
+   *  Once the same new FEN has been pending for ≥ INTERMEDIATE_RELEASE_MS we
+   *  give up and accept it as the real position — protects against premoves
+   *  and stuck-highlight cases where the highlight squares never change after
+   *  the position settles. */
+  private intermediatePendingFen: string | null = null;
+  private intermediatePendingTs = 0;
+  private static readonly INTERMEDIATE_RELEASE_MS = 800;
   private lastBoardSample: Uint8Array | null = null;
   private lastRecognitionResult: RecognitionResult | null = null;
   private lastRawFen: string = '';
@@ -114,6 +122,8 @@ export class FrameProcessor {
     this.prevPositionFen = null;
     this.lastEval = null;
     this.lastDisplayEval = null;
+    this.intermediatePendingFen = null;
+    this.intermediatePendingTs = 0;
     this.lastArrows = [];
     this.lastFullFen = null;
     this.lastPlayedMove = null;
@@ -516,23 +526,51 @@ export class FrameProcessor {
           highlightedSquares.length === 2 && prevHighlightedSquares.length === 2 &&
           highlightedSquares[0] === prevHighlightedSquares[0] &&
           highlightedSquares[1] === prevHighlightedSquares[1]) {
-        detectionStatus = 'Intermediate frame — highlights unchanged';
-        log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [intermediate, skipped] total=${Date.now() - startTime}ms`);
-        this.lastBoardSample = prevBoardSample;
-        // Restore the previous recognition so the in-progress (mid-animation)
-        // FEN doesn't leak to the overlay's virtual board grid. Without this,
-        // the grid + best-moves panel re-render every intermediate frame with
-        // the partially-moved position, which the user sees as flicker.
-        recognition = this.lastRecognitionResult;
-        rawFen = this.lastRawFen;
-        isFlipped = this.lastIsFlipped;
-        orientationSource = this.lastOrientationSource;
-        highlightedSquares = this.lastHighlightedSquares;
-        highlightTurn = this.lastHighlightTurn;
-        squareColors = this.lastSquareColors;
-        sendResult(makeResult(evalDisplayOpts()));
-        return;
+        // Stability gate: only treat as intermediate if the same new FEN
+        // hasn't been pending for too long. After INTERMEDIATE_RELEASE_MS
+        // we give up and accept it (handles premoves / stuck highlights).
+        const now = Date.now();
+        if (this.intermediatePendingFen === positionFen) {
+          if (now - this.intermediatePendingTs >= FrameProcessor.INTERMEDIATE_RELEASE_MS) {
+            log(`Intermediate stability window exceeded (${FrameProcessor.INTERMEDIATE_RELEASE_MS}ms) — accepting new position`);
+            this.intermediatePendingFen = null;
+            // Fall through to the normal new-position handling below.
+          } else {
+            // Still within the stability window — keep treating as intermediate.
+            detectionStatus = 'Intermediate frame — highlights unchanged';
+            log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [intermediate, skipped, ${now - this.intermediatePendingTs}ms] total=${Date.now() - startTime}ms`);
+            this.lastBoardSample = prevBoardSample;
+            recognition = this.lastRecognitionResult;
+            rawFen = this.lastRawFen;
+            isFlipped = this.lastIsFlipped;
+            orientationSource = this.lastOrientationSource;
+            highlightedSquares = this.lastHighlightedSquares;
+            highlightTurn = this.lastHighlightTurn;
+            squareColors = this.lastSquareColors;
+            sendResult(makeResult(evalDisplayOpts()));
+            return;
+          }
+        } else {
+          // Different new FEN (or first observation) — start a fresh window.
+          this.intermediatePendingFen = positionFen;
+          this.intermediatePendingTs = now;
+          detectionStatus = 'Intermediate frame — highlights unchanged';
+          log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [intermediate, skipped] total=${Date.now() - startTime}ms`);
+          this.lastBoardSample = prevBoardSample;
+          recognition = this.lastRecognitionResult;
+          rawFen = this.lastRawFen;
+          isFlipped = this.lastIsFlipped;
+          orientationSource = this.lastOrientationSource;
+          highlightedSquares = this.lastHighlightedSquares;
+          highlightTurn = this.lastHighlightTurn;
+          squareColors = this.lastSquareColors;
+          sendResult(makeResult(evalDisplayOpts()));
+          return;
+        }
       }
+      // Past any intermediate state — clear the pending window so the next
+      // mid-animation event starts fresh.
+      this.intermediatePendingFen = null;
 
       const whiteKings = (positionFen.match(/K/g) || []).length;
       const blackKings = (positionFen.match(/k/g) || []).length;
