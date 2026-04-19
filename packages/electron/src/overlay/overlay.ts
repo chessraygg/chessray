@@ -9,7 +9,7 @@ import { lossToColor } from '../shared/arrows.js';
 import { loadPrefs, savePrefs } from './preferences.js';
 import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow } from './canvas-renderer.js';
 import { preloadPieceImages } from './piece-svg.js';
-import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid, setFpsBudgetMs, renderDebugHistoryNav, type DebugHistoryNavState } from './debug-panel.js';
+import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid, setFpsBudgetMs, renderDebugHistoryNav, formatDebugReport, type DebugHistoryNavState } from './debug-panel.js';
 import { loadHistory, pushSlowFrame, clearHistory, snapshotToResult, type DebugSnapshot } from './debug-history.js';
 import { pieceSvg } from './piece-svg.js';
 import { SplitLayout, type LayoutNode, type SectionDef } from './split-layout.js';
@@ -394,6 +394,37 @@ function initOverlay(): void {
       state.borderVisible = !state.borderVisible;
       borderBtn.classList.toggle('active', state.borderVisible);
       savePrefs({ borderVisible: state.borderVisible });
+    });
+  }
+
+  // Copy debug button — copies a Markdown + JSON report of the currently shown
+  // debug view (live frame or selected history entry) to the clipboard.
+  const copyBtn = document.getElementById('cv-copy-debug-btn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const inHistory = historyIndex !== null;
+      const entry = inHistory ? debugHistory[historyIndex!] : null;
+      const result = entry ? snapshotToResult(entry) : state.currentResult;
+      if (!result) {
+        copyBtn.textContent = 'No data';
+        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1200);
+        return;
+      }
+      const report = formatDebugReport(result, inHistory && entry
+        ? { source: 'history', historyIndex: historyIndex!, historyCount: debugHistory.length, ageLabel: ageLabel(entry.captured_at) }
+        : { source: 'live' });
+      try {
+        await navigator.clipboard.writeText(report);
+        copyBtn.textContent = '✓ Copied';
+        copyBtn.classList.add('active');
+      } catch (err) {
+        console.error('[chessray] Copy debug failed', err);
+        copyBtn.textContent = 'Copy failed';
+      }
+      setTimeout(() => {
+        copyBtn.textContent = 'Copy';
+        copyBtn.classList.remove('active');
+      }, 1200);
     });
   }
 

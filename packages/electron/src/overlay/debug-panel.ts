@@ -471,6 +471,155 @@ export function renderDebugHistoryNav(
  *  storage). Update both if the cap changes. */
 const MAX_ENTRIES_HINT = 10;
 
+/** Build a human-readable Markdown report of all debug details for the given
+ *  result. Used by the "Copy" button in the debug section. The image data URL
+ *  and a raw JSON dump are appended at the end so the recipient can recreate
+ *  the snapshot exactly. */
+export function formatDebugReport(
+  result: PipelineResult,
+  meta: { source: 'live' | 'history'; historyIndex?: number; historyCount?: number; ageLabel?: string },
+): string {
+  const ft = result.frame_timing;
+  const recog = result.recognition;
+  const hl = result.highlight_debug;
+  const lines: string[] = [];
+
+  const header = meta.source === 'history'
+    ? `# ChessRay debug — history ${meta.historyIndex! + 1}/${meta.historyCount}${meta.ageLabel ? ` (${meta.ageLabel})` : ''}`
+    : `# ChessRay debug — live frame`;
+  lines.push(header);
+  lines.push(`Captured: ${new Date().toISOString()}`);
+  lines.push('');
+
+  // Position
+  lines.push('## Position');
+  const posFen = result.evaluation?.fen ?? recog?.fen ?? 'n/a';
+  lines.push(`FEN: ${posFen}`);
+  lines.push(`Orientation: ${result.flipped ? 'white top' : 'white bottom'} (source: ${result.orientation_source ?? '?'})`);
+  lines.push(`Turn: ${result.turn ?? '?'}`);
+  if (recog) lines.push(`Recognition confidence: ${(recog.confidence * 100).toFixed(1)}%`);
+  if (result.detection_status) lines.push(`Status: ${result.detection_status}`);
+  if (result.game_over) lines.push(`Game over: ${result.game_over}`);
+  if (result.eval_depth != null) {
+    const max = result.eval_max_depth != null ? `/${result.eval_max_depth}` : '';
+    lines.push(`Eval depth: ${result.eval_depth}${max}`);
+  }
+  lines.push('');
+
+  // Timing
+  if (ft) {
+    const ipcMs = ft.ipc_ms ?? 0;
+    const renderMs = ft.render_ms ?? 0;
+    const total = ft.capture_ms + ft.pipeline_ms + ipcMs + renderMs;
+    lines.push('## Frame timing (ms)');
+    lines.push(`Total: ${total}  (capture ${ft.capture_ms} + pipeline ${ft.pipeline_ms} + ipc ${ipcMs} + render ${renderMs})`);
+    lines.push(`Capture:        ${ft.capture_ms}`);
+    lines.push(`Fingerprint:    ${ft.fingerprint_ms}`);
+    lines.push(`Detect:         ${ft.detect_ms}${ft.detect_skipped ? ' (skipped)' : ''}`);
+    lines.push(`Crop:           ${ft.crop_ms}`);
+    lines.push(`Preview:        ${ft.preview_ms}`);
+    lines.push(`Change detect:  ${ft.change_detect_ms}`);
+    lines.push(`Recognition:    ${ft.recog_ms}`);
+    if (ft.recog_breakdown) {
+      const rb = ft.recog_breakdown;
+      lines.push(`  yolo prep:    ${rb.yolo_prep_ms}`);
+      lines.push(`  yolo infer:   ${rb.yolo_infer_ms}`);
+      lines.push(`  yolo post:    ${rb.yolo_post_ms}`);
+      lines.push(`  pieces:       ${rb.pieces_ms}`);
+      lines.push(`  orientation:  ${rb.orientation_ms}`);
+      lines.push(`  highlights:   ${rb.highlights_ms}`);
+      lines.push(`  disambiguate: ${rb.disambiguate_ms}`);
+      lines.push(`  pawn refine:  ${rb.pawn_refine_ms}`);
+      lines.push(`  turn:         ${rb.turn_ms}`);
+    }
+    lines.push(`FEN build:      ${ft.fen_build_ms}`);
+    lines.push(`Game over:      ${ft.game_over_ms}`);
+    lines.push(`Seq move:       ${ft.seq_move_ms}`);
+    lines.push(`IPC:            ${ipcMs}`);
+    lines.push(`Render (prev):  ${renderMs}`);
+    if (ft.eval_ms != null && ft.eval_depth != null) {
+      lines.push(`Eval (async):   ${ft.eval_ms} at depth ${ft.eval_depth}`);
+    }
+    lines.push('');
+  }
+
+  // Highlights
+  if (hl) {
+    lines.push('## Highlight detection');
+    if (hl.midAnimation) lines.push('Flag: mid-animation');
+    if (hl.invalidHighlights) lines.push('Flag: invalid (no legal pair)');
+    lines.push(`Medians: light=rgb(${hl.medians.light.join(',')})  dark=rgb(${hl.medians.dark.join(',')})`);
+    if (hl.candidates.length) {
+      lines.push(`Candidates (${hl.candidates.length}):`);
+      for (const c of hl.candidates) {
+        lines.push(`  ${c.square}  score=${c.score.toFixed(1)}  piece=${c.piece ?? '·'}`);
+      }
+    } else {
+      lines.push('Candidates: none');
+    }
+    const dis = hl.disambiguation;
+    lines.push(`Legal pairs (${dis.validPairs.length}, +${dis.rejectedCount} rejected):`);
+    for (const p of [...dis.validPairs].sort((a, b) => b.combinedScore - a.combinedScore)) {
+      const natural = Math.max(p.srcNaturalness, p.destNaturalness) <= 0.08 ? 'natural' : 'annotation';
+      lines.push(`  ${p.src}→${p.dest}  piece=${p.piece}  score=${p.combinedScore.toFixed(1)}  pass=${p.pass}  ${natural}`);
+    }
+    if (dis.winner) {
+      lines.push(`Winner: ${dis.winner.src}→${dis.winner.dest}  reason=${dis.winner.reason}`);
+    } else {
+      lines.push('Winner: none');
+    }
+    lines.push('');
+  }
+
+  // Top moves (if eval ran)
+  if (result.evaluation?.top_moves?.length) {
+    lines.push('## Top moves');
+    for (const m of result.evaluation.top_moves.slice(0, 5)) {
+      const score = m.score_cp >= 0 ? `+${(m.score_cp / 100).toFixed(2)}` : (m.score_cp / 100).toFixed(2);
+      const loss = m.loss_cp > 0 ? ` (−${m.loss_cp}cp)` : '';
+      lines.push(`  ${score}${loss}  ${m.pv.slice(0, 6).join(' ')}`);
+    }
+    lines.push('');
+  }
+
+  // Image (data URL — large; placed last so the readable section is near the
+  // top when pasted into a viewer).
+  if (result.board_image_url) {
+    lines.push('## Board image');
+    lines.push(`<details><summary>JPEG data URL (${result.board_image_url.length} chars)</summary>`);
+    lines.push('');
+    lines.push(result.board_image_url);
+    lines.push('</details>');
+    lines.push('');
+  }
+
+  // Raw JSON for round-tripping into a test or replay tool.
+  lines.push('## Raw JSON');
+  lines.push('```json');
+  lines.push(JSON.stringify({
+    source: meta.source,
+    history_index: meta.historyIndex,
+    history_count: meta.historyCount,
+    age: meta.ageLabel,
+    recognition: recog,
+    evaluation: result.evaluation,
+    flipped: result.flipped,
+    turn: result.turn,
+    orientation_source: result.orientation_source,
+    detection_status: result.detection_status,
+    game_over: result.game_over,
+    highlighted_squares: result.highlighted_squares,
+    eval_depth: result.eval_depth,
+    eval_max_depth: result.eval_max_depth,
+    frame_timing: ft,
+    highlight_debug: hl,
+    square_colors: result.square_colors,
+  }, null, 2));
+  lines.push('```');
+
+  return lines.join('\n');
+}
+
 /** Color level for a duration. Used to tint timing bars and the total bar.
  *  Per-section uses the tighter scale; the total bar uses the wider scale
  *  because it sums many stages. */
