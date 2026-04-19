@@ -40,6 +40,12 @@ export interface ImageDataLike {
   height: number;
 }
 
+/** Per-frame capture metadata forwarded from the capture layer. Tests may omit it. */
+export interface FrameMeta {
+  capture_ms: number;
+  captured_at: number;
+}
+
 export interface FrameProcessorDeps {
   onnxSession: unknown;
   ortModule: unknown;
@@ -138,10 +144,15 @@ export class FrameProcessor {
     return Math.min(this.multiPvMax, EVAL_MULTI_PV_START + linesFromRamp);
   }
 
-  async processFrame(imageData: ImageDataLike): Promise<void> {
+  async processFrame(imageData: ImageDataLike, frameMeta?: FrameMeta): Promise<void> {
     const startTime = Date.now();
     const log = this.deps.log;
     const sendResult = this.deps.sendResult;
+    const captureMs = frameMeta?.capture_ms ?? 0;
+    /** Last completed eval depth's elapsed_ms — survives across frames so the timing
+     *  panel keeps showing the most recent eval cost while async eval depths roll in. */
+    const lastEvalMs = this.lastEval?.elapsed_ms;
+    const lastEvalDepth = this.lastEval?.depth;
 
     try {
       const pixels: PixelBuffer = {
@@ -158,14 +169,17 @@ export class FrameProcessor {
       let activeBbox = this.cachedBbox;
       let detectionConf = 1;
       let tDetect = 0;
+      let tFingerprint = 0;
       let detectSkipped = false;
       {
         // Cheap fingerprint: sample the frame outside the cached bbox. When it's
         // unchanged the UI chrome around the board hasn't moved, so the bbox is
         // still valid — skipping detectBoard saves ~250ms/frame. Refresh
         // periodically as a safety net against drift.
+        const tFp = Date.now();
         const frameSample = sampleFrameOutsideBbox(pixels.data, pixels.width, pixels.height, this.cachedBbox);
         const frameUnchanged = this.lastFrameSample !== null && boardUnchanged(this.lastFrameSample, frameSample);
+        tFingerprint = Date.now() - tFp;
         const shouldRefresh = this.framesSinceDetect >= FrameProcessor.DETECT_REFRESH_FRAMES;
         const canSkip = this.cachedBbox !== null && frameUnchanged && !shouldRefresh;
         this.lastFrameSample = frameSample;
@@ -204,6 +218,8 @@ export class FrameProcessor {
 
       let t = Date.now();
       const cropped = cropPixels(pixels, activeBbox);
+      const tCrop = Date.now() - t;
+      t = Date.now();
       const boardImageUrl = this.deps.encodePreviewUrl?.(cropped) ?? '';
       const tPreview = Date.now() - t;
 
@@ -348,27 +364,70 @@ export class FrameProcessor {
       }
 
       const self = this;
-      const makeResult = (opts: { evaluation?: EvalResult | null; arrows?: ArrowDescriptor[]; eval_depth?: number; eval_max_depth?: number; game_over?: GameOver; stale_eval?: boolean }): PipelineResult => ({
-        board_detection: { found: true, bbox: activeBbox!, confidence: detectionConf },
-        recognition,
-        evaluation: opts.evaluation ?? null,
-        eval_depth: opts.eval_depth,
-        eval_max_depth: opts.eval_max_depth,
-        stale_eval: opts.stale_eval,
-        arrows: opts.arrows ?? [],
-        highlighted_squares: highlightedSquares,
-        turn: highlightTurn ?? undefined,
-        game_over: opts.game_over,
-        flipped: isFlipped,
-        orientation_source: orientationSource,
-        played_move: self.lastPlayedMove,
-        detection_status: detectionStatus,
-        board_image_url: boardImageUrl,
-        frame_dimensions: { width: pixels.width, height: pixels.height },
-        square_colors: squareColors,
-        highlight_debug: highlightDebug,
-        total_elapsed_ms: Date.now() - startTime,
-      });
+      // Mutable accumulators for stages that run after makeResult is defined.
+      // makeResult snapshots them at call time so each sendResult reflects the
+      // work actually completed before that point.
+      let tFenBuild = 0;
+      let tGameOver = 0;
+      let tSeqMove = 0;
+      const makeResult = (opts: { evaluation?: EvalResult | null; arrows?: ArrowDescriptor[]; eval_depth?: number; eval_max_depth?: number; game_over?: GameOver; stale_eval?: boolean }): PipelineResult => {
+        const now = Date.now();
+        const evalRes = opts.evaluation ?? null;
+        const evalMs = evalRes?.elapsed_ms ?? lastEvalMs;
+        const evalDepth = opts.eval_depth ?? lastEvalDepth;
+        const recogBreakdown = brTiming
+          ? {
+              yolo_prep_ms: recognition?.timing?.prep_ms ?? 0,
+              yolo_infer_ms: recognition?.timing?.infer_ms ?? 0,
+              yolo_post_ms: recognition?.timing?.post_ms ?? 0,
+              pieces_ms: brTiming.pieces_ms,
+              orientation_ms: brTiming.orientation_ms,
+              highlights_ms: brTiming.highlights_ms,
+              disambiguate_ms: brTiming.disambiguate_ms,
+              pawn_refine_ms: brTiming.pawnRefine_ms,
+              turn_ms: brTiming.turn_ms,
+            }
+          : null;
+        return {
+          board_detection: { found: true, bbox: activeBbox!, confidence: detectionConf },
+          recognition,
+          evaluation: evalRes,
+          eval_depth: opts.eval_depth,
+          eval_max_depth: opts.eval_max_depth,
+          stale_eval: opts.stale_eval,
+          arrows: opts.arrows ?? [],
+          highlighted_squares: highlightedSquares,
+          turn: highlightTurn ?? undefined,
+          game_over: opts.game_over,
+          flipped: isFlipped,
+          orientation_source: orientationSource,
+          played_move: self.lastPlayedMove,
+          detection_status: detectionStatus,
+          board_image_url: boardImageUrl,
+          frame_dimensions: { width: pixels.width, height: pixels.height },
+          square_colors: squareColors,
+          highlight_debug: highlightDebug,
+          frame_timing: {
+            capture_ms: captureMs,
+            fingerprint_ms: tFingerprint,
+            detect_ms: tDetect,
+            detect_skipped: detectSkipped,
+            crop_ms: tCrop,
+            preview_ms: tPreview,
+            change_detect_ms: tChangeDetect,
+            recog_ms: tRecog,
+            recog_breakdown: recogBreakdown,
+            fen_build_ms: tFenBuild,
+            game_over_ms: tGameOver,
+            seq_move_ms: tSeqMove,
+            pipeline_ms: now - startTime,
+            sent_at: now,
+            eval_ms: evalMs,
+            eval_depth: evalDepth,
+          },
+          total_elapsed_ms: now - startTime,
+        };
+      };
 
       let recogDetail: string;
       if (brTiming) {
@@ -472,7 +531,7 @@ export class FrameProcessor {
       t = Date.now();
       const turn = highlightTurn ?? guessTurn(this.prevPositionFen, positionFen);
       const fullFen = buildFullFen(positionFen, turn);
-      const tFenBuild = Date.now() - t;
+      tFenBuild = Date.now() - t;
 
       t = Date.now();
       let gameOver: GameOver | undefined;
@@ -481,7 +540,7 @@ export class FrameProcessor {
         if (chess.isCheckmate()) gameOver = 'checkmate';
         else if (chess.isStalemate()) gameOver = 'stalemate';
       } catch { /* invalid FEN — continue to engine */ }
-      const tGameOver = Date.now() - t;
+      tGameOver = Date.now() - t;
 
       if (gameOver) {
         log(`Game over: ${gameOver}`);
@@ -513,7 +572,7 @@ export class FrameProcessor {
           }
         }
       }
-      const tSeqMove = Date.now() - t;
+      tSeqMove = Date.now() - t;
 
       const playedMoveLossFromTopMoves = this.lastPlayedMove
         ? this.lastEval?.top_moves.some(m => m.move === this.lastPlayedMove!.uci) ?? false

@@ -2,7 +2,15 @@ import { initEngine, initRecognizer, getOnnxSession } from './engine-init.js';
 
 export let TARGET_FPS = 2;
 
-let captureOnFrame: ((imageData: ImageData) => Promise<void>) | null = null;
+/** Measured upstream cost for a single captured frame, before the pipeline runs. */
+export interface FrameMeta {
+  /** drawImage + getImageData duration in ms. */
+  capture_ms: number;
+  /** Date.now() right after the frame was captured, for IPC + render timing downstream. */
+  captured_at: number;
+}
+
+let captureOnFrame: ((imageData: ImageData, meta: FrameMeta) => Promise<void>) | null = null;
 let captureCtx: CanvasRenderingContext2D | null = null;
 let captureCanvas: HTMLCanvasElement | null = null;
 let captureVideo: HTMLVideoElement | null = null;
@@ -27,10 +35,13 @@ export function setTargetFps(fps: number): void {
         resetState?.();
       }
       isProcessing = true;
+      const tCap = Date.now();
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const captured_at = Date.now();
+      const meta: FrameMeta = { capture_ms: captured_at - tCap, captured_at };
       try {
-        await onFrame(imageData);
+        await onFrame(imageData, meta);
       } finally {
         isProcessing = false;
       }
@@ -52,7 +63,7 @@ function debugLog(msg: string): void {
 
 export async function initAndStartCapture(
   sourceId: string,
-  onFrame: (imageData: ImageData) => Promise<void>,
+  onFrame: (imageData: ImageData, meta: FrameMeta) => Promise<void>,
   resetState: () => void,
 ): Promise<void> {
   stopCapture(resetState);
@@ -210,10 +221,13 @@ export async function initAndStartCapture(
         resetState();
       }
       isProcessing = true;
+      const tCap = Date.now();
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const captured_at = Date.now();
+      const meta: FrameMeta = { capture_ms: captured_at - tCap, captured_at };
       try {
-        await onFrame(imageData);
+        await onFrame(imageData, meta);
       } finally {
         isProcessing = false;
       }

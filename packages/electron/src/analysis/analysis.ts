@@ -8,7 +8,7 @@ import type { PixelBuffer } from '@chessray/core';
 import type { PipelineResult } from '../shared/types.js';
 import { setMultiPvMax, setMultiPvRamp } from './eval-cache.js';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
-import { initAndStartCapture, stopCapture, setTargetFps } from './frame-capture.js';
+import { initAndStartCapture, stopCapture, setTargetFps, type FrameMeta } from './frame-capture.js';
 import { FrameProcessor, type ImageDataLike } from './frame-processor.js';
 import { setRecording, recordFrame, recordResultSidecar, currentFrameFilename, isRecording } from './frame-recorder.js';
 
@@ -60,7 +60,7 @@ const processor = new FrameProcessor({
   encodePreviewUrl,
 });
 
-async function onCapturedFrame(imageData: ImageDataLike): Promise<void> {
+async function onCapturedFrame(imageData: ImageDataLike, meta: FrameMeta): Promise<void> {
   if (isRecording()) {
     pendingArtifactFilename = currentFrameFilename();
     // Fire and forget — PNG encoding should not block the processor.
@@ -68,7 +68,7 @@ async function onCapturedFrame(imageData: ImageDataLike): Promise<void> {
   } else {
     pendingArtifactFilename = null;
   }
-  await processor.processFrame(imageData);
+  await processor.processFrame(imageData, meta);
 }
 
 window.chessRay.onRecordingStateChanged((active: boolean, sessionDir: string | null) => {

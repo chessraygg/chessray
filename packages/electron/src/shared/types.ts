@@ -55,5 +55,52 @@ export interface PipelineResult {
     midAnimation: boolean;
     timing: { highlights_ms: number; disambiguate_ms: number };
   };
+  /** Per-stage timings for the full frame loop. All values are milliseconds. */
+  frame_timing?: {
+    /** drawImage + getImageData in the capture interval. */
+    capture_ms: number;
+    /** Cheap fingerprint sample of the frame outside the cached bbox. */
+    fingerprint_ms: number;
+    /** YOLO board detection. 0 when skipped (cached bbox + frame unchanged). */
+    detect_ms: number;
+    detect_skipped: boolean;
+    /** Cropping the board region. */
+    crop_ms: number;
+    /** JPEG/dataURL encoding for the debug preview (0 in tests). */
+    preview_ms: number;
+    /** Sampling cropped board pixels for change detection. */
+    change_detect_ms: number;
+    /** Total recognition wall time (covers the breakdown below). */
+    recog_ms: number;
+    /** Recognition sub-stage breakdown. Null when recognition was cached/skipped. */
+    recog_breakdown: {
+      yolo_prep_ms: number;
+      yolo_infer_ms: number;
+      yolo_post_ms: number;
+      pieces_ms: number;
+      orientation_ms: number;
+      highlights_ms: number;
+      disambiguate_ms: number;
+      pawn_refine_ms: number;
+      turn_ms: number;
+    } | null;
+    /** Building the full FEN string. */
+    fen_build_ms: number;
+    /** Detecting checkmate/stalemate. */
+    game_over_ms: number;
+    /** Detecting a sequential move from previous position. */
+    seq_move_ms: number;
+    /** Sum of pipeline work in processFrame. */
+    pipeline_ms: number;
+    /** Wall-clock when the captured frame was sent over IPC (Date.now). */
+    sent_at: number;
+    /** Last completed eval depth's elapsed_ms (async, not part of pipeline_ms). */
+    eval_ms?: number;
+    eval_depth?: number;
+    /** IPC delivery time, computed in the overlay (received_at - sent_at). */
+    ipc_ms?: number;
+    /** DOM/render time of the previous frame, computed in the overlay. */
+    render_ms?: number;
+  };
   total_elapsed_ms: number;
 }

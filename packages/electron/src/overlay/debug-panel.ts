@@ -310,14 +310,9 @@ export function updateDebugPanel(
     }
   }
 
-  // Debug meta info
+  // Debug meta info — confidence + frame loop timing breakdown
   if (debugInfo) {
-    const parts: string[] = [];
-    if (result.recognition) {
-      parts.push(`conf: ${(result.recognition.confidence * 100).toFixed(0)}%`);
-    }
-    parts.push(`${result.total_elapsed_ms}ms`);
-    debugInfo.textContent = parts.join(' | ');
+    renderFrameTiming(debugInfo, result);
   }
 
   // Detection status
@@ -358,9 +353,6 @@ function renderHighlightDebug(container: HTMLElement, result: PipelineResult): v
   const mediansLine = `<div class="hl-row"><span class="hl-k">medians</span>`
     + ` ${rgbSwatch(d.medians.light)} light`
     + ` ${rgbSwatch(d.medians.dark)} dark</div>`;
-
-  const timingLine = `<div class="hl-row"><span class="hl-k">timing</span>`
-    + ` detect ${d.timing.highlights_ms}ms · disamb ${d.timing.disambiguate_ms}ms</div>`;
 
   const candHtml = d.candidates.length
     ? d.candidates.map(c => {
@@ -403,5 +395,119 @@ function renderHighlightDebug(container: HTMLElement, result: PipelineResult): v
     winnerLine = `<div class="hl-row hl-winner"><span class="hl-k">winner</span> none — ${reasonLabel.no_legal_pair}</div>`;
   }
 
-  container.innerHTML = flagsLine + candsLine + mediansLine + pairsLine + winnerLine + timingLine;
+  container.innerHTML = flagsLine + candsLine + mediansLine + pairsLine + winnerLine;
+}
+
+/** Color level for a duration. Used to tint timing bars and the total bar.
+ *  Per-section uses the tighter scale; the total bar uses the wider scale
+ *  because it sums many stages. */
+type FtLevel = 'fast' | 'ok' | 'mid' | 'slow' | 'over';
+function levelForSection(ms: number): FtLevel {
+  if (ms < 25) return 'fast';
+  if (ms < 75) return 'ok';
+  if (ms < 200) return 'mid';
+  if (ms < 400) return 'slow';
+  return 'over';
+}
+function levelForTotal(ms: number): FtLevel {
+  if (ms < 100) return 'fast';
+  if (ms < 250) return 'ok';
+  if (ms < 400) return 'mid';
+  if (ms < 500) return 'slow';
+  return 'over';
+}
+
+interface FtRow {
+  key: string;
+  label: string;
+  ms: number;
+  /** Mark dimmed when the stage was skipped/cached so the breakdown still
+   *  shows the slot but signals it didn't run this frame. */
+  dim?: boolean;
+}
+
+function renderFrameTiming(container: HTMLElement, result: PipelineResult): void {
+  const ft = result.frame_timing;
+  if (!ft) {
+    // Fallback for results without frame_timing (e.g., no-board frames).
+    const conf = result.recognition ? `conf ${(result.recognition.confidence * 100).toFixed(0)}% · ` : '';
+    container.innerHTML = `<div class="ft-fallback">${conf}${result.total_elapsed_ms}ms</div>`;
+    return;
+  }
+
+  const rb = ft.recog_breakdown;
+  const recogChildren: FtRow[] = rb
+    ? [
+        { key: 'yolo-prep', label: 'yolo prep', ms: rb.yolo_prep_ms },
+        { key: 'yolo-infer', label: 'yolo infer', ms: rb.yolo_infer_ms },
+        { key: 'yolo-post', label: 'yolo post', ms: rb.yolo_post_ms },
+        { key: 'pieces', label: 'pieces', ms: rb.pieces_ms },
+        { key: 'orient', label: 'orientation', ms: rb.orientation_ms },
+        { key: 'highlights', label: 'highlights', ms: rb.highlights_ms },
+        { key: 'disamb', label: 'disambiguate', ms: rb.disambiguate_ms },
+        { key: 'pawn', label: 'pawn refine', ms: rb.pawn_refine_ms },
+        { key: 'turn', label: 'turn', ms: rb.turn_ms },
+      ]
+    : [{ key: 'recog-cached', label: 'recog (cached)', ms: ft.recog_ms, dim: true }];
+
+  const stages: FtRow[] = [
+    { key: 'capture', label: 'capture', ms: ft.capture_ms },
+    { key: 'fingerprint', label: 'fingerprint', ms: ft.fingerprint_ms },
+    { key: 'detect', label: ft.detect_skipped ? 'detect (skip)' : 'detect', ms: ft.detect_ms, dim: ft.detect_skipped },
+    { key: 'crop', label: 'crop', ms: ft.crop_ms },
+    { key: 'preview', label: 'preview', ms: ft.preview_ms },
+    { key: 'changedet', label: 'change det', ms: ft.change_detect_ms },
+    ...recogChildren,
+    { key: 'fenbuild', label: 'fen build', ms: ft.fen_build_ms },
+    { key: 'gameover', label: 'game over', ms: ft.game_over_ms },
+    { key: 'seqmove', label: 'seq move', ms: ft.seq_move_ms },
+    { key: 'ipc', label: 'ipc', ms: ft.ipc_ms ?? 0 },
+    { key: 'render', label: 'render (prev)', ms: ft.render_ms ?? 0, dim: (ft.render_ms ?? 0) === 0 },
+  ];
+
+  // Total = pipeline + ipc + render. The async eval is shown separately because
+  // it doesn't gate the next frame.
+  const ipcMs = ft.ipc_ms ?? 0;
+  const renderMs = ft.render_ms ?? 0;
+  const total = ft.pipeline_ms + ipcMs + renderMs;
+  const totalLevel = levelForTotal(total);
+
+  const conf = result.recognition ? `${(result.recognition.confidence * 100).toFixed(0)}%` : '—';
+  const evalStr = ft.eval_depth != null && ft.eval_ms != null
+    ? `<span class="ft-eval">eval d${ft.eval_depth} · ${ft.eval_ms}ms</span>`
+    : '';
+
+  // Stacked bar: each stage gets a slice proportional to its time. Min total
+  // is clamped so an idle frame still renders a visible row.
+  const stackBudget = Math.max(total, 1);
+  const stackHtml = stages
+    .filter(s => s.ms > 0)
+    .map(s => {
+      const pct = (s.ms / stackBudget) * 100;
+      const lvl = levelForSection(s.ms);
+      return `<div class="ft-seg ft-${lvl}" style="flex:0 0 ${pct.toFixed(2)}%" title="${s.label}: ${s.ms}ms"></div>`;
+    }).join('');
+
+  // Per-row breakdown: label, mini bar, ms. Bar width is relative to the
+  // largest stage so small stages still register visually.
+  const maxRowMs = Math.max(1, ...stages.map(s => s.ms));
+  const rowsHtml = stages.map(s => {
+    const lvl = levelForSection(s.ms);
+    const pct = (s.ms / maxRowMs) * 100;
+    const dim = s.dim ? ' ft-row-dim' : '';
+    return `<div class="ft-row${dim}">`
+      + `<span class="ft-label">${s.label}</span>`
+      + `<span class="ft-rowbar"><span class="ft-rowbar-fill ft-${lvl}" style="width:${pct.toFixed(2)}%"></span></span>`
+      + `<span class="ft-ms ft-ms-${lvl}">${s.ms}ms</span>`
+      + `</div>`;
+  }).join('');
+
+  container.innerHTML =
+    `<div class="ft-total ft-${totalLevel}">`
+      + `<span class="ft-total-label">frame</span>`
+      + `<span class="ft-total-ms">${total}ms</span>`
+      + `<span class="ft-meta">conf ${conf}${evalStr ? ' · ' : ''}${evalStr}</span>`
+    + `</div>`
+    + `<div class="ft-stack" title="Stages summed to ${total}ms">${stackHtml}</div>`
+    + `<div class="ft-rows">${rowsHtml}</div>`;
 }

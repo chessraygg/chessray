@@ -1093,6 +1093,9 @@ initOverlay();
 
 let pendingResult: PipelineResult | null = null;
 let rafScheduled = false;
+/** Wall time of the previous frame's render (DOM update) — fed back into the
+ *  next frame's frame_timing so the panel shows last-frame render cost. */
+let lastRenderMs = 0;
 let userLockedLine = -1; // -1 = cycle all, >= 0 = locked to that line
 let lastEvalFen: string | null = null;
 let lastRecogFen: string | null = null;
@@ -1114,6 +1117,7 @@ function processPendingResult(): void {
   const result = pendingResult;
   if (!result) return;
   pendingResult = null;
+  const tRender = Date.now();
 
   // No board detected — clear everything
   if (!result.board_detection?.found) {
@@ -1193,10 +1197,21 @@ function processPendingResult(): void {
       window.chessRay.updateLichess(fen, color);
     }
   }
+
+  lastRenderMs = Date.now() - tRender;
 }
 
 window.chessRay.onFrameResult((result) => {
-  pendingResult = result as PipelineResult;
+  const r = result as PipelineResult;
+  if (r.frame_timing) {
+    const sent = r.frame_timing.sent_at;
+    if (typeof sent === 'number') r.frame_timing.ipc_ms = Math.max(0, Date.now() - sent);
+    // Carry over the previous frame's render cost so the panel always shows the
+    // latest measurable values (current frame's render_ms isn't known until
+    // after the DOM update completes).
+    r.frame_timing.render_ms = lastRenderMs;
+  }
+  pendingResult = r;
   if (!rafScheduled) {
     rafScheduled = true;
     // setTimeout instead of rAF: transparent overlays can have rAF stalled
