@@ -65,36 +65,6 @@ const FADE_STEP = 16; // ~60fps
 const videoArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
 const vboardArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
 
-// ── Preview pulse (half-sine envelope) ──
-// Period of one full pulse cycle in ms. The previewed line + loss circle
-// fade in over the first half and out over the second.
-const PV_PULSE_MS = 1600;
-/** Pulse opacity multiplier for the preview line/circle. Half-sine envelope:
- *  0 → 1 → 0 → 1 → 0 ... shared across canvases so vboard and video pulse in
- *  sync. Returns 1 when not in preview mode (no pulse). */
-function pulseFactor(): number {
-  const t = (Date.now() % PV_PULSE_MS) / PV_PULSE_MS;
-  return Math.sin(Math.PI * t);
-}
-/** Per-canvas timer that re-renders at ~30fps while a preview is active.
- *  Cleared automatically when preview ends. */
-const pulseTimers = { vboard: 0 as any, video: 0 as any };
-function ensurePulseTimer(
-  key: 'vboard' | 'video',
-  active: boolean,
-  onTick: () => void,
-): void {
-  if (active && !pulseTimers[key]) {
-    pulseTimers[key] = setInterval(onTick, 33);
-  } else if (!active && pulseTimers[key]) {
-    clearInterval(pulseTimers[key]);
-    pulseTimers[key] = 0;
-  }
-}
-/** Opacity multiplier for non-previewed arrows when a preview is active.
- *  Pulled into a constant so the vboard and video paths agree. */
-const PV_PREVIEW_DIM = 0.5;
-
 function arrowKey(a: ArrowDescriptor): string {
   return `${a.from}-${a.to}`;
 }
@@ -245,32 +215,23 @@ function drawAnalysisBoard(
   }
 }
 
-/** Get the arrows to display based on current mode.
- *  In preview mode all arrows are still returned (dimmed by the renderer);
- *  the previewed line is drawn separately on top with bell + pulse. */
+/** Get the arrows to display based on current mode (top moves, with optional preview emphasis) */
 export function getActiveArrows(state: OverlayState): ArrowDescriptor[] {
+  // Preview mode: show all move arrows but emphasize the selected line's first move
   if (state.pvPreviewLineIndex !== null && state.currentResult?.evaluation?.top_moves?.length) {
-    return state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold);
+    const allArrows = state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold);
+    const idx = Math.min(state.pvPreviewLineIndex, state.currentResult.evaluation.top_moves.length - 1);
+    const previewMove = state.currentResult.evaluation.top_moves[idx].move;
+    const previewFrom = previewMove.slice(0, 2);
+    const previewTo = previewMove.slice(2, 4);
+    const match = allArrows.find(a => a.from === previewFrom && a.to === previewTo);
+    if (match) return [{ ...match, opacity: 1, width: Math.max(match.width, 5) }];
+    return [];
   }
+
   return state.arrowsVisible
     ? state.currentArrows.filter(a => a.loss_cp <= state.lossThreshold)
     : [];
-}
-
-/** Resolve the previewed move's arrow (always returned regardless of
- *  lossThreshold so the user-selected line is never hidden). Returns null
- *  when not in preview mode. */
-function getPreviewArrow(state: OverlayState): ArrowDescriptor | null {
-  if (state.pvPreviewLineIndex === null) return null;
-  const moves = state.currentResult?.evaluation?.top_moves;
-  if (!moves?.length) return null;
-  const idx = Math.min(state.pvPreviewLineIndex, moves.length - 1);
-  const previewMove = moves[idx].move;
-  const previewFrom = previewMove.slice(0, 2);
-  const previewTo = previewMove.slice(2, 4);
-  const match = state.currentArrows.find(a => a.from === previewFrom && a.to === previewTo);
-  if (match) return { ...match, opacity: 1, width: Math.max(match.width, 5) };
-  return null;
 }
 
 /** Draw a small colored badge on the target square of the played move (overlaid on
@@ -281,9 +242,6 @@ function drawPlayedMoveMarker(
   lossCp: number,
   board: { x: number; y: number; width: number; height: number },
   displayFlipped: boolean,
-  /** Multiplied into every globalAlpha so the marker can be pulsed in lockstep
-   *  with the previewed line (1 = unchanged). */
-  opacityMul: number = 1,
 ): void {
   const squareW = board.width / 8;
   const squareH = board.height / 8;
@@ -301,13 +259,13 @@ function drawPlayedMoveMarker(
     const strokeW = Math.max(2, r * 0.28);
 
     ctx.save();
-    ctx.globalAlpha = 0.5 * opacityMul;
+    ctx.globalAlpha = 0.5;
     ctx.fillStyle = '#22c55e';
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.globalAlpha = 0.55 * opacityMul;
+    ctx.globalAlpha = 0.55;
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = strokeW;
     ctx.lineCap = 'round';
@@ -327,7 +285,7 @@ function drawPlayedMoveMarker(
   const color = lossToColor(lossCp);
 
   ctx.save();
-  ctx.globalAlpha = 0.7 * opacityMul;
+  ctx.globalAlpha = 0.7;
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -338,7 +296,7 @@ function drawPlayedMoveMarker(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const text = `−${(lossCp / 100).toFixed(1)}`;
-  ctx.globalAlpha = 1 * opacityMul;
+  ctx.globalAlpha = 1;
   ctx.lineJoin = 'round';
   ctx.lineWidth = Math.max(2, fontSize * 0.18);
   ctx.strokeStyle = '#000';
@@ -357,11 +315,6 @@ export function drawArrow(
   curveOffset: number = 0,
   progress: number = 1,
   noArrowhead: boolean = false,
-  /** Replace the linear (transparent→opaque) gradient with a sine bell along
-   *  the line: 0 at source → peak (= arrow.opacity) at midpoint → 0 at tip.
-   *  Used for the PV preview arrow so it visually "breathes" into the loss
-   *  circle at the destination. */
-  bellGradient: boolean = false,
 ): void {
   const squareW = board.width / 8;
   const squareH = board.height / 8;
@@ -416,24 +369,13 @@ export function drawArrow(
   ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
 
-  // Gradient stroke. Default: transparent at source, full opacity at tip.
-  // Bell variant: 0 → peak → 0 along the line (preview mode only).
+  // Gradient stroke: transparent at source, full opacity at tip
   const grad = ctx.createLinearGradient(x1, y1, endX, endY);
   const r = parseInt(arrow.color.slice(1, 3), 16);
   const g = parseInt(arrow.color.slice(3, 5), 16);
   const b = parseInt(arrow.color.slice(5, 7), 16);
-  if (bellGradient) {
-    // 9 stops sample a half-sine; smoother than a 3-stop triangle.
-    const stops = 9;
-    for (let i = 0; i <= stops; i++) {
-      const u = i / stops;
-      const w = Math.sin(Math.PI * u); // 0 → 1 → 0
-      grad.addColorStop(u, `rgba(${r},${g},${b},${(arrow.opacity * w).toFixed(3)})`);
-    }
-  } else {
-    grad.addColorStop(0, `rgba(${r},${g},${b},${(arrow.opacity * 0.15).toFixed(2)})`);
-    grad.addColorStop(1, `rgba(${r},${g},${b},${arrow.opacity.toFixed(2)})`);
-  }
+  grad.addColorStop(0, `rgba(${r},${g},${b},${(arrow.opacity * 0.15).toFixed(2)})`);
+  grad.addColorStop(1, `rgba(${r},${g},${b},${arrow.opacity.toFixed(2)})`);
 
   // Draw the shaft (quadratic bezier curve)
   ctx.strokeStyle = grad;
@@ -534,49 +476,29 @@ export function renderArrows(state: OverlayState): void {
   }
 
   const targetArrows = getActiveArrows(state);
-  const isPreviewActive = state.pvPreviewLineIndex !== null;
 
-  if (targetArrows.length === 0 && !state.currentResult?.played_move && !isPreviewActive) {
+  if (targetArrows.length === 0 && !state.currentResult?.played_move) {
     vboardArrowState.animated = [];
     if (vboardArrowState.timer) { clearInterval(vboardArrowState.timer); vboardArrowState.timer = 0; }
-    ensurePulseTimer('vboard', false, () => renderArrows(state));
     return;
   }
 
   const animated = updateAnimatedArrows(targetArrows, vboardArrowState, () => renderArrows(state));
-  const isPreview = state.pvPreviewLineIndex !== null;
-  // Dim every arrow when a preview is active so the previewed line (drawn on
-  // top with the bell + pulse) clearly stands out without hiding alternatives.
-  const drawList = animated.map(a => ({
-    arrow: { ...a, opacity: a.fadeOpacity * (isPreview ? PV_PREVIEW_DIM : 1) },
-    progress: a.progress,
-  }));
+  const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
 
+  const isPreview = state.pvPreviewLineIndex !== null;
   const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
   for (let i = drawList.length - 1; i >= 0; i--) {
     const isLineArrow = !!drawList[i].arrow.label;
-    drawArrow(ctx, drawList[i].arrow, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow);
+    drawArrow(ctx, drawList[i].arrow, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow || isPreview);
   }
 
-  // Preview emphasis: bell-gradient line + pulsing loss circle for the selected move.
-  // The pulse multiplies opacity by sin(πt) over a ~1.6s cycle (half-sine envelope).
-  ensurePulseTimer('vboard', isPreview, () => renderArrows(state));
-  if (isPreview) {
-    const previewArrow = getPreviewArrow(state);
-    if (previewArrow) {
-      const pulse = pulseFactor();
-      drawArrow(
-        ctx,
-        { ...previewArrow, opacity: previewArrow.opacity * pulse },
-        virtualBoard, 1, state.displayFlipped,
-        0, 1, true /* noArrowhead */, true /* bellGradient */,
-      );
-      const moves = state.currentResult!.evaluation!.top_moves!;
-      const idx = Math.min(state.pvPreviewLineIndex!, moves.length - 1);
-      const move = moves[idx];
-      const to = move.move.slice(2, 4);
-      drawPlayedMoveMarker(ctx, to, move.loss_cp, virtualBoard, state.displayFlipped, pulse);
-    }
+  // Draw played-move-style loss marker during preview mode on the selected line's target square
+  if (state.pvPreviewLineIndex !== null && state.currentResult?.evaluation?.top_moves?.length) {
+    const idx = Math.min(state.pvPreviewLineIndex, state.currentResult.evaluation.top_moves.length - 1);
+    const move = state.currentResult.evaluation.top_moves[idx];
+    const to = move.move.slice(2, 4);
+    drawPlayedMoveMarker(ctx, to, move.loss_cp, virtualBoard, state.displayFlipped);
   }
 }
 
@@ -648,42 +570,27 @@ export function renderVideoOverlay(state: OverlayState): void {
     if (state.arrowsVisible || state.pvPreviewLineIndex !== null) {
       const targetArrows = getActiveArrows(state);
       const animated = updateAnimatedArrows(targetArrows, videoArrowState, () => renderVideoOverlay(state));
+      // Draw with animated opacity
+      const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
       const arrowScale = (bw + bh) / 2 / 192;
+
       const isPreview = state.pvPreviewLineIndex !== null;
-      // Dim non-previewed arrows so the previewed line (drawn next with bell + pulse)
-      // clearly stands out without hiding alternatives.
-      const drawList = animated.map(a => ({
-        arrow: { ...a, opacity: a.fadeOpacity * (isPreview ? PV_PREVIEW_DIM : 1) },
-        progress: a.progress,
-      }));
       const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
       for (let i = drawList.length - 1; i >= 0; i--) {
-        drawArrow(ctx, drawList[i].arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress, false);
+        drawArrow(ctx, drawList[i].arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress, isPreview);
       }
 
-      // Preview emphasis: bell-gradient line + pulsing loss circle, half-sine envelope.
-      ensurePulseTimer('video', isPreview, () => renderVideoOverlay(state));
-      if (isPreview) {
-        const previewArrow = getPreviewArrow(state);
-        if (previewArrow && result.evaluation?.top_moves?.length) {
-          const pulse = pulseFactor();
-          drawArrow(
-            ctx,
-            { ...previewArrow, opacity: previewArrow.opacity * pulse },
-            boardRect, arrowScale, state.displayFlipped,
-            0, 1, true /* noArrowhead */, true /* bellGradient */,
-          );
-          const idx = Math.min(state.pvPreviewLineIndex!, result.evaluation.top_moves.length - 1);
-          const move = result.evaluation.top_moves[idx];
-          const to = move.move.slice(2, 4);
-          drawPlayedMoveMarker(ctx, to, move.loss_cp, boardRect, state.displayFlipped, pulse);
-        }
+      // Draw played-move-style loss marker during preview mode on the selected line's target square
+      if (state.pvPreviewLineIndex !== null && result.evaluation?.top_moves?.length) {
+        const idx = Math.min(state.pvPreviewLineIndex, result.evaluation.top_moves.length - 1);
+        const move = result.evaluation.top_moves[idx];
+        const to = move.move.slice(2, 4);
+        drawPlayedMoveMarker(ctx, to, move.loss_cp, boardRect, state.displayFlipped);
       }
     } else {
       // Clear animation state when arrows are hidden
       videoArrowState.animated = [];
       if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
-      ensurePulseTimer('video', false, () => renderVideoOverlay(state));
     }
   }
 
