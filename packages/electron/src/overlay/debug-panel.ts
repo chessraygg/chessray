@@ -585,18 +585,9 @@ export function formatDebugReport(
     lines.push('');
   }
 
-  // Image (data URL — large; placed last so the readable section is near the
-  // top when pasted into a viewer).
-  if (result.board_image_url) {
-    lines.push('## Board image');
-    lines.push(`<details><summary>JPEG data URL (${result.board_image_url.length} chars)</summary>`);
-    lines.push('');
-    lines.push(result.board_image_url);
-    lines.push('</details>');
-    lines.push('');
-  }
-
-  // Raw JSON for round-tripping into a test or replay tool.
+  // Raw JSON for round-tripping into a test or replay tool. Image data URL
+  // is intentionally excluded — pasting ~70KB of base64 into chat/issues
+  // is rarely useful and bloats the clipboard.
   lines.push('## Raw JSON');
   lines.push('```json');
   lines.push(JSON.stringify({
