@@ -511,11 +511,12 @@ function renderFrameTiming(container: HTMLElement, result: PipelineResult): void
     { key: 'render', label: 'render (prev)', ms: ft.render_ms ?? 0, dim: (ft.render_ms ?? 0) === 0 },
   ];
 
-  // Total = pipeline + ipc + render. The async eval is shown separately because
-  // it doesn't gate the next frame.
+  // Total = capture + pipeline + ipc + render. Capture happens upstream of
+  // processFrame (in the capture interval) so pipeline_ms doesn't include it.
+  // The async eval is shown separately because it doesn't gate the next frame.
   const ipcMs = ft.ipc_ms ?? 0;
   const renderMs = ft.render_ms ?? 0;
-  const total = ft.pipeline_ms + ipcMs + renderMs;
+  const total = ft.capture_ms + ft.pipeline_ms + ipcMs + renderMs;
   const totalLevel = levelForTotal(total);
 
   const conf = result.recognition ? `${(result.recognition.confidence * 100).toFixed(0)}%` : '—';
