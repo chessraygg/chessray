@@ -317,8 +317,10 @@ export function updateDebugPanel(
     }
   }
 
-  // Debug meta info — confidence + frame loop timing breakdown
-  if (debugInfo) {
+  // Debug meta info — confidence + frame loop timing breakdown.
+  // Skip the rewrite while hovered so tooltip targets aren't destroyed
+  // mid-interaction (the values resume updating once the cursor leaves).
+  if (debugInfo && !debugInfo.matches(':hover')) {
     renderFrameTiming(debugInfo, dbg);
   }
 
@@ -333,9 +335,10 @@ export function updateDebugPanel(
     }
   }
 
-  // Highlight detection debug breakdown
+  // Highlight detection debug breakdown — same hover-skip as the timing block
+  // so tooltips on candidates / pairs / labels stay alive while inspected.
   const hlDebugEl = document.getElementById('cv-highlight-debug');
-  if (hlDebugEl) renderHighlightDebug(hlDebugEl, dbg);
+  if (hlDebugEl && !hlDebugEl.matches(':hover')) renderHighlightDebug(hlDebugEl, dbg);
 }
 
 const reasonLabel: Record<string, string> = {
