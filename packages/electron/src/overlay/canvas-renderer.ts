@@ -65,6 +65,45 @@ const FADE_STEP = 16; // ~60fps
 const videoArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
 const vboardArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
 
+// ── Video-overlay eval bar tween ──
+// The bar's winProb is animated from current → target over EVAL_BAR_TWEEN_MS
+// using a cubic ease-out. Without this the bar snaps as eval depths arrive.
+const EVAL_BAR_TWEEN_MS = 350;
+const evalBarAnim = {
+  /** Currently displayed winProb (0..1). Used by renderVideoOverlay's draw call. */
+  current: 0.5,
+  /** Most recent target winProb. The tween eases from `start` toward this. */
+  target: 0.5,
+  /** Snapshot of `current` at the start of the active tween (so we can lerp
+   *  with the same start value across frames, not jump ahead). */
+  start: 0.5,
+  /** Wall time when the active tween began. */
+  startTs: 0,
+  /** rAF/interval handle for the active tween. 0 when no tween is running. */
+  timer: 0 as any,
+};
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+function tickEvalBar(state: OverlayState): void {
+  const elapsed = Date.now() - evalBarAnim.startTs;
+  const t = Math.min(1, elapsed / EVAL_BAR_TWEEN_MS);
+  evalBarAnim.current = evalBarAnim.start + (evalBarAnim.target - evalBarAnim.start) * easeOutCubic(t);
+  if (t >= 1) {
+    if (evalBarAnim.timer) { clearInterval(evalBarAnim.timer); evalBarAnim.timer = 0; }
+  }
+  renderVideoOverlay(state);
+}
+function setEvalBarTarget(state: OverlayState, target: number): void {
+  if (Math.abs(target - evalBarAnim.target) < 0.001) return;
+  evalBarAnim.start = evalBarAnim.current;
+  evalBarAnim.target = target;
+  evalBarAnim.startTs = Date.now();
+  if (!evalBarAnim.timer) {
+    evalBarAnim.timer = setInterval(() => tickEvalBar(state), 16);
+  }
+}
+
 // ── PV preview emphasis ──
 // The previewed move's line uses a spatial sine bell (0 → peak → 0 along the
 // length) AND its overall opacity (line + loss circle) is multiplied by a
@@ -683,7 +722,9 @@ export function renderVideoOverlay(state: OverlayState): void {
     const sideScore = result.evaluation.top_moves[0].score_cp;
     const turn = result.evaluation.fen?.split(' ')[1] || 'w';
     const bestScore = turn === 'b' ? -sideScore : sideScore;
-    const winProb = 1 / (1 + Math.pow(10, -bestScore / 400));
+    const targetWinProb = 1 / (1 + Math.pow(10, -bestScore / 400));
+    setEvalBarTarget(state, targetWinProb);
+    const winProb = evalBarAnim.current;
 
     const barW = Math.max(8, Math.round(bw * 0.04));
     const barX = bx > barW + 4
