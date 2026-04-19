@@ -674,7 +674,13 @@ export class FrameProcessor {
       }
 
       log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} fen=${tFenBuild}ms gameOver=${tGameOver}ms seqMove=${tSeqMove}ms [new pos] total=${Date.now() - startTime}ms`);
-      sendResult(makeResult({ evaluation: staleEval, eval_max_depth: this.maxDepth, stale_eval: true }));
+      // Prefer the just-reset lastEval (already null by now) → fall back to
+      // lastDisplayEval, which survives back-to-back [new pos] frames so the
+      // bar stays visible (transparent) instead of vanishing.
+      const newPosStaleEval = staleEval ?? this.lastDisplayEval;
+      sendResult(makeResult(newPosStaleEval
+        ? { evaluation: newPosStaleEval, eval_depth: newPosStaleEval.depth, eval_max_depth: this.maxDepth, stale_eval: true }
+        : { eval_max_depth: this.maxDepth, stale_eval: true }));
 
       const evalPositionFen = positionFen;
       void (async () => {
