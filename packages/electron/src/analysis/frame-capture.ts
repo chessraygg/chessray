@@ -15,37 +15,50 @@ let captureCtx: CanvasRenderingContext2D | null = null;
 let captureCanvas: HTMLCanvasElement | null = null;
 let captureVideo: HTMLVideoElement | null = null;
 let captureResetState: (() => void) | null = null;
+/** Module-scope guard so setTargetFps and initAndStartCapture share the same
+ *  flag — without this, recreating the interval on FPS change would start a
+ *  second concurrent processFrame while the first is still mid-inference,
+ *  racing on canvas/processor state and eventually wedging the renderer. */
+let captureIsProcessing = false;
+
+function startCaptureIntervalAtCurrentFps(): void {
+  if (!captureOnFrame || !captureCtx || !captureCanvas || !captureVideo) return;
+  if (captureInterval) clearInterval(captureInterval);
+  const ctx = captureCtx;
+  const canvas = captureCanvas;
+  const video = captureVideo;
+  const onFrame = captureOnFrame;
+  const resetState = captureResetState;
+  captureInterval = setInterval(async () => {
+    if (captureIsProcessing) return;
+    if (video.videoWidth > 0 && (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight)) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      resetState?.();
+    }
+    captureIsProcessing = true;
+    const tCap = Date.now();
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const captured_at = Date.now();
+    const meta: FrameMeta = { capture_ms: captured_at - tCap, captured_at };
+    try {
+      await onFrame(imageData, meta);
+    } finally {
+      captureIsProcessing = false;
+    }
+  }, 1000 / TARGET_FPS);
+}
 
 export function setTargetFps(fps: number): void {
-  TARGET_FPS = Math.max(1, Math.min(10, fps));
-  // Restart the capture interval at the new rate
+  const next = Math.max(1, Math.min(10, fps));
+  // No-op when the rate hasn't actually changed — avoids recreating the
+  // interval (and the orphaned in-flight processFrame race) every time the
+  // auto-tuner toggles between two values it already settled on.
+  if (next === TARGET_FPS && captureInterval) return;
+  TARGET_FPS = next;
   if (captureInterval && captureOnFrame && captureCtx && captureCanvas && captureVideo) {
-    clearInterval(captureInterval);
-    let isProcessing = false;
-    const ctx = captureCtx;
-    const canvas = captureCanvas;
-    const video = captureVideo;
-    const onFrame = captureOnFrame;
-    const resetState = captureResetState;
-    captureInterval = setInterval(async () => {
-      if (isProcessing) return;
-      if (video.videoWidth > 0 && (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight)) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        resetState?.();
-      }
-      isProcessing = true;
-      const tCap = Date.now();
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const captured_at = Date.now();
-      const meta: FrameMeta = { capture_ms: captured_at - tCap, captured_at };
-      try {
-        await onFrame(imageData, meta);
-      } finally {
-        isProcessing = false;
-      }
-    }, 1000 / TARGET_FPS);
+    startCaptureIntervalAtCurrentFps();
   }
 }
 
@@ -210,28 +223,10 @@ export async function initAndStartCapture(
     captureCanvas = canvas;
     captureVideo = video;
     captureResetState = resetState;
-
-    let isProcessing = false;
-
-    captureInterval = setInterval(async () => {
-      if (isProcessing) return;
-      if (video.videoWidth > 0 && (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight)) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        resetState();
-      }
-      isProcessing = true;
-      const tCap = Date.now();
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const captured_at = Date.now();
-      const meta: FrameMeta = { capture_ms: captured_at - tCap, captured_at };
-      try {
-        await onFrame(imageData, meta);
-      } finally {
-        isProcessing = false;
-      }
-    }, 1000 / TARGET_FPS);
+    // Both this initial start and any later setTargetFps go through the same
+    // helper using the module-scope captureIsProcessing flag, so an interval
+    // recreated mid-frame can never start a second concurrent processFrame.
+    startCaptureIntervalAtCurrentFps();
 
   } catch (err) {
     debugLog(`Init/capture FAILED: ${err}`);
@@ -244,6 +239,7 @@ export function stopCapture(resetPipelineState?: () => void): void {
     clearInterval(captureInterval);
     captureInterval = null;
   }
+  captureIsProcessing = false;
   if (videoElement) {
     videoElement.pause();
     videoElement.srcObject = null;
