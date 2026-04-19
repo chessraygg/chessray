@@ -341,16 +341,25 @@ function rgbSwatch([r, g, b]: [number, number, number]): string {
   return `<span class="sw" style="background:rgb(${r},${g},${b})"></span>`;
 }
 
+const HL_TIPS = {
+  candidates: 'Squares whose border-frame median color shifted enough vs the parity median to be flagged as possibly highlighted (last-move overlay). Sorted by score; small dot = empty square, letter = piece on that square.',
+  medians: 'Median RGB color of the board\'s light and dark squares (sampled from the inner 6×6 to skip edge labels and pieces). Used as the baseline that highlight scoring measures deviation from.',
+  legalPairs: 'Candidate (source → destination) pairs that form a geometrically legal move for the piece on the destination square. The disambiguator picks one of these as the highlighted move.',
+  winner: 'The (source, destination) pair the disambiguator picked as the actual last move, plus the reason it won (top score, most natural pair, or none if no legal pair was found).',
+  midAnim: 'A piece is mid-animation between squares — recognition would read garbage so this frame is skipped and the previous result is reused.',
+  invalid: 'Highlights were detected but no legal (source, destination) pair could be formed. The frame is rejected rather than guessing a wrong move.',
+} as const;
+
 function renderHighlightDebug(container: HTMLElement, result: PipelineResult): void {
   const d = result.highlight_debug;
   if (!d) { container.innerHTML = ''; return; }
 
   const flags: string[] = [];
-  if (d.midAnimation) flags.push('<span class="hl-flag warn">mid-animation</span>');
-  if (d.invalidHighlights) flags.push('<span class="hl-flag err">invalid (no legal pair)</span>');
+  if (d.midAnimation) flags.push(`<span class="hl-flag warn"${tip(HL_TIPS.midAnim)} data-tip-pos="left">mid-animation</span>`);
+  if (d.invalidHighlights) flags.push(`<span class="hl-flag err"${tip(HL_TIPS.invalid)} data-tip-pos="left">invalid (no legal pair)</span>`);
   const flagsLine = flags.length ? `<div class="hl-flags">${flags.join(' ')}</div>` : '';
 
-  const mediansLine = `<div class="hl-row"><span class="hl-k">medians</span>`
+  const mediansLine = `<div class="hl-row"><span class="hl-k"${tip(HL_TIPS.medians)} data-tip-pos="left">medians</span>`
     + ` ${rgbSwatch(d.medians.light)} light`
     + ` ${rgbSwatch(d.medians.dark)} dark</div>`;
 
@@ -360,7 +369,7 @@ function renderHighlightDebug(container: HTMLElement, result: PipelineResult): v
         return `<span class="hl-cand">${c.square}<span class="hl-score">${c.score.toFixed(0)}</span><span class="hl-glyph">${glyph}</span></span>`;
       }).join(' ')
     : '<span class="hl-dim">none</span>';
-  const candsLine = `<div class="hl-row"><span class="hl-k">candidates (${d.candidates.length})</span> ${candHtml}</div>`;
+  const candsLine = `<div class="hl-row"><span class="hl-k"${tip(HL_TIPS.candidates)} data-tip-pos="left">candidates (${d.candidates.length})</span> ${candHtml}</div>`;
 
   const disamb = d.disambiguation;
   let pairsLine = '';
@@ -383,16 +392,16 @@ function renderHighlightDebug(container: HTMLElement, result: PipelineResult): v
     const rejTag = disamb.rejectedCount > 0
       ? `<span class="hl-rejected">+${disamb.rejectedCount} rejected (illegal move)</span>`
       : '';
-    pairsLine = `<div class="hl-row"><span class="hl-k">legal pairs (${disamb.validPairs.length})</span> ${rejTag}</div>`
+    pairsLine = `<div class="hl-row"><span class="hl-k"${tip(HL_TIPS.legalPairs)} data-tip-pos="left">legal pairs (${disamb.validPairs.length})</span> ${rejTag}</div>`
       + `<div class="hl-pairs">${pairHtml}</div>`;
   }
 
   let winnerLine = '';
   if (disamb.winner) {
     const reason = reasonLabel[disamb.winner.reason] ?? disamb.winner.reason;
-    winnerLine = `<div class="hl-row hl-winner"><span class="hl-k">winner</span> ${disamb.winner.src}→${disamb.winner.dest} — ${reason}</div>`;
+    winnerLine = `<div class="hl-row hl-winner"><span class="hl-k"${tip(HL_TIPS.winner)} data-tip-pos="left">winner</span> ${disamb.winner.src}→${disamb.winner.dest} — ${reason}</div>`;
   } else if (d.candidates.length > 0) {
-    winnerLine = `<div class="hl-row hl-winner"><span class="hl-k">winner</span> none — ${reasonLabel.no_legal_pair}</div>`;
+    winnerLine = `<div class="hl-row hl-winner"><span class="hl-k"${tip(HL_TIPS.winner)} data-tip-pos="left">winner</span> none — ${reasonLabel.no_legal_pair}</div>`;
   }
 
   container.innerHTML = flagsLine + candsLine + mediansLine + pairsLine + winnerLine;
@@ -426,6 +435,43 @@ interface FtRow {
   dim?: boolean;
 }
 
+/** Tooltip text for each timing row. Keyed by FtRow.key so the same description
+ *  is reused if a row is re-labeled (e.g. "detect" vs "detect (skip)"). */
+const FT_TIPS: Record<string, string> = {
+  capture: 'Pulling the latest video frame from the OS desktop capture stream and copying its pixels into a canvas (drawImage + getImageData). Runs once per frame at the configured FPS.',
+  fingerprint: 'Cheap pixel sample of the screen area outside the cached board bbox. When this fingerprint is unchanged, the board hasn\'t moved on screen and YOLO board detection can be skipped on this frame.',
+  detect: 'YOLOv11n board detection: locates the chessboard bounding box in the captured frame. Runs when the fingerprint changes or every 30 frames as a safety refresh.',
+  'detect-skip': 'Board detection was skipped this frame because the fingerprint outside the cached bbox was unchanged. The cached bbox from a previous frame is reused.',
+  crop: 'Slicing the detected board region out of the full captured frame into a smaller pixel buffer.',
+  preview: 'Encoding the cropped board into a JPEG data URL for the debug panel preview image. Runs in the renderer (canvas.toDataURL).',
+  changedet: 'Sampling the cropped board pixels and comparing them to the previous frame. When unchanged, recognition is skipped and the cached recognition result is reused.',
+  'yolo-prep': 'Preprocessing the cropped board for YOLO piece detection: resize to model input size and convert pixels to the float tensor layout the network expects.',
+  'yolo-infer': 'YOLOv11n piece detection forward pass: predicts piece class + bounding box for every piece on the cropped board. Usually the single most expensive stage on cold frames.',
+  'yolo-post': 'Post-processing YOLO outputs: NMS, confidence filtering, and mapping detected boxes to grid squares to build a 64-square piece array.',
+  pieces: 'Total recognition wrapper: orchestrates YOLO prep/infer/post plus per-square label assignment to produce the raw 64-square piece array.',
+  orient: 'Board orientation detection: piece-position heuristic + Tesseract OCR fallback to decide whether white is at the top or bottom of the captured board.',
+  highlights: 'Per-square highlight scoring. Compares each square\'s border-frame median color to the parity median to find squares tinted by the last-move highlight overlay.',
+  disamb: 'Highlight disambiguation: filters candidate squares to a legal (source, destination) pair by checking piece movement rules. Picks the most balanced and natural pair when several are legal.',
+  pawn: 'Refinement pass for pawn detections (which YOLO often confuses with empty squares or other pawns). Uses orientation + per-square cues to fix ambiguous pawn rows.',
+  turn: 'Decides whose turn it is from the highlighted source/destination squares and the piece on the destination — uppercase piece means White just moved, so it\'s Black\'s turn.',
+  fenbuild: 'Building the full 6-field FEN string (position + side to move + castling + en passant + clocks) from the recognized position and detected turn.',
+  gameover: 'Detecting checkmate or stalemate via chess.js (constructs a Chess instance from the FEN and asks isCheckmate / isStalemate).',
+  seqmove: 'Detecting the move that was played between the previous position and the current one (used to compute centipawn loss for the move that was played).',
+  ipc: 'Time the PipelineResult took to travel from the analysis renderer process to the overlay renderer process via Electron IPC (sent_at → received_at).',
+  render: 'DOM update time of the previous frame (board grid, eval bar, best moves, this debug panel). Shown for the previous frame because the current frame\'s render isn\'t finished until after this number is written.',
+  total: 'Whole-frame budget: pipeline work (capture → seq move) + IPC delivery + previous-frame render. At 2 FPS the budget per frame is 500ms; values above 500ms mean the next captured frame is dropped because the previous one was still processing.',
+  conf: 'YOLO recognition confidence (mean per-square classification probability) for the piece grid extracted on this frame. Below 30% the frame is shown as low-confidence and not evaluated.',
+  eval: 'Stockfish evaluation timing: depth of the most recently completed search and how many milliseconds that depth took. Eval runs asynchronously in the background and is not part of the per-frame budget.',
+  'recog-cached': 'Recognition was skipped because the cropped board pixels were unchanged from the previous frame; the previous recognition result was reused.',
+};
+
+function tip(text: string | undefined): string {
+  if (!text) return '';
+  // Quote-safe HTML attribute encoding for inline data-tip attributes.
+  const safe = text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return ` data-tip="${safe}"`;
+}
+
 function renderFrameTiming(container: HTMLElement, result: PipelineResult): void {
   const ft = result.frame_timing;
   if (!ft) {
@@ -453,7 +499,7 @@ function renderFrameTiming(container: HTMLElement, result: PipelineResult): void
   const stages: FtRow[] = [
     { key: 'capture', label: 'capture', ms: ft.capture_ms },
     { key: 'fingerprint', label: 'fingerprint', ms: ft.fingerprint_ms },
-    { key: 'detect', label: ft.detect_skipped ? 'detect (skip)' : 'detect', ms: ft.detect_ms, dim: ft.detect_skipped },
+    { key: ft.detect_skipped ? 'detect-skip' : 'detect', label: ft.detect_skipped ? 'detect (skip)' : 'detect', ms: ft.detect_ms, dim: ft.detect_skipped },
     { key: 'crop', label: 'crop', ms: ft.crop_ms },
     { key: 'preview', label: 'preview', ms: ft.preview_ms },
     { key: 'changedet', label: 'change det', ms: ft.change_detect_ms },
@@ -473,8 +519,8 @@ function renderFrameTiming(container: HTMLElement, result: PipelineResult): void
   const totalLevel = levelForTotal(total);
 
   const conf = result.recognition ? `${(result.recognition.confidence * 100).toFixed(0)}%` : '—';
-  const evalStr = ft.eval_depth != null && ft.eval_ms != null
-    ? `<span class="ft-eval">eval d${ft.eval_depth} · ${ft.eval_ms}ms</span>`
+  const evalText = ft.eval_depth != null && ft.eval_ms != null
+    ? `eval d${ft.eval_depth} · ${ft.eval_ms}ms`
     : '';
 
   // Stacked bar: each stage gets a slice proportional to its time. Min total
@@ -496,18 +542,21 @@ function renderFrameTiming(container: HTMLElement, result: PipelineResult): void
     const pct = (s.ms / maxRowMs) * 100;
     const dim = s.dim ? ' ft-row-dim' : '';
     return `<div class="ft-row${dim}">`
-      + `<span class="ft-label">${s.label}</span>`
+      + `<span class="ft-label"${tip(FT_TIPS[s.key])} data-tip-pos="left">${s.label}</span>`
       + `<span class="ft-rowbar"><span class="ft-rowbar-fill ft-${lvl}" style="width:${pct.toFixed(2)}%"></span></span>`
       + `<span class="ft-ms ft-ms-${lvl}">${s.ms}ms</span>`
       + `</div>`;
   }).join('');
 
   container.innerHTML =
-    `<div class="ft-total ft-${totalLevel}">`
+    `<div class="ft-total ft-${totalLevel}"${tip(FT_TIPS.total)} data-tip-pos="left">`
       + `<span class="ft-total-label">frame</span>`
       + `<span class="ft-total-ms">${total}ms</span>`
-      + `<span class="ft-meta">conf ${conf}${evalStr ? ' · ' : ''}${evalStr}</span>`
+      + `<span class="ft-meta">`
+        + `<span${tip(FT_TIPS.conf)} data-tip-pos="right">conf ${conf}</span>`
+        + (evalText ? ` · <span class="ft-eval"${tip(FT_TIPS.eval)} data-tip-pos="right">${evalText}</span>` : '')
+      + `</span>`
     + `</div>`
-    + `<div class="ft-stack" title="Stages summed to ${total}ms">${stackHtml}</div>`
+    + `<div class="ft-stack" data-tip="Each stage as a slice of the total ${total}ms frame budget. Hover any per-row label below for stage detail.">${stackHtml}</div>`
     + `<div class="ft-rows">${rowsHtml}</div>`;
 }

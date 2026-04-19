@@ -135,14 +135,14 @@
       </div>
 
       <div class="section-body debug-section" id="debug-section" data-section-id="debug" data-section-title="Debug">
-        <img id="cv-debug-img" src="" alt="Board capture">
-        <div class="fen" id="cv-debug-fen">Waiting...</div>
-        <div class="debug-orient" id="cv-orientation-info"></div>
+        <img id="cv-debug-img" src="" alt="Board capture" data-tip="JPEG preview of the cropped board pixels actually fed into the recognition pipeline. Useful for verifying the bbox is on the board and not on adjacent UI." data-tip-pos="below">
+        <div class="fen" id="cv-debug-fen" data-tip="Full FEN of the recognized position (with side to move, castling rights, en passant, halfmove clock and fullmove number) once eval has run; otherwise position-only.">Waiting...</div>
+        <div class="debug-orient" id="cv-orientation-info" data-tip="Detected board orientation (white at top vs bottom) and the signal that decided it: coord labels (OCR), pawn move direction, or piece-count heuristic."></div>
         <div class="meta" id="cv-debug-info"></div>
-        <div class="detection-status" id="cv-detection-status" style="display:none"></div>
+        <div class="detection-status" id="cv-detection-status" style="display:none" data-tip="Why the latest frame wasn't fully processed (e.g. mid-animation, low confidence, no highlights, intermediate frame)."></div>
         <div class="highlight-debug" id="cv-highlight-debug"></div>
         <div class="toggle-row">
-          <button class="toggle" id="cv-border-btn">Box</button>
+          <button class="toggle" id="cv-border-btn" data-tip="Draw a green rectangle around the detected board on the actual screen. Useful for verifying the bbox visually.">Box</button>
           <button class="toggle" id="cv-record-btn" data-tip="Dump raw captured frames to ~/chessray-recordings/ for test fixtures">● Record</button>
         </div>
       </div>
