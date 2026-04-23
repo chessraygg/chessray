@@ -1319,6 +1319,11 @@ function initOverlay(): void {
     userPanel?.classList.toggle('compact', on);
     compactBtn?.classList.toggle('active', on);
     if (compactHintEl) compactHintEl.textContent = on ? 'double-click to expand' : 'double-click to compact';
+    // Let the panel resize to fit its new content on mode switch. Without this
+    // the inline height set at startup (or by a previous resize) keeps the
+    // frame at the compact size when expanding — cramming headers and sections
+    // inside. Width is preserved (user's horizontal size preference).
+    if (userPanel) userPanel.style.height = '';
     savePrefs({ compactMode: on });
     if (on) updateCompactMoves();
   }
