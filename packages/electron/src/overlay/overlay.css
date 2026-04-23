@@ -640,7 +640,8 @@ canvas#video-overlay {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 2px;
+  top: 100%;
+  padding: 4px 0 0;
   text-align: center;
   font: 11px/1.2 var(--sans);
   color: var(--text-faint);
