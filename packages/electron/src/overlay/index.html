@@ -118,6 +118,10 @@
           <input type="range" id="cv-show-moves-delay" min="0" max="10" value="0" step="1">
           <span id="cv-show-moves-delay-val">0</span><span style="font-size:8px;color:var(--text-faint)">s</span>
         </div>
+        <div class="pv-depth-row">
+          <label data-tip="After showing top moves, automatically play the best line piece-by-piece on the virtual board.">PV autoplay</label>
+          <input type="checkbox" id="cv-pv-autoplay">
+        </div>
         <div class="pv-depth-row" id="cv-auto-delay-row">
           <label data-tip="Seconds to show top moves before switching to best line">Delay</label>
           <input type="range" id="cv-auto-delay" min="1" max="15" value="5" step="1">

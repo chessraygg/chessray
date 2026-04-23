@@ -1137,6 +1137,7 @@ function initOverlay(): void {
   const autoDelayVal = document.getElementById('cv-auto-delay-val');
 
   let autoDelaySec = prefs.autoDelaySec;
+  let pvAutoplay = prefs.pvAutoplay;
   let autoTimer: ReturnType<typeof setTimeout> | null = null;
 
   function resetAutoTimer(): void {
@@ -1148,6 +1149,8 @@ function initOverlay(): void {
     pvCycleStop();
     renderArrows(state);
     renderVideoOverlay(state);
+
+    if (!pvAutoplay) return;
 
     autoTimer = setTimeout(() => {
       autoTimer = null;
@@ -1174,6 +1177,22 @@ function initOverlay(): void {
       resetAutoTimer();
     });
   }
+
+  const pvAutoplayCheckbox = document.getElementById('cv-pv-autoplay') as HTMLInputElement | null;
+  const autoDelayRow = document.getElementById('cv-auto-delay-row');
+  function applyPvAutoplayUI(): void {
+    if (autoDelayRow) autoDelayRow.style.display = pvAutoplay ? '' : 'none';
+  }
+  if (pvAutoplayCheckbox) {
+    pvAutoplayCheckbox.checked = pvAutoplay;
+    pvAutoplayCheckbox.addEventListener('change', () => {
+      pvAutoplay = pvAutoplayCheckbox.checked;
+      savePrefs({ pvAutoplay });
+      applyPvAutoplayUI();
+      resetAutoTimer();
+    });
+  }
+  applyPvAutoplayUI();
 
 
   // ── Collapse panel ──

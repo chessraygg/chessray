@@ -13,6 +13,8 @@ export interface Prefs {
   panelScale: number;
   collapsed: boolean;
   autoDelaySec: number;
+  /** When true, auto-play the PV piece-by-piece animation after the top-moves delay. */
+  pvAutoplay: boolean;
   pvGrowDelaySec: number;
   /** Seconds the PV preview phase (single highlighted move, others hidden)
    *  stays visible before the per-step PV animation starts. */
@@ -43,6 +45,7 @@ export const DEFAULT_PREFS: Prefs = {
   overlayVisible: true,
   borderVisible: false,
   autoDelaySec: 5,
+  pvAutoplay: false,
   pvGrowDelaySec: 3,
   pvPreviewSec: 1,
   showMovesDelaySec: 0,
