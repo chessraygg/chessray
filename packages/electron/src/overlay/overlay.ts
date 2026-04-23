@@ -450,14 +450,12 @@ function initOverlay(): void {
       if (resizing) {
         resizing = false;
         document.body.style.userSelect = '';
-        const w = userPanel!.offsetWidth;
-        const h = userPanel!.offsetHeight;
-        const left = userPanel!.offsetLeft;
-        const top = userPanel!.offsetTop;
-        const inCompact = userPanel!.classList.contains('compact');
-        savePrefs(inCompact
-          ? { compactPanelWidth: w, compactPanelHeight: h, panelLeft: left, panelTop: top }
-          : { panelWidth: w, panelHeight: h, panelLeft: left, panelTop: top });
+        savePrefs({
+          panelWidth: userPanel!.offsetWidth,
+          panelHeight: userPanel!.offsetHeight,
+          panelLeft: userPanel!.offsetLeft,
+          panelTop: userPanel!.offsetTop,
+        });
       }
     });
   }
@@ -1317,33 +1315,10 @@ function initOverlay(): void {
   const compactHintEl = document.getElementById('cv-compact-hint');
   function setCompactMode(on: boolean): void {
     if (on && collapsed) setCollapsed(false);
-    if (!userPanel) { compactMode = on; return; }
-    // Save the outgoing mode's current size, then restore the incoming mode's
-    // stored size (if any). This prevents the non-compact view from being
-    // squeezed into the compact frame when the user expands.
-    const curW = userPanel.offsetWidth;
-    const curH = userPanel.offsetHeight;
-    if (compactMode !== on) {
-      if (compactMode) savePrefs({ compactPanelWidth: curW, compactPanelHeight: curH });
-      else savePrefs({ panelWidth: curW, panelHeight: curH });
-    }
     compactMode = on;
-    userPanel.classList.toggle('compact', on);
+    userPanel?.classList.toggle('compact', on);
     compactBtn?.classList.toggle('active', on);
     if (compactHintEl) compactHintEl.textContent = on ? 'double-click to expand' : 'double-click to compact';
-    const prefsNow = loadPrefs();
-    const targetW = on ? prefsNow.compactPanelWidth : prefsNow.panelWidth;
-    const targetH = on ? prefsNow.compactPanelHeight : prefsNow.panelHeight;
-    // Non-compact: always apply an explicit size (fall back to CSS default if
-    // no stored pref). Compact: only apply if the user previously resized
-    // while compact — otherwise let the compact CSS auto-size the frame.
-    if (on) {
-      userPanel.style.width = targetW != null ? `${targetW}px` : '';
-      userPanel.style.height = targetH != null ? `${targetH}px` : '';
-    } else {
-      if (targetW != null) userPanel.style.width = `${targetW}px`;
-      if (targetH != null) userPanel.style.height = `${targetH}px`;
-    }
     savePrefs({ compactMode: on });
     if (on) updateCompactMoves();
   }
