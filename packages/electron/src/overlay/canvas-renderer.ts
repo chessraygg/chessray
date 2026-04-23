@@ -43,11 +43,12 @@ export interface OverlayState {
   /** Line index of the arrow currently under the mouse (either canvas), or null.
    *  Drives hover emphasis: hovered arrow → opacity 1.0, others → dimmed. */
   hoveredArrowIndex: number | null;
-  /** User-configurable arrow knobs. `arrowMaxWidth` is the best-move (rank 0)
-   *  width at the canonical 192px board; other ranks scale proportionally.
-   *  `arrowMaxOpacity` is the uniform alpha applied to every arrow. */
-  arrowMaxWidth: number;
-  arrowMaxOpacity: number;
+  /** User-configurable decoration knobs — apply to arrows, PV step labels,
+   *  and played-move markers. `overlaySize` is the best-move arrow width at
+   *  the canonical 192px board (other ranks/marker radii scale proportionally
+   *  against the 5px baseline). `overlayOpacity` is the uniform alpha. */
+  overlaySize: number;
+  overlayOpacity: number;
   panelScale: number;
   boardScale: number;
   displayInfo: {
@@ -493,6 +494,10 @@ function drawPlayedMoveMarker(
   /** Multiplied into every globalAlpha so the marker can pulse in lockstep
    *  with the previewed line (1 = unchanged). */
   opacityMul: number = 1,
+  /** User-pref scales: `sizeScale` multiplies the marker radius/font,
+   *  `opacityScale` multiplies the uniform alpha (stacks with opacityMul). */
+  sizeScale: number = 1,
+  opacityScale: number = 1,
 ): void {
   const squareW = board.width / 8;
   const squareH = board.height / 8;
@@ -502,21 +507,22 @@ function drawPlayedMoveMarker(
 
   const cx = board.x + (file + 0.5) * squareW;
   const cy = board.y + (7 - rank + 0.5) * squareH;
+  const alphaK = opacityMul * opacityScale;
 
   if (lossCp < 10) {
     // Excellent move — white checkmark inside a translucent green disk
-    const r = Math.min(squareW, squareH) * 0.22;
+    const r = Math.min(squareW, squareH) * 0.22 * sizeScale;
     const size = r * 1.25;
     const strokeW = Math.max(2, r * 0.28);
 
     ctx.save();
-    ctx.globalAlpha = 0.5 * opacityMul;
+    ctx.globalAlpha = 0.5 * alphaK;
     ctx.fillStyle = '#22c55e';
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.globalAlpha = 0.55 * opacityMul;
+    ctx.globalAlpha = 0.55 * alphaK;
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = strokeW;
     ctx.lineCap = 'round';
@@ -531,12 +537,12 @@ function drawPlayedMoveMarker(
   }
 
   // Loss badge — colored disk with centipawn loss text inside
-  const fontSize = Math.max(7, Math.round(Math.min(squareW, squareH) * 0.20));
+  const fontSize = Math.max(7, Math.round(Math.min(squareW, squareH) * 0.20 * sizeScale));
   const r = fontSize * 1.25;
   const color = lossToColor(lossCp);
 
   ctx.save();
-  ctx.globalAlpha = 0.7 * opacityMul;
+  ctx.globalAlpha = 0.7 * alphaK;
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -547,7 +553,7 @@ function drawPlayedMoveMarker(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const text = `−${(lossCp / 100).toFixed(1)}`;
-  ctx.globalAlpha = 1 * opacityMul;
+  ctx.globalAlpha = alphaK;
   ctx.lineJoin = 'round';
   ctx.lineWidth = Math.max(2, fontSize * 0.18);
   ctx.strokeStyle = '#000';
@@ -798,9 +804,10 @@ export function renderArrows(state: OverlayState): void {
   }
 
   // Mark the played move's target square (on the moved piece) with a loss-colored dot
+  const userSizeScale = state.overlaySize / 5;
   if (state.currentResult?.played_move) {
     const pm = state.currentResult.played_move;
-    drawPlayedMoveMarker(ctx, pm.to, pm.loss_cp, virtualBoard, state.displayFlipped);
+    drawPlayedMoveMarker(ctx, pm.to, pm.loss_cp, virtualBoard, state.displayFlipped, 1, userSizeScale, state.overlayOpacity);
   }
 
   const targetArrows = getActiveArrows(state);
@@ -818,8 +825,8 @@ export function renderArrows(state: OverlayState): void {
   }
 
   // Apply user opacity pref to the fade-in target so animated.fadeOpacity ramps
-  // toward the user's max, and keep user width pref as a widthScale multiplier.
-  const scaledTargets = targetArrows.map(a => ({ ...a, opacity: state.arrowMaxOpacity }));
+  // toward the user's max, and keep user size pref as a widthScale multiplier.
+  const scaledTargets = targetArrows.map(a => ({ ...a, opacity: state.overlayOpacity }));
   const animated = updateAnimatedArrows(scaledTargets, vboardArrowState, () => renderArrows(state));
   const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
 
@@ -827,7 +834,7 @@ export function renderArrows(state: OverlayState): void {
   vboardHitCache.arrows = [];
   vboardHitCache.animBoardRect = null;
   const hoveredIdx = state.hoveredArrowIndex;
-  const userWidthMult = state.arrowMaxWidth / 5;
+  const userWidthMult = state.overlaySize / 5;
   for (let i = drawList.length - 1; i >= 0; i--) {
     const isLineArrow = !!drawList[i].arrow.label;
     const arrow = drawList[i].arrow;
@@ -860,7 +867,7 @@ export function renderArrows(state: OverlayState): void {
       const idx = Math.min(state.pvPreviewLineIndex!, moves.length - 1);
       const move = moves[idx];
       const to = move.move.slice(2, 4);
-      drawPlayedMoveMarker(ctx, to, move.loss_cp, virtualBoard, state.displayFlipped, pulse);
+      drawPlayedMoveMarker(ctx, to, move.loss_cp, virtualBoard, state.displayFlipped, pulse, userSizeScale, state.overlayOpacity);
     }
   }
 }
@@ -954,18 +961,19 @@ export function renderVideoOverlay(state: OverlayState): void {
   } else {
     videoHitCache.animBoardRect = null;
     // Mark the played move's target square (on the moved piece) with a loss-colored dot
+    const userSizeScaleVideo = state.overlaySize / 5;
     if (result.played_move) {
       const pm = result.played_move;
-      drawPlayedMoveMarker(ctx, pm.to, pm.loss_cp, boardRect, state.displayFlipped);
+      drawPlayedMoveMarker(ctx, pm.to, pm.loss_cp, boardRect, state.displayFlipped, 1, userSizeScaleVideo, state.overlayOpacity);
     }
 
     if (state.arrowsVisible || state.pvPreviewLineIndex !== null) {
       const targetArrows = getActiveArrows(state);
       // Apply user opacity pref as the fade-in target.
-      const scaledTargets = targetArrows.map(a => ({ ...a, opacity: state.arrowMaxOpacity }));
+      const scaledTargets = targetArrows.map(a => ({ ...a, opacity: state.overlayOpacity }));
       const animated = updateAnimatedArrows(scaledTargets, videoArrowState, () => renderVideoOverlay(state));
       const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
-      const userWidthMult = state.arrowMaxWidth / 5;
+      const userWidthMult = state.overlaySize / 5;
       const arrowScale = (bw + bh) / 2 / 192 * userWidthMult;
       const isPreview = state.pvPreviewLineIndex !== null;
       const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
@@ -1001,7 +1009,7 @@ export function renderVideoOverlay(state: OverlayState): void {
           const idx = Math.min(state.pvPreviewLineIndex!, result.evaluation.top_moves.length - 1);
           const move = result.evaluation.top_moves[idx];
           const to = move.move.slice(2, 4);
-          drawPlayedMoveMarker(ctx, to, move.loss_cp, boardRect, state.displayFlipped, pulse);
+          drawPlayedMoveMarker(ctx, to, move.loss_cp, boardRect, state.displayFlipped, pulse, userSizeScaleVideo, state.overlayOpacity);
         }
       }
     } else {

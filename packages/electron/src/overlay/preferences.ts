@@ -39,12 +39,14 @@ export interface Prefs {
   gravityUp: boolean;
   /** Debug section's board-preview image scale, percent of panel width (25..200). */
   debugImgScale: number;
-  /** Best-move (rank 0) arrow width at the canonical 192px board size. Other
-   *  ranks scale proportionally, preserving the current 5:4:3 ratio. */
-  arrowMaxWidth: number;
-  /** Uniform alpha applied to every arrow. Color carries quality; this knob
-   *  just adjusts overall presence. */
-  arrowMaxOpacity: number;
+  /** Scales every on-board decoration: best-move arrow width (rank 0), PV step
+   *  label circle, and played-move markers. Other arrow ranks keep the 5:4:3
+   *  ratio. Value is the target best-move arrow width in px at the canonical
+   *  192px board size (5 = previous default). */
+  overlaySize: number;
+  /** Uniform alpha applied to every on-board decoration (arrows, step labels,
+   *  played-move markers). Color carries quality; this is just presence. */
+  overlayOpacity: number;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -78,14 +80,27 @@ export const DEFAULT_PREFS: Prefs = {
   sectionLayout: null,
   gravityUp: true,
   debugImgScale: 100,
-  arrowMaxWidth: 5,
-  arrowMaxOpacity: 0.85,
+  overlaySize: 5,
+  overlayOpacity: 0.85,
 };
 
 export function loadPrefs(): Prefs {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    if (raw) return { ...DEFAULT_PREFS, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<Prefs> & {
+        arrowMaxWidth?: number; arrowMaxOpacity?: number;
+      };
+      // Migration: the arrow-only knobs were renamed when their scope expanded
+      // to all on-board decorations. Copy legacy values forward.
+      if (parsed.arrowMaxWidth != null && parsed.overlaySize == null) {
+        parsed.overlaySize = parsed.arrowMaxWidth;
+      }
+      if (parsed.arrowMaxOpacity != null && parsed.overlayOpacity == null) {
+        parsed.overlayOpacity = parsed.arrowMaxOpacity;
+      }
+      return { ...DEFAULT_PREFS, ...parsed };
+    }
   } catch { /* ignore */ }
   return { ...DEFAULT_PREFS };
 }

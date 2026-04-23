@@ -147,14 +147,14 @@
           <input type="checkbox" id="cv-change-detect" checked>
         </div>
         <div class="pv-depth-row">
-          <label data-tip="Best-move arrow width (pixels at the canonical board size). Other ranks scale proportionally.">Arrow size</label>
-          <input type="range" id="cv-arrow-max-width" min="3" max="10" value="5" step="1">
-          <span id="cv-arrow-max-width-val">5</span>
+          <label data-tip="Size of all on-board decorations: arrows, PV move numbers, and played-move markers.">Overlay size</label>
+          <input type="range" id="cv-overlay-size" min="3" max="10" value="5" step="1">
+          <span id="cv-overlay-size-val">5</span>
         </div>
         <div class="pv-depth-row">
-          <label data-tip="Uniform opacity applied to every arrow (color still carries quality).">Arrow opacity</label>
-          <input type="range" id="cv-arrow-max-opacity" min="20" max="100" value="85" step="5">
-          <span id="cv-arrow-max-opacity-val">85</span><span style="font-size:8px;color:var(--text-faint)">%</span>
+          <label data-tip="Opacity of all on-board decorations: arrows, PV move numbers, and played-move markers. Color still carries quality.">Overlay opacity</label>
+          <input type="range" id="cv-overlay-opacity" min="20" max="100" value="85" step="5">
+          <span id="cv-overlay-opacity-val">85</span><span style="font-size:8px;color:var(--text-faint)">%</span>
         </div>
       </div>
 
