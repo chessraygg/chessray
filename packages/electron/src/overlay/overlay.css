@@ -637,12 +637,14 @@ canvas#video-overlay {
   -webkit-backdrop-filter: none;
 }
 .compact-hint {
-  display: block;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
   text-align: center;
   font: 11px/1.2 var(--sans);
   color: var(--text-faint);
   opacity: 0;
-  padding: 5px 0 2px;
   user-select: none;
   transition: opacity 0.15s;
   pointer-events: none;
