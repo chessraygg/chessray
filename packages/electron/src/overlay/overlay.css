@@ -616,12 +616,26 @@ canvas#video-overlay {
 .panel.compact .top-bar { display: none; }
 .panel.compact .section-header { display: none; }
 .panel.compact .leaf { background: transparent; border: none; }
-.panel.compact .leaf:not([data-leaf-id="board"]) { display: none; }
 .panel.compact .leaf-body { padding: 2px; }
 .panel.compact .splitter { display: none; }
 .panel.compact .hidden-tray { display: none; }
 .panel.compact .compact-moves { display: flex !important; }
 .panel.compact { padding: 4px; }
+/* Don't reserve 200px for an empty split-root in compact mode — that was the
+ * "blank section" above the double-click hint when all sections are hidden. */
+.panel.compact .split-root { min-height: 0; }
+.panel.compact .split-root:empty { display: none; }
+/* When no sections are visible, collapse panel to just the hint (invisible
+ * frame — user can still double-click the hint to exit compact). */
+.panel.compact:has(.split-root:empty) {
+  height: auto !important;
+  width: auto !important;
+  min-width: 0;
+  background: transparent;
+  border-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 .compact-hint { display: none; }
 .panel.compact .compact-hint {
   display: block;
