@@ -638,13 +638,18 @@ canvas#video-overlay {
 }
 .compact-hint {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 50%;
   top: 100%;
-  padding: 4px 0 0;
-  text-align: center;
+  transform: translate(-50%, 4px);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  white-space: nowrap;
   font: 11px/1.2 var(--sans);
-  color: var(--text-faint);
+  color: var(--text);
   opacity: 0;
   user-select: none;
   transition: opacity 0.15s;
