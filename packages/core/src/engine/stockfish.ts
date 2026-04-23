@@ -214,6 +214,14 @@ export class StockfishEngine {
     signal?: AbortSignal,
   ): Promise<EvalResult | null> {
     return new Promise<EvalResult | null>((resolve) => {
+      // Keep the engine's MultiPV in sync with the caller's request. Without
+      // this, direct runDepth() callers (bypassing run()) get the defaultMultiPV
+      // set during UCI init — so ramp-up past the starting N silently returns
+      // fewer PV lines than requested.
+      if (multiPV !== this.defaultMultiPV) {
+        this.send(`setoption name MultiPV value ${multiPV}`);
+        this.defaultMultiPV = multiPV;
+      }
       const startTime = Date.now();
       // Safety timeout: 5 minutes. Normal cancellation uses AbortSignal.
       const timeout = setTimeout(() => {
