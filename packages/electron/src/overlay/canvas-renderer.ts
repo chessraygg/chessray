@@ -752,7 +752,9 @@ export function renderArrows(state: OverlayState): void {
   const isPreview = state.pvPreviewLineIndex !== null;
 
   if (targetArrows.length === 0 && !state.currentResult?.played_move && !isPreview) {
-    vboardArrowState.animated = [];
+    // Nothing to draw, but keep `.animated` intact so arrows that return later
+    // (e.g. after playback, loss-threshold change, visibility toggle) are
+    // matched by from-to and stay steady instead of re-growing from source.
     if (vboardArrowState.timer) { clearInterval(vboardArrowState.timer); vboardArrowState.timer = 0; }
     ensurePulseTimer('vboard', false, () => renderArrows(state));
     vboardHitCache.arrows = [];
@@ -869,8 +871,9 @@ export function renderVideoOverlay(state: OverlayState): void {
   // During PV animation, draw analysis board (background + pieces + animated arrow)
   if (state.pvBoardState) {
     drawAnalysisBoard(ctx, boardRect, state.pvBoardState);
-    // Clear normal arrow animation state while analysis board is active
-    videoArrowState.animated = [];
+    // Pause the fade timer while the analysis board is active, but keep
+    // `.animated` intact so that when playback ends the same arrows re-appear
+    // at progress=1 (steady) instead of re-growing from source.
     if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
     // Arrows aren't visible during animation — hit-test the board region instead
     // so a click anywhere on the animated board resets the animation.
@@ -927,8 +930,9 @@ export function renderVideoOverlay(state: OverlayState): void {
         }
       }
     } else {
-      // Clear animation state when arrows are hidden
-      videoArrowState.animated = [];
+      // Arrows hidden (e.g. during the brief gap between PV steps, or while
+      // arrowsVisible=false with no preview). Pause the fade timer but keep
+      // `.animated` so the same arrows resume steady when they reappear.
       if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
       ensurePulseTimer('video', false, () => renderVideoOverlay(state));
       videoHitCache.arrows = [];
