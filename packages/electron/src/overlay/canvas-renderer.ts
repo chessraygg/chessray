@@ -721,25 +721,36 @@ export function drawArrow(
     ctx.fill();
   }
 
-  // Draw label at midpoint of arrow (only when fully extended)
+  // Step-number label — a dark pill with a colored identity ring, drawn at
+  // the arrow's midpoint. Stays fully opaque regardless of arrow alpha so it
+  // remains legible even when the host arrow is hover-dimmed or mid-fade.
   if (arrow.label && t >= 1) {
-    const fontSize = Math.max(8, lineWidth * 2);
+    const fontSize = Math.max(9, lineWidth * 2);
+    const r = fontSize * 0.85;
+    const strokeW = Math.max(1.5, fontSize * 0.14);
+    const ox = curveOffset === 0 ? (x1 + x2) / 2 : mx;
+    const oy = curveOffset === 0 ? (y1 + y2) / 2 : my;
+
+    // Solid near-black pill (independent of arrow.opacity).
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = '#0f0f0f';
+    ctx.beginPath();
+    ctx.arc(ox, oy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Colored ring ties the pill to the arrow's line.
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = arrow.color;
+    ctx.lineWidth = strokeW;
+    ctx.beginPath();
+    ctx.arc(ox, oy, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Bold white number.
     ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.globalAlpha = arrow.opacity;
-    const r = fontSize * 0.55;
-    // Midpoint: for curved arrows use the control point, for straight use midpoint
-    const ox = curveOffset === 0 ? (x1 + x2) / 2 : mx;
-    const oy = curveOffset === 0 ? (y1 + y2) / 2 : my;
-    ctx.beginPath();
-    ctx.arc(ox, oy, r, 0, Math.PI * 2);
-    ctx.fillStyle = arrow.color;
-    ctx.fill();
-    // Contrast text: dark on light circles, white on dark circles
-    const hex = arrow.color.replace('#', '');
-    const lum = (parseInt(hex.substring(0, 2), 16) * 299 + parseInt(hex.substring(2, 4), 16) * 587 + parseInt(hex.substring(4, 6), 16) * 114) / 1000;
-    ctx.fillStyle = lum > 140 ? '#000' : '#fff';
+    ctx.fillStyle = '#fff';
     ctx.fillText(arrow.label, ox, oy);
   }
 
