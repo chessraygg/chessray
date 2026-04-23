@@ -101,6 +101,13 @@ export async function recognizeBoard(
   let t = Date.now();
   const pieceCount = rawFen.replace(/[0-8/]/g, '').length;
   const pieceCountReliable = pieceCount >= 20;
+  // Pawn-move orientation refinement is only active for pawn-endgame-density
+  // positions. Above this, piece-count is trustworthy enough on its own that
+  // a misdirected pawn-move inference could flip a correctly-detected board.
+  // Below this (≈ pawn endgame), piece-count is shaky and the direction of
+  // a pawn's move is a strong enough cue to override it.
+  const PAWN_REFINE_MAX_PIECES = 10;
+  const pawnRefineEligible = pieceCount <= PAWN_REFINE_MAX_PIECES;
   let orientation: OrientationResult;
   let labelsResult: BoardRecognitionResult['labels'];
   let labelDetectionResult: LabelDetectionResult | null = null;
@@ -128,11 +135,12 @@ export async function recognizeBoard(
   const firstAttempt = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians, orientation.flipped);
   let highlightedSquares = firstAttempt.highlighted;
   let disambiguationTrace: DisambiguationTrace = firstAttempt.trace;
-  // When the initial orientation guess (piece_count with low piece count) is
-  // unreliable AND no legal pair was found, retry with the flipped orientation
-  // so pawn_move refinement below can pick up the correct flip.
+  // When the initial piece-count guess is in the pawn-endgame density band
+  // AND no legal pair was found, retry with the flipped orientation so the
+  // pawn-move refinement below can pick up the correct flip. Outside that
+  // band we trust piece-count and don't second-guess it here.
   if (highlightedSquares.length === 0 && hlResult.highlighted.length > 0
-      && orientation.source === 'piece_count' && !pieceCountReliable) {
+      && orientation.source === 'piece_count' && pawnRefineEligible) {
     const flippedTry = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians, !orientation.flipped);
     if (flippedTry.highlighted.length === 2) {
       highlightedSquares = flippedTry.highlighted;
@@ -144,10 +152,12 @@ export async function recognizeBoard(
   const tDisambiguate = Date.now() - t;
 
   // Step 4: Refine orientation using pawn move direction from highlights.
-  // Only needed for sparse positions (<20 pieces) where piece_count is unreliable.
-  // With 20+ pieces, piece_count is reliable. Labels and cache are always reliable.
+  // Only active in the pawn-endgame density band (≤ PAWN_REFINE_MAX_PIECES).
+  // At higher density piece-count is trustworthy and a misleading pawn-move
+  // inference could flip a correctly-detected orientation. Labels / cache
+  // outcomes are always trusted and never re-refined.
   t = Date.now();
-  if (orientation.source === 'piece_count' && !pieceCountReliable && highlightedSquares.length === 2) {
+  if (orientation.source === 'piece_count' && pawnRefineEligible && highlightedSquares.length === 2) {
     const fenRows = rawFen.split('/');
     const fenBoard: (string | null)[] = new Array(64).fill(null);
     for (let r = 0; r < 8; r++) {
