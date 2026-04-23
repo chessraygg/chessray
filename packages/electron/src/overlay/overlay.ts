@@ -1257,8 +1257,11 @@ function initOverlay(): void {
     compactMovesEl.querySelectorAll('.compact-move').forEach(el => {
       el.addEventListener('click', () => {
         const idx = parseInt((el as HTMLElement).dataset.line!, 10);
-        // Toggle lock: click same = unlock (stop PV, show top moves), click different = lock + animate
-        if (userLockedLine === idx) {
+        // "This line is currently playing" uses live state, not userLockedLine
+        // (userLockedLine can be reset by processPendingResult on eval-FEN change,
+        // which caused the toggle to need two clicks to take effect).
+        const playingThis = state.lineVisible && state.selectedLineIndex === idx;
+        if (playingThis) {
           userLockedLine = -1;
           (window as any).__chessrayPvPlayStop?.();
           state.arrowsVisible = true;
