@@ -92,6 +92,11 @@ export class FrameProcessor {
   private lastSquareColors: PipelineResult['square_colors'] | undefined;
   private lastHighlightDebug: PipelineResult['highlight_debug'] | undefined;
   private lastArrows: ArrowDescriptor[] = [];
+  /** Sticky game-over flag for the current `lastPositionFen`. Once set we keep
+   *  asserting it on dedup / intermediate-frame re-emissions so the overlay
+   *  pill doesn't flicker across frames that short-circuit before the normal
+   *  game-over check runs. Cleared when a new position is accepted. */
+  private lastGameOver: GameOver | undefined = undefined;
   private lastFullFen: string | null = null;
   private lastPlayedMove: PipelineResult['played_move'] = null;
   private cachedOrientation: { prevFen: string; orientation: { flipped: boolean; source: OrientationSource } } | null = null;
@@ -514,7 +519,7 @@ export class FrameProcessor {
       if (this.lastPositionFen && compareFen(this.lastPositionFen, positionFen) && !evalTurnMismatch) {
         detectionStatus = 'Position unchanged';
         log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [dedup] total=${Date.now() - startTime}ms`);
-        sendResult(makeResult(evalDisplayOpts()));
+        sendResult(makeResult({ ...evalDisplayOpts(), game_over: this.lastGameOver }));
         return;
       }
       if (evalTurnMismatch) {
@@ -615,10 +620,22 @@ export class FrameProcessor {
       tGameOver = Date.now() - t;
 
       if (gameOver) {
+        // Latch the position so subsequent frames dedup against it (instead of
+        // classifying the same FEN as "intermediate", which caused the overlay
+        // pill to flicker: the old code only emitted `game_over` on a single
+        // frame per 800ms intermediate-release cycle). Stickying `lastGameOver`
+        // ensures dedup / intermediate re-emissions carry the flag too.
+        this.prevPositionFen = positionFen;
+        this.lastPositionFen = positionFen;
+        this.lastFullFen = fullFen;
+        this.lastGameOver = gameOver;
         log(`Game over: ${gameOver}`);
         sendResult(makeResult({ game_over: gameOver }));
         return;
       }
+      // Reaching here means the current position is NOT game-over — drop any
+      // stale sticky flag from an earlier position.
+      this.lastGameOver = undefined;
 
       t = Date.now();
       this.lastPlayedMove = null;

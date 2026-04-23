@@ -968,9 +968,12 @@ export function renderVideoOverlay(state: OverlayState): void {
   // Gate the entire actual-board overlay on recognition confidence. Matches
   // the analysis pipeline's own low-confidence threshold (0.3) so that a
   // transient misread doesn't paint arrows/eval-bar over a board we can't
-  // actually read. Canvas was cleared above, so returning here hides the overlay.
+  // actually read. Exception: if the position is game-over (checkmate /
+  // stalemate), keep rendering the dim + corner pill so it doesn't flicker
+  // off on low-confidence frames — the game has ended, the board isn't
+  // changing. Canvas was cleared above, so returning here hides the overlay.
   const recogConfidence = result.recognition?.confidence ?? 0;
-  if (recogConfidence < 0.3) {
+  if (recogConfidence < 0.3 && !result.game_over) {
     videoHitCache.arrows = [];
     videoHitCache.animBoardRect = null;
     if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
