@@ -1364,8 +1364,13 @@ let lastEvalDepth: number = 0;
 function selectLine(index: number): void {
   state.selectedLineIndex = index;
   if (state.currentResult) {
-    // Restart grow from 2 when a different line is selected
-    if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
+    // User explicitly picked a line — play its PV animation regardless of the
+    // autoplay setting (autoplay only controls whether PVs start on their own
+    // after the top-moves delay).
+    (window as any).__chessrayClearAutoTimer?.();
+    state.arrowsVisible = false;
+    state.lineVisible = true;
+    (window as any).__chessrayPvGrowStart?.();
     const snap = historyIndex !== null ? snapshotToResult(debugHistory[historyIndex]) : null;
     updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine, snap);
     renderArrows(state);
