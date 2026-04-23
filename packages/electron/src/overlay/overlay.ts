@@ -695,14 +695,15 @@ function initOverlay(): void {
     if (indices.length === 0) return;
 
     if (userLockedLine >= 0) {
-      // Locked: repeat same line
-      pvCycleLineIndex = userLockedLine;
-    } else {
-      // Advance to next line in the cycle
-      const curPos = indices.indexOf(pvCycleLineIndex);
-      const nextPos = (curPos + 1) % indices.length;
-      pvCycleLineIndex = indices[nextPos];
+      // User explicitly picked this line (arrow/pill click) — play once and
+      // stop; do not loop. Auto-cycle (userLockedLine < 0) keeps rotating.
+      stopPvLine();
+      return;
     }
+    // Advance to next line in the cycle
+    const curPos = indices.indexOf(pvCycleLineIndex);
+    const nextPos = (curPos + 1) % indices.length;
+    pvCycleLineIndex = indices[nextPos];
     state.selectedLineIndex = pvCycleLineIndex;
 
     // Exit analysis view for the interlude
