@@ -283,8 +283,13 @@
       ctx.restore();
     }
 
-    /** 5. Tapered ribbon — width grows from source (thin) to target (full), brush-stroke feel. */
-    function drawTapered(ctx, p1, p2, rgb, width, opacity) {
+    /** 5. Tapered ribbon — width grows from source (thin) to target (full), brush-stroke feel.
+     *  Opacity is UNIFORM across the ribbon and the same for every arrow — color
+     *  carries 100% of the quality signal; width carries rank; opacity is just
+     *  "presence", tuned for readability over any square. */
+    function drawTapered(ctx, p1, p2, rgb, _widthOpacity, _rankOpacity) {
+      const width = _widthOpacity; // keep the rank-scaled width
+      const opacity = 0.85;        // flat for all arrows
       const segments = 30;
       const head = width * 2.2;
       const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
@@ -434,8 +439,8 @@
         fn: drawNeon,
       },
       {
-        key: 'tapered', title: 'Tapered ribbon', tag: 'directional', highlight: true,
-        blurb: 'Width grows from thin at source to full at target. Reads direction instantly.',
+        key: 'tapered', title: 'Tapered ribbon', tag: 'chosen', highlight: true,
+        blurb: 'Width grows thin → full toward target (direction cue). Opacity is uniform across all arrows — color does 100% of the quality signaling; width carries rank.',
         fn: drawTapered,
       },
       {
