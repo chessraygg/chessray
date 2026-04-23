@@ -616,8 +616,10 @@ canvas#video-overlay {
 .panel.compact .top-bar { display: none; }
 .panel.compact .section-header { display: none; }
 .panel.compact .leaf { background: transparent; border: none; }
+.panel.compact .leaf:not([data-leaf-id="board"]) { display: none; }
 .panel.compact .leaf-body { padding: 2px; }
 .panel.compact .splitter { display: none; }
+.panel.compact .hidden-tray { display: none; }
 .panel.compact .compact-moves { display: flex !important; }
 .panel.compact { padding: 4px; }
 .compact-hint { display: none; }
