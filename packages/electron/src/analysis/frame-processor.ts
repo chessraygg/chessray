@@ -248,6 +248,18 @@ export class FrameProcessor {
       const visuallyUnchanged = this.changeDetectEnabled && this.lastBoardSample && boardUnchanged(this.lastBoardSample, boardSample);
       const prevBoardSample = this.lastBoardSample;
       this.lastBoardSample = boardSample;
+      // Snapshot the committed per-frame state before any fresh-recognition
+      // updates overwrite `this.last*`. The intermediate-frame branch needs
+      // to emit the PREVIOUS committed recognition (not whatever recognition
+      // just ran this frame) so the overlay doesn't see the recog FEN change
+      // mid-move and wipe its arrow animation state.
+      const prevRecognitionResult = this.lastRecognitionResult;
+      const prevRawFen = this.lastRawFen;
+      const prevIsFlipped = this.lastIsFlipped;
+      const prevOrientationSource = this.lastOrientationSource;
+      const prevHighlightedSquaresCommitted = this.lastHighlightedSquares.slice();
+      const prevHighlightTurn = this.lastHighlightTurn;
+      const prevSquareColors = this.lastSquareColors;
       const tChangeDetect = Date.now() - t;
 
       let recognition: RecognitionResult | null = null;
@@ -545,13 +557,20 @@ export class FrameProcessor {
             detectionStatus = 'Intermediate frame — highlights unchanged';
             log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [intermediate, skipped, ${now - this.intermediatePendingTs}ms] total=${Date.now() - startTime}ms`);
             this.lastBoardSample = prevBoardSample;
-            recognition = this.lastRecognitionResult;
-            rawFen = this.lastRawFen;
-            isFlipped = this.lastIsFlipped;
-            orientationSource = this.lastOrientationSource;
-            highlightedSquares = this.lastHighlightedSquares;
-            highlightTurn = this.lastHighlightTurn;
-            squareColors = this.lastSquareColors;
+            this.lastRecognitionResult = prevRecognitionResult;
+            this.lastRawFen = prevRawFen;
+            this.lastIsFlipped = prevIsFlipped;
+            this.lastOrientationSource = prevOrientationSource;
+            this.lastHighlightedSquares = prevHighlightedSquaresCommitted;
+            this.lastHighlightTurn = prevHighlightTurn;
+            this.lastSquareColors = prevSquareColors;
+            recognition = prevRecognitionResult;
+            rawFen = prevRawFen;
+            isFlipped = prevIsFlipped;
+            orientationSource = prevOrientationSource;
+            highlightedSquares = prevHighlightedSquaresCommitted;
+            highlightTurn = prevHighlightTurn;
+            squareColors = prevSquareColors;
             sendResult(makeResult(evalDisplayOpts()));
             return;
           }
@@ -562,13 +581,20 @@ export class FrameProcessor {
           detectionStatus = 'Intermediate frame — highlights unchanged';
           log(`Timing: detect=${tDetect}ms${detectSkipped ? '[skip]' : ''} crop+preview=${tPreview}ms chgdet=${tChangeDetect}ms ${recogDetail} [intermediate, skipped] total=${Date.now() - startTime}ms`);
           this.lastBoardSample = prevBoardSample;
-          recognition = this.lastRecognitionResult;
-          rawFen = this.lastRawFen;
-          isFlipped = this.lastIsFlipped;
-          orientationSource = this.lastOrientationSource;
-          highlightedSquares = this.lastHighlightedSquares;
-          highlightTurn = this.lastHighlightTurn;
-          squareColors = this.lastSquareColors;
+          this.lastRecognitionResult = prevRecognitionResult;
+          this.lastRawFen = prevRawFen;
+          this.lastIsFlipped = prevIsFlipped;
+          this.lastOrientationSource = prevOrientationSource;
+          this.lastHighlightedSquares = prevHighlightedSquaresCommitted;
+          this.lastHighlightTurn = prevHighlightTurn;
+          this.lastSquareColors = prevSquareColors;
+          recognition = prevRecognitionResult;
+          rawFen = prevRawFen;
+          isFlipped = prevIsFlipped;
+          orientationSource = prevOrientationSource;
+          highlightedSquares = prevHighlightedSquaresCommitted;
+          highlightTurn = prevHighlightTurn;
+          squareColors = prevSquareColors;
           sendResult(makeResult(evalDisplayOpts()));
           return;
         }
