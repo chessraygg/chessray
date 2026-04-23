@@ -5,7 +5,10 @@
 
 export type RGB = [number, number, number];
 
-const ANALYSIS_BRIGHTNESS = 0.18; // mix toward white by 18% in analysis mode
+// Analysis-mode brightening removed: the numbered step-label circles on PV
+// arrows already signal "this is an engine-projected position" clearly, so
+// tinting the squares lighter was redundant and visually distracting.
+const ANALYSIS_BRIGHTNESS = 0;
 const HIGHLIGHT_YELLOW: RGB = [247, 247, 105];
 const HIGHLIGHT_BLEND = 0.55;
 
