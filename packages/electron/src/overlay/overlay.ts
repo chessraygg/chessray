@@ -1223,14 +1223,20 @@ function initOverlay(): void {
     userPanel?.classList.toggle('compact', on);
     compactBtn?.classList.toggle('active', on);
     savePrefs({ compactMode: on });
-    if (on) {
+    if (on && userPanel) {
+      savedExpandedHeight = userPanel.offsetHeight;
       updateCompactMoves();
-      if (userPanel) {
-        savedExpandedHeight = userPanel.offsetHeight;
-        // Board fills width, so ~square; add room for compact-moves, status, hint, padding
-        const w = userPanel.offsetWidth;
-        const height = Math.round(w + 96);
-        userPanel.style.height = `${height}px`;
+      // Measure the actual compact layout so the panel hugs the board without
+      // leaving empty space above the "double-click to expand" hint. We want
+      // the board-fit square (height == width): shift the panel height by the
+      // delta between target and current board-fit height.
+      const boardFit = document.getElementById('cv-board-fit');
+      if (boardFit) {
+        const currentPanelH = userPanel.offsetHeight;
+        const currentBoardFitH = boardFit.offsetHeight;
+        const targetBoardFitH = boardFit.offsetWidth;
+        const newPanelH = currentPanelH - currentBoardFitH + targetBoardFitH;
+        userPanel.style.height = `${newPanelH}px`;
       }
     } else if (userPanel && savedExpandedHeight !== null) {
       userPanel.style.height = `${savedExpandedHeight}px`;
