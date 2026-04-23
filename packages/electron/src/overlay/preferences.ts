@@ -35,6 +35,11 @@ export interface Prefs {
   panelTop: number | null;
   panelWidth: number | null;
   panelHeight: number | null;
+  /** Last panel size while in compact mode. Kept separate from
+   *  panelWidth/panelHeight so toggling back to non-compact restores the
+   *  expanded size instead of reusing the cramped compact frame. */
+  compactPanelWidth: number | null;
+  compactPanelHeight: number | null;
   sectionLayout: unknown | null;
   gravityUp: boolean;
   /** Debug section's board-preview image scale, percent of panel width (25..200). */
@@ -69,6 +74,8 @@ export const DEFAULT_PREFS: Prefs = {
   panelTop: null,
   panelWidth: null,
   panelHeight: null,
+  compactPanelWidth: null,
+  compactPanelHeight: null,
   sectionLayout: null,
   gravityUp: true,
   debugImgScale: 100,
