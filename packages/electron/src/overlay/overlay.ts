@@ -1257,9 +1257,14 @@ function initOverlay(): void {
     compactMovesEl.querySelectorAll('.compact-move').forEach(el => {
       el.addEventListener('click', () => {
         const idx = parseInt((el as HTMLElement).dataset.line!, 10);
-        // Toggle lock: click same = unlock, click different = lock
+        // Toggle lock: click same = unlock (stop PV, show top moves), click different = lock + animate
         if (userLockedLine === idx) {
           userLockedLine = -1;
+          (window as any).__chessrayPvPlayStop?.();
+          state.arrowsVisible = true;
+          state.lineVisible = false;
+          renderArrows(state);
+          renderVideoOverlay(state);
           updateCompactMoves();
         } else {
           userLockedLine = idx;
