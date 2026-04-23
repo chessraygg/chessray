@@ -621,15 +621,23 @@ canvas#video-overlay {
 .panel.compact .splitter { display: none; }
 .panel.compact .hidden-tray { display: none; }
 .panel.compact .compact-moves { display: flex !important; }
-.panel.compact { padding: 4px; }
+.panel.compact { padding: 4px; height: auto !important; }
+/* Collapse the flex chain so the panel hugs the board + moves + hint instead of
+ * inheriting the expanded panel's user-resized height (which left empty space
+ * below the board in compact mode). */
+.panel.compact .panel-body,
+.panel.compact .split-root,
+.panel.compact .leaf-body,
+.panel.compact .board-frame { min-height: 0; flex: 0 0 auto; }
+.panel.compact .board-fit { flex: 0 0 auto; aspect-ratio: 1 / 1; }
 .compact-hint { display: none; }
 .panel.compact .compact-hint {
   display: block;
   text-align: center;
-  font: 8px/1 var(--sans);
+  font: 11px/1.2 var(--sans);
   color: var(--text-faint);
-  opacity: 0.4;
-  padding: 3px 0 1px;
+  opacity: 0.75;
+  padding: 5px 0 2px;
   user-select: none;
 }
 
