@@ -37,6 +37,44 @@
     .ws-card.drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-soft); }
     .ws-card.hidden { display: none; }
 
+    /* Hidden-sections tray: chips for each hidden section so they're easy to bring back */
+    .hidden-tray {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 6px 8px;
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .hidden-tray:empty { display: none; }
+    .hidden-tray .tray-label {
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      align-self: center;
+      margin-right: 4px;
+    }
+    .hidden-tray .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 3px 9px;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-dim);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .hidden-tray .chip:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+    .hidden-tray .chip::before { content: '+'; color: var(--text-faint); font-weight: 400; }
+    .hidden-tray .chip:hover::before { color: var(--accent); }
+
     .grip {
       display: inline-block;
       width: 8px;
@@ -86,7 +124,8 @@
        by the Sections menu (.hidden class) and survives the toggle, so the
        user picks what stays in the compact view by hiding the rest first. */
     .ws-panel.compact { width: 280px; height: auto; max-height: 720px; }
-    .ws-panel.compact .top-bar { display: none; }
+    .ws-panel.compact .top-bar,
+    .ws-panel.compact .hidden-tray { display: none; }
     .ws-panel.compact .ws-body {
       display: flex;
       flex-direction: column;
@@ -191,6 +230,8 @@
         <div class="menu-item">● Start recording</div>
       </div>
     </div>
+
+    <div class="hidden-tray" id="hidden-tray"></div>
 
     <div class="ws-body">
       <div class="ws-card board-card" data-section="board" draggable="true">
@@ -334,11 +375,31 @@
     attachMenuToggle('m-tools-btn', 'm-tools');
 
     // Sections menu ⇄ card .hidden state (and per-card × hide buttons)
+    const SECTION_TITLES = { board: 'Board', eval: 'Eval', lines: 'Lines', tune: 'Tuning', tools: 'Tools', diag: 'Diagnostics' };
+    const tray = document.getElementById('hidden-tray');
+    function renderTray() {
+      tray.innerHTML = '';
+      const hidden = document.querySelectorAll('.ws-card.hidden');
+      if (hidden.length === 0) return;
+      const label = document.createElement('span');
+      label.className = 'tray-label';
+      label.textContent = 'Hidden';
+      tray.appendChild(label);
+      hidden.forEach((card) => {
+        const id = card.dataset.section;
+        const chip = document.createElement('button');
+        chip.className = 'chip';
+        chip.textContent = SECTION_TITLES[id] ?? id;
+        chip.addEventListener('click', () => setSectionVisible(id, true));
+        tray.appendChild(chip);
+      });
+    }
     function setSectionVisible(id, visible) {
       const card = document.querySelector(`.ws-card[data-section="${id}"]`);
       const cb = document.querySelector(`#m-sections input[data-section="${id}"]`);
       if (card) card.classList.toggle('hidden', !visible);
       if (cb) cb.checked = visible;
+      renderTray();
     }
     document.querySelectorAll('#m-sections input[data-section]').forEach((cb) => {
       cb.addEventListener('change', () => setSectionVisible(cb.dataset.section, cb.checked));
@@ -350,6 +411,7 @@
         if (card?.dataset.section) setSectionVisible(card.dataset.section, false);
       });
     });
+    renderTray();
 
     // anchor menus under their buttons
     ['sections','display','tools'].forEach((id) => {
