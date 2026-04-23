@@ -1245,21 +1245,6 @@ function initOverlay(): void {
     });
   }
 
-  // ── MultiPV ramp slider ──
-  const multiPvRampSlider = document.getElementById('cv-multi-pv-ramp') as HTMLInputElement | null;
-  const multiPvRampVal = document.getElementById('cv-multi-pv-ramp-val');
-  if (multiPvRampSlider && multiPvRampVal) {
-    multiPvRampSlider.value = String(prefs.multiPvRamp);
-    multiPvRampVal.textContent = String(prefs.multiPvRamp);
-    window.chessRay.setMultiPvRamp(prefs.multiPvRamp);
-    multiPvRampSlider.addEventListener('input', () => {
-      const n = parseInt(multiPvRampSlider.value, 10);
-      multiPvRampVal.textContent = String(n);
-      savePrefs({ multiPvRamp: n });
-      window.chessRay.setMultiPvRamp(n);
-    });
-  }
-
   // ── Change detection toggle ──
   const changeDetectCheckbox = document.getElementById('cv-change-detect') as HTMLInputElement | null;
   if (changeDetectCheckbox) {

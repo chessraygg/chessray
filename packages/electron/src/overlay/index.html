@@ -133,14 +133,9 @@
           <span id="cv-max-depth-val">28</span>
         </div>
         <div class="pv-depth-row">
-          <label data-tip="Max engine lines (starts at 2, ramps up as position stays)">Lines</label>
+          <label data-tip="Number of engine lines shown. The first (quick) eval uses up to 3; every deeper eval uses this value.">Lines</label>
           <input type="range" id="cv-multi-pv-max" min="1" max="8" value="5" step="1">
           <span id="cv-multi-pv-max-val">5</span>
-        </div>
-        <div class="pv-depth-row">
-          <label data-tip="Depth steps before adding another engine line (higher = slower ramp)">Ramp</label>
-          <input type="range" id="cv-multi-pv-ramp" min="1" max="4" value="1" step="1">
-          <span id="cv-multi-pv-ramp-val">1</span>
         </div>
         <div class="pv-depth-row">
           <label data-tip="Skip recognition when board pixels haven't changed (faster but may miss subtle changes)">Change detect</label>

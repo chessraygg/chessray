@@ -26,7 +26,7 @@ import type { PipelineResult, ArrowDescriptor, GameOver } from '../shared/types.
 
 import {
   EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH,
-  EVAL_MULTI_PV_START, EVAL_MULTI_PV_MAX, EVAL_MULTI_PV_RAMP,
+  EVAL_MULTI_PV_START, EVAL_MULTI_PV_MAX,
   cacheGet, cachePut,
 } from './eval-cache.js';
 import { sampleBoardPixels, sampleFrameOutsideBbox, boardUnchanged } from './change-detect.js';
@@ -61,7 +61,6 @@ export interface FrameProcessorDeps {
   changeDetectEnabled?: boolean;
   maxDepth?: number;
   multiPvMax?: number;
-  multiPvRamp?: number;
 }
 
 export class FrameProcessor {
@@ -112,13 +111,11 @@ export class FrameProcessor {
   // ── Tunables (overridable at runtime) ──
   private maxDepth: number;
   private multiPvMax: number;
-  private multiPvRamp: number;
   private changeDetectEnabled: boolean;
 
   constructor(private deps: FrameProcessorDeps) {
     this.maxDepth = deps.maxDepth ?? DEFAULT_MAX_DEPTH;
     this.multiPvMax = deps.multiPvMax ?? EVAL_MULTI_PV_MAX;
-    this.multiPvRamp = deps.multiPvRamp ?? EVAL_MULTI_PV_RAMP;
     this.changeDetectEnabled = deps.changeDetectEnabled ?? true;
   }
 
@@ -154,14 +151,13 @@ export class FrameProcessor {
 
   setMaxDepth(d: number): void { this.maxDepth = d; }
   setMultiPvMax(n: number): void { this.multiPvMax = n; }
-  setMultiPvRamp(n: number): void { this.multiPvRamp = n; }
   setChangeDetect(on: boolean): void { this.changeDetectEnabled = on; }
 
-  /** Ramp multiPV from start to max as depth increases. */
+  /** First (shallowest) pass gets a small quick-look count; every deeper pass
+   *  uses the user's selected max. No ramp. */
   private multiPvForDepth(depth: number): number {
-    const steps = Math.floor((depth - EVAL_START_DEPTH) / EVAL_DEPTH_STEP);
-    const linesFromRamp = this.multiPvRamp > 0 ? Math.floor(steps / this.multiPvRamp) : steps;
-    return Math.min(this.multiPvMax, EVAL_MULTI_PV_START + linesFromRamp);
+    if (depth === EVAL_START_DEPTH) return Math.min(EVAL_MULTI_PV_START, this.multiPvMax);
+    return this.multiPvMax;
   }
 
   async processFrame(imageData: ImageDataLike, frameMeta?: FrameMeta): Promise<void> {

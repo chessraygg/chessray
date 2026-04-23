@@ -6,7 +6,7 @@
 
 import type { PixelBuffer } from '@chessray/core';
 import type { PipelineResult } from '../shared/types.js';
-import { setMultiPvMax, setMultiPvRamp } from './eval-cache.js';
+import { setMultiPvMax } from './eval-cache.js';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
 import { initAndStartCapture, stopCapture, setTargetFps, type FrameMeta } from './frame-capture.js';
 import { FrameProcessor, type ImageDataLike } from './frame-processor.js';
@@ -96,12 +96,6 @@ window.chessRay.onSetMultiPvMax((n: number) => {
   debugLog(`MultiPV max changed to ${n}`);
   setMultiPvMax(n);
   processor.setMultiPvMax(n);
-});
-
-window.chessRay.onSetMultiPvRamp((n: number) => {
-  debugLog(`MultiPV ramp changed to ${n} steps/line`);
-  setMultiPvRamp(n);
-  processor.setMultiPvRamp(n);
 });
 
 window.chessRay.onSetChangeDetect((enabled: boolean) => {

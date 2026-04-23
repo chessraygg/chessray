@@ -57,10 +57,6 @@ const api = {
     ipcRenderer.send('set-multi-pv-max', n),
   onSetMultiPvMax: (cb: (n: number) => void) =>
     ipcRenderer.on('set-multi-pv-max', (_e, n: number) => cb(n)),
-  setMultiPvRamp: (n: number) =>
-    ipcRenderer.send('set-multi-pv-ramp', n),
-  onSetMultiPvRamp: (cb: (n: number) => void) =>
-    ipcRenderer.on('set-multi-pv-ramp', (_e, n: number) => cb(n)),
 
   // Change detection
   setChangeDetect: (enabled: boolean) =>

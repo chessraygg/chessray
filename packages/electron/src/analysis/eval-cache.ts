@@ -4,22 +4,22 @@ import type { ArrowDescriptor } from '../shared/types.js';
 export const EVAL_START_DEPTH = 16;
 export const EVAL_DEPTH_STEP = 4;
 export const EVAL_MAX_DEPTH = 28;
-export const EVAL_MULTI_PV_START = 2;
+/** Line count for the very first (shallowest) eval pass. Capped by the user's
+ *  selected max below. Kept small so the initial preview arrives quickly. */
+export const EVAL_MULTI_PV_START = 3;
 export const EVAL_MULTI_PV_MAX = 5;
-export const EVAL_MULTI_PV_RAMP = 1; // depth steps per additional line
 
 // Mutable runtime overrides (set via IPC from UI)
 export let multiPvMax = EVAL_MULTI_PV_MAX;
-export let multiPvRamp = EVAL_MULTI_PV_RAMP;
 
 export function setMultiPvMax(n: number): void { multiPvMax = n; }
-export function setMultiPvRamp(n: number): void { multiPvRamp = n; }
 
-/** Return multiPV count for a given search depth — ramp from start to max */
+/** Return multiPV count for a given search depth. First pass gets a small
+ *  quick-look count (EVAL_MULTI_PV_START, capped to user's max); every deeper
+ *  pass gets the user's full selected max. No ramp. */
 export function multiPvForDepth(depth: number): number {
-  const steps = Math.floor((depth - EVAL_START_DEPTH) / EVAL_DEPTH_STEP);
-  const linesFromRamp = multiPvRamp > 0 ? Math.floor(steps / multiPvRamp) : steps;
-  return Math.min(multiPvMax, EVAL_MULTI_PV_START + linesFromRamp);
+  if (depth === EVAL_START_DEPTH) return Math.min(EVAL_MULTI_PV_START, multiPvMax);
+  return multiPvMax;
 }
 export const EVAL_CACHE_SIZE = 32;
 export const ENGINE_ID = 'stockfish-18-lite-single';

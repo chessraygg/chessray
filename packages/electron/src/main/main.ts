@@ -450,12 +450,6 @@ ipcMain.on('set-multi-pv-max', (_e, n: number) => {
   }
 });
 
-ipcMain.on('set-multi-pv-ramp', (_e, n: number) => {
-  if (analysisWindow && !analysisWindow.isDestroyed()) {
-    analysisWindow.webContents.send('set-multi-pv-ramp', n);
-  }
-});
-
 ipcMain.on('set-change-detect', (_e, enabled: boolean) => {
   if (analysisWindow && !analysisWindow.isDestroyed()) {
     analysisWindow.webContents.send('set-change-detect', enabled);
