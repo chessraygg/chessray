@@ -41,13 +41,16 @@ describe('rankToWidth', () => {
 });
 
 describe('rankToOpacity', () => {
-  it('returns decreasing opacity for ranks 0, 1, 2', () => {
-    expect(rankToOpacity(0)).toBeGreaterThan(rankToOpacity(1));
-    expect(rankToOpacity(1)).toBeGreaterThan(rankToOpacity(2));
+  // Uniform opacity by design: color (loss) carries 100% of the quality signal
+  // and width carries rank — alpha is just "presence", same for every arrow.
+  it('returns the same opacity for every rank', () => {
+    expect(rankToOpacity(0)).toBe(rankToOpacity(1));
+    expect(rankToOpacity(1)).toBe(rankToOpacity(2));
+    expect(rankToOpacity(5)).toBe(rankToOpacity(0));
   });
 
-  it('returns 0.675 for best move', () => {
-    expect(rankToOpacity(0)).toBe(0.675);
+  it('returns 0.85 (uniform presence)', () => {
+    expect(rankToOpacity(0)).toBe(0.85);
   });
 });
 

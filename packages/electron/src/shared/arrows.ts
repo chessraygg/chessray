@@ -36,10 +36,11 @@ export function rankToWidth(rank: number): number {
 
 /**
  * Map move rank to opacity.
+ * Uniform across all ranks so color (loss) carries 100% of the quality signal
+ * and width carries rank. Opacity is just "presence", tuned for readability.
  */
-export function rankToOpacity(rank: number): number {
-  const opacities = [0.675, 0.525, 0.375];
-  return opacities[Math.min(rank, opacities.length - 1)];
+export function rankToOpacity(_rank: number): number {
+  return 0.85;
 }
 
 /**

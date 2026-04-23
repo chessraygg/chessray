@@ -592,7 +592,12 @@ export function drawArrow(
   const y2 = y1 + (fullY2 - y1) * t;
 
   const lineWidth = arrow.width * widthScale;
-  const headLength = lineWidth * 3;
+  const wStart = Math.max(lineWidth * 0.2, 1.5);
+  const wTip = wStart + (lineWidth - wStart) * t;
+  // Head length scales with the current tip width so that during fade-in
+  // (small progress → thin tip) the head stays proportional and can't pull
+  // endX,endY behind the source.
+  const headLength = wTip * 3;
 
   // Compute perpendicular offset for the control point (curve)
   const dx = x2 - x1;
@@ -616,39 +621,84 @@ export function drawArrow(
   const endY = noArrowhead ? y2 : y2 - headLength * Math.sin(tipAngle);
 
   ctx.save();
-  ctx.lineWidth = lineWidth;
-  ctx.lineCap = 'round';
-
-  // Gradient stroke. Default: transparent at source → opaque at tip.
-  // Bell variant: 0 → peak → 0 along the line (preview mode only).
-  const grad = ctx.createLinearGradient(x1, y1, endX, endY);
   const r = parseInt(arrow.color.slice(1, 3), 16);
   const g = parseInt(arrow.color.slice(3, 5), 16);
   const b = parseInt(arrow.color.slice(5, 7), 16);
+
   if (bellGradient) {
+    // Preview mode — keep the stroked bell-gradient line. The tapered ribbon
+    // wouldn't compose with the spatial bell pulse, and the preview is a
+    // distinct emphasis mode anyway.
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+    const grad = ctx.createLinearGradient(x1, y1, endX, endY);
     const stops = 9;
     for (let i = 0; i <= stops; i++) {
       const u = i / stops;
       const w = Math.sin(Math.PI * u); // 0 → 1 → 0
       grad.addColorStop(u, `rgba(${r},${g},${b},${(arrow.opacity * w).toFixed(3)})`);
     }
+    ctx.strokeStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    if (curveOffset === 0) ctx.lineTo(endX, endY);
+    else ctx.quadraticCurveTo(mx, my, endX, endY);
+    ctx.stroke();
   } else {
-    grad.addColorStop(0, `rgba(${r},${g},${b},${(arrow.opacity * 0.15).toFixed(2)})`);
-    grad.addColorStop(1, `rgba(${r},${g},${b},${arrow.opacity.toFixed(2)})`);
+    // Tapered ribbon — filled polygon that grows in width from thin at the
+    // source to full at the tip. Uniform alpha (color carries quality; width
+    // carries rank; the taper itself is the direction cue).
+    // wStart / wTip declared above drive both the ribbon and the scaled head.
+    const segs = curveOffset === 0
+      ? 2
+      : Math.max(12, Math.round(Math.hypot(endX - x1, endY - y1) / 6));
+
+    const pointAt = (s: number): { x: number; y: number; nx: number; ny: number } => {
+      // s in [0,1] along the (possibly curved) shaft from source to endX,endY
+      let sx: number, sy: number, tx: number, ty: number;
+      if (curveOffset === 0) {
+        sx = x1 + (endX - x1) * s;
+        sy = y1 + (endY - y1) * s;
+        tx = endX - x1;
+        ty = endY - y1;
+      } else {
+        const u = 1 - s;
+        sx = u * u * x1 + 2 * u * s * mx + s * s * endX;
+        sy = u * u * y1 + 2 * u * s * my + s * s * endY;
+        tx = 2 * u * (mx - x1) + 2 * s * (endX - mx);
+        ty = 2 * u * (my - y1) + 2 * s * (endY - my);
+      }
+      const mag = Math.hypot(tx, ty) || 1;
+      return { x: sx, y: sy, nx: -ty / mag, ny: tx / mag };
+    };
+
+    ctx.globalAlpha = arrow.opacity;
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+
+    ctx.beginPath();
+    // Left edge: source → tip, width ramping wStart → wTip
+    for (let i = 0; i <= segs; i++) {
+      const s = i / segs;
+      const w = (wStart + (wTip - wStart) * s) / 2;
+      const p = pointAt(s);
+      const lx = p.x + p.nx * w, ly = p.y + p.ny * w;
+      if (i === 0) ctx.moveTo(lx, ly);
+      else ctx.lineTo(lx, ly);
+    }
+    // Right edge: tip → source
+    for (let i = segs; i >= 0; i--) {
+      const s = i / segs;
+      const w = (wStart + (wTip - wStart) * s) / 2;
+      const p = pointAt(s);
+      const rx = p.x - p.nx * w, ry = p.y - p.ny * w;
+      ctx.lineTo(rx, ry);
+    }
+    ctx.closePath();
+    ctx.fill();
   }
 
-  // Draw the shaft (quadratic bezier curve)
-  ctx.strokeStyle = grad;
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  if (curveOffset === 0) {
-    ctx.lineTo(endX, endY);
-  } else {
-    ctx.quadraticCurveTo(mx, my, endX, endY);
-  }
-  ctx.stroke();
-
-  // Draw the arrowhead at full opacity (unless disabled)
+  // Arrowhead — same length as the gap between x2,y2 and endX,endY (headLength
+  // was computed from the current tip width, so head and ribbon stay in sync).
   if (!noArrowhead) {
     ctx.globalAlpha = arrow.opacity;
     ctx.fillStyle = arrow.color;
