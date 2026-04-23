@@ -484,60 +484,59 @@ function getPreviewArrow(state: OverlayState): ArrowDescriptor | null {
   return null;
 }
 
-/** Compact game-over pill in the top-right corner of the board. Replaces the
- *  old full-width center banner so the final position remains visible under
- *  the dim overlay. Shares the step-label visual family: near-black pill,
- *  accent ring, bold white text. */
+/** Game-over watermark — thin, wide-tracked text centered on the board over
+ *  the dim overlay. No pill or chrome; the dim does the "game is over" work
+ *  and the watermark names the outcome subtly. Alpha is capped by the user's
+ *  overlayOpacity so the whole annotation family scales together. */
 function drawGameOverPill(
   ctx: CanvasRenderingContext2D,
   board: { x: number; y: number; width: number; height: number },
   gameOver: GameOver,
   turn: Turn | undefined,
+  overlayOpacity: number,
 ): void {
-  const text = gameOver === 'checkmate'
+  const raw = gameOver === 'checkmate'
     ? (turn === 'w' ? 'Black wins' : 'White wins')
     : 'Draw';
-  const accent = gameOver === 'checkmate' ? '#f59e0b' : '#9ca3af';
+  const text = raw.toUpperCase();
 
   const size = Math.min(board.width, board.height);
-  const fontSize = Math.max(11, Math.round(size * 0.055));
-  ctx.font = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-  const padX = fontSize * 0.7;
-  const padY = fontSize * 0.45;
-  const metrics = ctx.measureText(text);
-  const pillW = metrics.width + padX * 2;
-  const pillH = fontSize + padY * 2;
-  const margin = Math.max(6, size * 0.025);
-  const cornerR = pillH / 2;
+  // Target ~58% of board width; font starts at ~11% of board and shrinks if
+  // the text would overflow (e.g. extremely wide letter-spacing on narrow boards).
+  let fontSize = Math.round(size * 0.11);
+  const letterSpacing = Math.max(2, Math.round(fontSize * 0.18));
+  ctx.font = `300 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  const targetW = board.width * 0.58;
+  const measure = (): number => {
+    // Canvas doesn't expose letter-spacing width directly — approximate by
+    // summing per-char widths plus the spacing gaps.
+    let w = 0;
+    for (let i = 0; i < text.length; i++) {
+      w += ctx.measureText(text[i]).width;
+    }
+    return w + letterSpacing * Math.max(0, text.length - 1);
+  };
+  let currentW = measure();
+  if (currentW > targetW) {
+    fontSize = Math.max(14, Math.round(fontSize * targetW / currentW));
+    ctx.font = `300 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+    currentW = measure();
+  }
 
-  // Top-right of the board, inset by margin.
-  const x = board.x + board.width - pillW - margin;
-  const y = board.y + margin;
+  const cx = board.x + board.width / 2;
+  const cy = board.y + board.height / 2;
 
   ctx.save();
-  // Solid dark pill.
-  ctx.globalAlpha = 0.92;
-  ctx.fillStyle = '#0f0f0f';
-  ctx.beginPath();
-  ctx.moveTo(x + cornerR, y);
-  ctx.arcTo(x + pillW, y, x + pillW, y + pillH, cornerR);
-  ctx.arcTo(x + pillW, y + pillH, x, y + pillH, cornerR);
-  ctx.arcTo(x, y + pillH, x, y, cornerR);
-  ctx.arcTo(x, y, x + pillW, y, cornerR);
-  ctx.closePath();
-  ctx.fill();
-
-  // Accent ring.
-  ctx.globalAlpha = 1;
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = Math.max(1.5, fontSize * 0.14);
-  ctx.stroke();
-
-  // Text.
-  ctx.textAlign = 'center';
+  ctx.globalAlpha = Math.max(0, Math.min(1, overlayOpacity * 0.45));
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#fff';
-  ctx.fillText(text, x + pillW / 2, y + pillH / 2);
+  // Draw char-by-char so we can apply letter-spacing in a cross-browser way.
+  let x = cx - currentW / 2;
+  for (let i = 0; i < text.length; i++) {
+    ctx.fillText(text[i], x, cy);
+    x += ctx.measureText(text[i]).width + letterSpacing;
+  }
   ctx.restore();
 }
 
@@ -865,12 +864,12 @@ export function renderArrows(state: OverlayState): void {
 
   const virtualBoard = { x: 0, y: 0, width: size, height: size };
 
-  // Game over overlay on virtual board — dim the whole board, then drop a
-  // compact corner pill naming the outcome. The final scene stays visible.
+  // Game over — dim the whole board, then fade in a subtle watermark naming
+  // the outcome. Dim does the "game ended" work, watermark names the result.
   if (state.currentResult?.game_over) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.fillRect(0, 0, size, size);
-    drawGameOverPill(ctx, virtualBoard, state.currentResult.game_over, state.currentResult.turn);
+    drawGameOverPill(ctx, virtualBoard, state.currentResult.game_over, state.currentResult.turn, state.overlayOpacity);
     return;
   }
 
@@ -1148,11 +1147,11 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.restore();
   }
 
-  // Game over overlay on the actual board — dim + compact corner pill.
+  // Game over on actual board — dim + subtle centered watermark.
   if (result.game_over) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.fillRect(bx, by, bw, bh);
-    drawGameOverPill(ctx, { x: bx, y: by, width: bw, height: bh }, result.game_over, result.turn);
+    drawGameOverPill(ctx, { x: bx, y: by, width: bw, height: bh }, result.game_over, result.turn, state.overlayOpacity);
   }
 }
 
