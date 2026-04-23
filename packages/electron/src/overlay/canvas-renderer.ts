@@ -828,6 +828,19 @@ export function renderVideoOverlay(state: OverlayState): void {
     logEvalBarTransition('video', false, `early return: ${why}`);
     return;
   }
+  // Gate the entire actual-board overlay on recognition confidence. Matches
+  // the analysis pipeline's own low-confidence threshold (0.3) so that a
+  // transient misread doesn't paint arrows/eval-bar over a board we can't
+  // actually read. Canvas was cleared above, so returning here hides the overlay.
+  const recogConfidence = result.recognition?.confidence ?? 0;
+  if (recogConfidence < 0.3) {
+    videoHitCache.arrows = [];
+    videoHitCache.animBoardRect = null;
+    if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
+    ensurePulseTimer('video', false, () => renderVideoOverlay(state));
+    logEvalBarTransition('video', false, `low confidence: ${(recogConfidence * 100).toFixed(0)}%`);
+    return;
+  }
 
   // The overlay window covers the work area (excludes menu bar/dock).
   // The captured frame covers the full display (includes menu bar).
