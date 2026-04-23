@@ -527,7 +527,7 @@ function drawGameOverPill(
   const cy = board.y + board.height / 2;
 
   ctx.save();
-  ctx.globalAlpha = Math.max(0, Math.min(1, overlayOpacity * 0.45));
+  ctx.globalAlpha = Math.max(0, Math.min(1, overlayOpacity * 0.65));
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#fff';
