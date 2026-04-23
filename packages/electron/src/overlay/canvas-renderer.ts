@@ -41,6 +41,7 @@ export interface OverlayState {
   pvPreviewLineIndex: number | null;
   pvBoardState: PvBoardState | null;
   panelScale: number;
+  boardScale: number;
   displayInfo: {
     size: { width: number; height: number };
     workArea: { x: number; y: number; width: number; height: number };
@@ -586,9 +587,11 @@ export function renderArrows(state: OverlayState): void {
 
   const size = 200;
   const dpr = window.devicePixelRatio || 1;
-  // Compensate for CSS transform:scale() on the panel — render at
-  // the effective pixel ratio so the canvas stays crisp at any zoom
-  const effectiveDpr = dpr * (state.panelScale || 1);
+  // Compensate for both CSS transforms stacking on this canvas: the outer
+  // panel's panelScale and the inner .board-container's --board-scale.
+  // Without boardScale the canvas upscales as a bitmap when the board leaf
+  // is larger than 200px, pixelating arrows/circles.
+  const effectiveDpr = dpr * (state.panelScale || 1) * (state.boardScale || 1);
   const bufferSize = Math.ceil(size * effectiveDpr);
 
   if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {

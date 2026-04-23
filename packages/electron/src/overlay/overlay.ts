@@ -50,6 +50,7 @@ const state: OverlayState = {
   pvPreviewLineIndex: null,
   pvBoardState: null,
   panelScale: 1,
+  boardScale: 1,
   displayInfo: null,
 };
 
@@ -276,6 +277,8 @@ function initOverlay(): void {
         const { width, height } = e.contentRect;
         const scale = Math.max(0, Math.min(width, height) / 200);
         boardContainer.style.setProperty('--board-scale', String(scale));
+        state.boardScale = scale;
+        renderArrows(state);
       }
     });
     observer.observe(boardFit);
@@ -844,7 +847,7 @@ function initOverlay(): void {
 
         const size = 200;
         const dpr = window.devicePixelRatio || 1;
-        const effectiveDpr = dpr * (state.panelScale || 1);
+        const effectiveDpr = dpr * (state.panelScale || 1) * (state.boardScale || 1);
         const bufferSize = Math.ceil(size * effectiveDpr);
         if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
           state.canvas.width = bufferSize;
