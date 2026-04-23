@@ -1214,11 +1214,13 @@ function initOverlay(): void {
     savePrefs({ collapsed: c });
   }
 
+  const compactHintEl = document.getElementById('cv-compact-hint');
   function setCompactMode(on: boolean): void {
     if (on && collapsed) setCollapsed(false);
     compactMode = on;
     userPanel?.classList.toggle('compact', on);
     compactBtn?.classList.toggle('active', on);
+    if (compactHintEl) compactHintEl.textContent = on ? 'double-click to expand' : 'double-click to compact';
     savePrefs({ compactMode: on });
     if (on) updateCompactMoves();
   }
