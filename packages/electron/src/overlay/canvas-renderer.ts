@@ -1,4 +1,5 @@
-import type { ArrowDescriptor, PipelineResult } from '../shared/types.js';
+import type { ArrowDescriptor, GameOver, PipelineResult } from '../shared/types.js';
+import type { Turn } from '@chessray/core';
 import { computeCurveOffsets, lossToColor } from '../shared/arrows.js';
 import { rgbToCss, squareColorPalette, type RGB } from '../shared/colors.js';
 import { pieceImages } from './piece-svg.js';
@@ -483,6 +484,63 @@ function getPreviewArrow(state: OverlayState): ArrowDescriptor | null {
   return null;
 }
 
+/** Compact game-over pill in the top-right corner of the board. Replaces the
+ *  old full-width center banner so the final position remains visible under
+ *  the dim overlay. Shares the step-label visual family: near-black pill,
+ *  accent ring, bold white text. */
+function drawGameOverPill(
+  ctx: CanvasRenderingContext2D,
+  board: { x: number; y: number; width: number; height: number },
+  gameOver: GameOver,
+  turn: Turn | undefined,
+): void {
+  const text = gameOver === 'checkmate'
+    ? (turn === 'w' ? 'Black wins' : 'White wins')
+    : 'Draw';
+  const accent = gameOver === 'checkmate' ? '#f59e0b' : '#9ca3af';
+
+  const size = Math.min(board.width, board.height);
+  const fontSize = Math.max(11, Math.round(size * 0.055));
+  ctx.font = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  const padX = fontSize * 0.7;
+  const padY = fontSize * 0.45;
+  const metrics = ctx.measureText(text);
+  const pillW = metrics.width + padX * 2;
+  const pillH = fontSize + padY * 2;
+  const margin = Math.max(6, size * 0.025);
+  const cornerR = pillH / 2;
+
+  // Top-right of the board, inset by margin.
+  const x = board.x + board.width - pillW - margin;
+  const y = board.y + margin;
+
+  ctx.save();
+  // Solid dark pill.
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = '#0f0f0f';
+  ctx.beginPath();
+  ctx.moveTo(x + cornerR, y);
+  ctx.arcTo(x + pillW, y, x + pillW, y + pillH, cornerR);
+  ctx.arcTo(x + pillW, y + pillH, x, y + pillH, cornerR);
+  ctx.arcTo(x, y + pillH, x, y, cornerR);
+  ctx.arcTo(x, y, x + pillW, y, cornerR);
+  ctx.closePath();
+  ctx.fill();
+
+  // Accent ring.
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = Math.max(1.5, fontSize * 0.14);
+  ctx.stroke();
+
+  // Text.
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(text, x + pillW / 2, y + pillH / 2);
+  ctx.restore();
+}
+
 /** Draw a small colored badge on the target square of the played move (overlaid on
  * the piece). Color encodes centipawn loss, and the loss value is shown inside. */
 function drawPlayedMoveMarker(
@@ -807,22 +865,12 @@ export function renderArrows(state: OverlayState): void {
 
   const virtualBoard = { x: 0, y: 0, width: size, height: size };
 
-  // Game over overlay on virtual board
+  // Game over overlay on virtual board — dim the whole board, then drop a
+  // compact corner pill naming the outcome. The final scene stays visible.
   if (state.currentResult?.game_over) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.fillRect(0, 0, size, size);
-
-    const bannerH = size * 0.18;
-    const bannerY = (size - bannerH) / 2;
-    ctx.fillStyle = state.currentResult.game_over === 'checkmate' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(80, 80, 80, 0.7)';
-    ctx.fillRect(0, bannerY, size, bannerH);
-
-    const fontSize = Math.max(10, Math.round(size * 0.07));
-    ctx.font = `600 ${fontSize}px -apple-system, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
-    ctx.fillText(state.currentResult.game_over === 'checkmate' ? 'Checkmate' : 'Stalemate', size / 2, bannerY + bannerH / 2);
+    drawGameOverPill(ctx, virtualBoard, state.currentResult.game_over, state.currentResult.turn);
     return;
   }
 
@@ -1097,29 +1145,11 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.restore();
   }
 
-  // Game over overlay on the actual board
+  // Game over overlay on the actual board — dim + compact corner pill.
   if (result.game_over) {
-    // Semi-transparent dark overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.fillRect(bx, by, bw, bh);
-
-    // Banner in the center
-    const bannerH = bh * 0.18;
-    const bannerY = by + (bh - bannerH) / 2;
-    ctx.fillStyle = result.game_over === 'checkmate' ? 'rgba(0, 0, 0, 0.75)' : 'rgba(80, 80, 80, 0.75)';
-    ctx.fillRect(bx, bannerY, bw, bannerH);
-
-    // Text
-    const fontSize = Math.max(14, Math.round(bw * 0.06));
-    ctx.font = `600 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
-
-    const text = result.game_over === 'checkmate'
-      ? `Checkmate — ${result.turn === 'w' ? 'Black' : 'White'} wins`
-      : 'Stalemate — Draw';
-    ctx.fillText(text, bx + bw / 2, bannerY + bannerH / 2);
+    drawGameOverPill(ctx, { x: bx, y: by, width: bw, height: bh }, result.game_over, result.turn);
   }
 }
 
