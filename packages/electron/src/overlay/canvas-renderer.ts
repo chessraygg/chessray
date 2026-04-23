@@ -507,22 +507,27 @@ function drawPlayedMoveMarker(
 
   const cx = board.x + (file + 0.5) * squareW;
   const cy = board.y + (7 - rank + 0.5) * squareH;
-  const alphaK = opacityMul * opacityScale;
+  // Disc alpha scales with BOTH the pulse (opacityMul) and the user's overlay
+  // opacity (opacityScale) — disc is decoration. The glyph (checkmark /
+  // loss text) scales only with the pulse, staying fully visible even when
+  // the user dials overlay opacity down.
+  const discAlpha = opacityMul * opacityScale;
+  const glyphAlpha = opacityMul;
 
   if (lossCp < 10) {
-    // Excellent move — white checkmark inside a translucent green disk
+    // Excellent move — white checkmark inside a solid-enough green disc.
     const r = Math.min(squareW, squareH) * 0.22 * sizeScale;
     const size = r * 1.25;
     const strokeW = Math.max(2, r * 0.28);
 
     ctx.save();
-    ctx.globalAlpha = 0.5 * alphaK;
+    ctx.globalAlpha = 0.85 * discAlpha;
     ctx.fillStyle = '#22c55e';
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.globalAlpha = 0.55 * alphaK;
+    ctx.globalAlpha = glyphAlpha;
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = strokeW;
     ctx.lineCap = 'round';
@@ -536,26 +541,27 @@ function drawPlayedMoveMarker(
     return;
   }
 
-  // Loss badge — colored disk with centipawn loss text inside
+  // Loss badge — colored disc with centipawn loss text inside.
   const fontSize = Math.max(7, Math.round(Math.min(squareW, squareH) * 0.20 * sizeScale));
   const r = fontSize * 1.25;
   const color = lossToColor(lossCp);
 
   ctx.save();
-  ctx.globalAlpha = 0.7 * alphaK;
+  ctx.globalAlpha = 0.9 * discAlpha;
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
 
-  // Translucent white loss text with black outline for legibility
+  // White text at full glyph alpha with a heavy black outline so the number
+  // stays readable over any loss color (including amber/yellow).
   ctx.font = `bold ${fontSize}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const text = `−${(lossCp / 100).toFixed(1)}`;
-  ctx.globalAlpha = alphaK;
+  ctx.globalAlpha = glyphAlpha;
   ctx.lineJoin = 'round';
-  ctx.lineWidth = Math.max(2, fontSize * 0.18);
+  ctx.lineWidth = Math.max(2.5, fontSize * 0.22);
   ctx.strokeStyle = '#000';
   ctx.strokeText(text, cx, cy);
   ctx.fillStyle = '#fff';
@@ -722,14 +728,20 @@ export function drawArrow(
   }
 
   // Step-number label — a dark pill with a colored identity ring, drawn at
-  // the arrow's midpoint. Stays fully opaque regardless of arrow alpha so it
-  // remains legible even when the host arrow is hover-dimmed or mid-fade.
+  // the top-right corner of the destination square so it tags the arriving
+  // piece instead of sitting on top of the shaft. Stays fully opaque
+  // regardless of arrow alpha so it's legible under any fade/dim state.
   if (arrow.label && t >= 1) {
     const fontSize = Math.max(9, lineWidth * 2);
     const r = fontSize * 0.85;
     const strokeW = Math.max(1.5, fontSize * 0.14);
-    const ox = curveOffset === 0 ? (x1 + x2) / 2 : mx;
-    const oy = curveOffset === 0 ? (y1 + y2) / 2 : my;
+    // Offset from destination center toward the top-right corner, clamped so
+    // the pill stays inside the square on smaller boards (e.g. vboard mini).
+    const margin = 2;
+    const offX = Math.min(squareW * 0.30, Math.max(0, squareW / 2 - r - margin));
+    const offY = Math.min(squareH * 0.30, Math.max(0, squareH / 2 - r - margin));
+    const ox = x2 + offX;
+    const oy = y2 - offY;
 
     // Solid near-black pill (independent of arrow.opacity).
     ctx.globalAlpha = 0.92;
