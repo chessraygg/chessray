@@ -1080,41 +1080,27 @@ canvas#video-overlay {
 /* ── Zoom controls ── */
 
 
-/* ── Custom tooltips (native title doesn't work in transparent Electron windows) ── */
+/* ── Custom tooltips (native title doesn't work in transparent Electron windows) ──
+ * A single shared tooltip element lives at document.body level (injected by
+ * JS) so it escapes every ancestor overflow-clipping. `::after` pseudo-els
+ * don't work here because several panel ancestors use overflow:hidden/auto
+ * for scrolling, which would crop the tooltip. */
 
-[data-tip] {
-  position: relative;
-}
-
-[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
+.cv-tooltip {
+  position: fixed;
   background: rgba(0,0,0,0.92);
   color: #e5e5e5;
   font: 10px/1.35 var(--sans);
   padding: 5px 8px;
   border-radius: 4px;
   white-space: normal;
-  width: max-content;
   max-width: 240px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s;
-  transition-delay: 0s;
-  z-index: 1000;
+  z-index: 10000;
   box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  left: 0;
+  top: 0;
 }
-
-[data-tip]:hover::after {
-  opacity: 1;
-  transition-delay: 0.3s;
-}
-
-/* Tooltip alignment variants — used when the default centered position would
-   clip against the panel edge or get cropped behind the source content. */
-[data-tip-pos="left"]::after  { left: 0; transform: none; }
-[data-tip-pos="right"]::after { left: auto; right: 0; transform: none; }
-[data-tip-pos="below"]::after { top: calc(100% + 6px); bottom: auto; }
+.cv-tooltip.visible { opacity: 1; }

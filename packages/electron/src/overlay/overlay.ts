@@ -191,10 +191,91 @@ function rerenderForHistoryChange(): void {
   updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine, snap);
 }
 
+// ── Tooltip controller ──
+// Renders `[data-tip]` text in a single shared element appended to <body>, so
+// tooltips escape every ancestor overflow-clipping in the panel layout.
+// Respects `data-tip-pos` (above / below / left / right) for alignment.
+function initTooltips(): void {
+  const tip = document.createElement('div');
+  tip.className = 'cv-tooltip';
+  document.body.appendChild(tip);
+
+  let current: HTMLElement | null = null;
+  let showTimer: ReturnType<typeof setTimeout> | null = null;
+  let hideTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const positionTip = (el: HTMLElement): void => {
+    const rect = el.getBoundingClientRect();
+    const pos = el.getAttribute('data-tip-pos') || 'above';
+    const margin = 6;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // Render invisibly first to measure.
+    tip.style.left = '0px';
+    tip.style.top = '0px';
+    const tw = tip.offsetWidth;
+    const th = tip.offsetHeight;
+
+    let x: number, y: number;
+    if (pos === 'below') {
+      x = rect.left + rect.width / 2 - tw / 2;
+      y = rect.bottom + margin;
+    } else if (pos === 'left') {
+      x = rect.left - tw - margin;
+      y = rect.top + rect.height / 2 - th / 2;
+    } else if (pos === 'right') {
+      x = rect.right + margin;
+      y = rect.top + rect.height / 2 - th / 2;
+    } else {
+      // above (default)
+      x = rect.left + rect.width / 2 - tw / 2;
+      y = rect.top - th - margin;
+    }
+
+    // Clamp inside the viewport so long tooltips don't fall off the edge.
+    x = Math.max(4, Math.min(vw - tw - 4, x));
+    y = Math.max(4, Math.min(vh - th - 4, y));
+    tip.style.left = `${x}px`;
+    tip.style.top = `${y}px`;
+  };
+
+  const show = (el: HTMLElement): void => {
+    const text = el.getAttribute('data-tip');
+    if (!text) return;
+    tip.textContent = text;
+    positionTip(el);
+    tip.classList.add('visible');
+  };
+
+  const hide = (): void => {
+    tip.classList.remove('visible');
+  };
+
+  document.addEventListener('mouseover', (e) => {
+    const target = (e.target as HTMLElement | null)?.closest('[data-tip]') as HTMLElement | null;
+    if (!target || target === current) return;
+    current = target;
+    if (hideTimer !== null) { clearTimeout(hideTimer); hideTimer = null; }
+    if (showTimer !== null) clearTimeout(showTimer);
+    showTimer = setTimeout(() => { showTimer = null; show(target); }, 300);
+  });
+  document.addEventListener('mouseout', (e) => {
+    const leaving = (e.target as HTMLElement | null)?.closest('[data-tip]') as HTMLElement | null;
+    if (leaving !== current) return;
+    if (showTimer !== null) { clearTimeout(showTimer); showTimer = null; }
+    if (hideTimer !== null) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => { hideTimer = null; hide(); current = null; }, 80);
+  });
+  // If the layout scrolls/reflows while a tip is visible, reposition against the current target.
+  window.addEventListener('scroll', () => { if (current) positionTip(current); }, true);
+  window.addEventListener('resize', () => { if (current) positionTip(current); });
+}
+
 // ── Init ──
 
 function initOverlay(): void {
   preloadPieceImages();
+  initTooltips();
 
   const prefs = loadPrefs();
   state.overlayVisible = prefs.overlayVisible;
