@@ -40,6 +40,9 @@ export interface OverlayState {
   vboardOverlayVisible: boolean;
   pvPreviewLineIndex: number | null;
   pvBoardState: PvBoardState | null;
+  /** Line index of the arrow currently under the mouse (either canvas), or null.
+   *  Drives hover emphasis: hovered arrow → opacity 1.0, others → dimmed. */
+  hoveredArrowIndex: number | null;
   panelScale: number;
   boardScale: number;
   displayInfo: {
@@ -49,6 +52,116 @@ export interface OverlayState {
     overlayBounds?: { x: number; y: number; width: number; height: number };
     displayBounds?: { x: number; y: number; width: number; height: number };
   } | null;
+}
+
+// ── Hit-test caches ──
+// Each render pass populates these so mouse handlers can map (x,y) → line index.
+// Stored in the canvas's own coordinate space (CSS pixels for video overlay,
+// 200×200 logical space for the virtual board canvas).
+export interface ArrowHitShape {
+  lineIndex: number;
+  x1: number; y1: number;
+  mx: number; my: number;   // bezier control point (equals midpoint when straight)
+  x2: number; y2: number;
+  lineWidth: number;
+  curved: boolean;
+}
+export interface HitCache {
+  arrows: ArrowHitShape[];
+  /** Board rect (canvas coords) to hit-test for "click to stop animation".
+   *  Non-null only while a PV animation is active on this canvas. */
+  animBoardRect: { x: number; y: number; width: number; height: number } | null;
+}
+export const videoHitCache: HitCache = { arrows: [], animBoardRect: null };
+export const vboardHitCache: HitCache = { arrows: [], animBoardRect: null };
+
+function distPointToSegment(
+  px: number, py: number,
+  x1: number, y1: number,
+  x2: number, y2: number,
+): number {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+/** Return the hovered line index for (px, py) in canvas-local coords, or null. */
+export function hitTestArrows(cache: HitCache, px: number, py: number): number | null {
+  let bestIdx: number | null = null;
+  let bestDist = Infinity;
+  for (const s of cache.arrows) {
+    const tol = s.lineWidth / 2 + 6;
+    let d: number;
+    if (!s.curved) {
+      d = distPointToSegment(px, py, s.x1, s.y1, s.x2, s.y2);
+    } else {
+      // Quadratic bezier: sample and take min distance to segment polyline
+      d = Infinity;
+      const steps = 16;
+      let prevX = s.x1, prevY = s.y1;
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const u = 1 - t;
+        const ix = u * u * s.x1 + 2 * u * t * s.mx + t * t * s.x2;
+        const iy = u * u * s.y1 + 2 * u * t * s.my + t * t * s.y2;
+        const dd = distPointToSegment(px, py, prevX, prevY, ix, iy);
+        if (dd < d) d = dd;
+        prevX = ix; prevY = iy;
+      }
+    }
+    if (d <= tol && d < bestDist) {
+      bestDist = d;
+      bestIdx = s.lineIndex;
+    }
+  }
+  return bestIdx;
+}
+
+export function hitTestAnimBoard(cache: HitCache, px: number, py: number): boolean {
+  const r = cache.animBoardRect;
+  if (!r) return false;
+  return px >= r.x && px <= r.x + r.width && py >= r.y && py <= r.y + r.height;
+}
+
+/** Compute the same geometry drawArrow uses, so the render loop can push a
+ *  hit-test shape without duplicating the math in callers. */
+function computeArrowHitShape(
+  arrow: ArrowDescriptor,
+  board: { x: number; y: number; width: number; height: number },
+  widthScale: number,
+  displayFlipped: boolean,
+  curveOffset: number,
+  lineIndex: number,
+): ArrowHitShape {
+  const squareW = board.width / 8;
+  const squareH = board.height / 8;
+  let fromFile = arrow.from.charCodeAt(0) - 97;
+  let fromRank = parseInt(arrow.from[1], 10) - 1;
+  let toFile = arrow.to.charCodeAt(0) - 97;
+  let toRank = parseInt(arrow.to[1], 10) - 1;
+  if (displayFlipped) {
+    fromFile = 7 - fromFile; fromRank = 7 - fromRank;
+    toFile = 7 - toFile; toRank = 7 - toRank;
+  }
+  const x1 = board.x + fromFile * squareW + squareW / 2;
+  const y1 = board.y + (7 - fromRank) * squareH + squareH / 2;
+  const x2 = board.x + toFile * squareW + squareW / 2;
+  const y2 = board.y + (7 - toRank) * squareH + squareH / 2;
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  const perpX = len > 0 ? -dy / len : 0;
+  const perpY = len > 0 ? dx / len : 0;
+  const offsetPx = curveOffset * (squareW + squareH) / 2;
+  const mx = (x1 + x2) / 2 + perpX * offsetPx;
+  const my = (y1 + y2) / 2 + perpY * offsetPx;
+  return {
+    lineIndex, x1, y1, mx, my, x2, y2,
+    lineWidth: arrow.width * widthScale,
+    curved: curveOffset !== 0,
+  };
 }
 
 // ── Arrow fade animation ──
@@ -573,8 +686,19 @@ export function drawArrow(
 }
 
 export function renderArrows(state: OverlayState): void {
-  // Skip virtual board arrow rendering while PV playback is animating or vboard overlay hidden
-  if ((window as any).__chessrayPvPlaying || !state.vboardOverlayVisible) return;
+  // Skip virtual board arrow rendering while PV playback is animating or vboard overlay hidden.
+  // When PV is playing, repurpose the vboard hit cache so clicking the virtual
+  // board canvas resets the animation (symmetric with actual-board click-to-stop).
+  if ((window as any).__chessrayPvPlaying) {
+    vboardHitCache.arrows = [];
+    vboardHitCache.animBoardRect = { x: 0, y: 0, width: 200, height: 200 };
+    return;
+  }
+  if (!state.vboardOverlayVisible) {
+    vboardHitCache.arrows = [];
+    vboardHitCache.animBoardRect = null;
+    return;
+  }
   if (!state.canvas) return;
 
   const size = 200;
@@ -631,6 +755,8 @@ export function renderArrows(state: OverlayState): void {
     vboardArrowState.animated = [];
     if (vboardArrowState.timer) { clearInterval(vboardArrowState.timer); vboardArrowState.timer = 0; }
     ensurePulseTimer('vboard', false, () => renderArrows(state));
+    vboardHitCache.arrows = [];
+    vboardHitCache.animBoardRect = null;
     return;
   }
 
@@ -638,9 +764,22 @@ export function renderArrows(state: OverlayState): void {
   const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
 
   const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
+  vboardHitCache.arrows = [];
+  vboardHitCache.animBoardRect = null;
+  const hoveredIdx = state.hoveredArrowIndex;
   for (let i = drawList.length - 1; i >= 0; i--) {
     const isLineArrow = !!drawList[i].arrow.label;
-    drawArrow(ctx, drawList[i].arrow, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow);
+    const arrow = drawList[i].arrow;
+    const lineIdx = state.currentArrows.findIndex(a => a.from === arrow.from && a.to === arrow.to);
+    let effectiveOpacity = arrow.opacity;
+    if (hoveredIdx !== null && lineIdx >= 0) {
+      if (lineIdx === hoveredIdx) effectiveOpacity = 1.0;
+      else effectiveOpacity = arrow.opacity * 0.25;
+    }
+    drawArrow(ctx, { ...arrow, opacity: effectiveOpacity }, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow);
+    if (lineIdx >= 0 && drawList[i].progress >= 1) {
+      vboardHitCache.arrows.push(computeArrowHitShape(arrow, virtualBoard, 1, state.displayFlipped, offsets[i], lineIdx));
+    }
   }
 
   // Preview emphasis: bell-gradient line + pulsing loss circle, half-sine envelope.
@@ -733,7 +872,12 @@ export function renderVideoOverlay(state: OverlayState): void {
     // Clear normal arrow animation state while analysis board is active
     videoArrowState.animated = [];
     if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
+    // Arrows aren't visible during animation — hit-test the board region instead
+    // so a click anywhere on the animated board resets the animation.
+    videoHitCache.arrows = [];
+    videoHitCache.animBoardRect = { x: bx, y: by, width: bw, height: bh };
   } else {
+    videoHitCache.animBoardRect = null;
     // Mark the played move's target square (on the moved piece) with a loss-colored dot
     if (result.played_move) {
       const pm = result.played_move;
@@ -747,8 +891,20 @@ export function renderVideoOverlay(state: OverlayState): void {
       const arrowScale = (bw + bh) / 2 / 192;
       const isPreview = state.pvPreviewLineIndex !== null;
       const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
+      videoHitCache.arrows = [];
+      const hoveredIdx = state.hoveredArrowIndex;
       for (let i = drawList.length - 1; i >= 0; i--) {
-        drawArrow(ctx, drawList[i].arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress, false);
+        const arrow = drawList[i].arrow;
+        const lineIdx = state.currentArrows.findIndex(a => a.from === arrow.from && a.to === arrow.to);
+        let effectiveOpacity = arrow.opacity;
+        if (hoveredIdx !== null && lineIdx >= 0) {
+          if (lineIdx === hoveredIdx) effectiveOpacity = 1.0;
+          else effectiveOpacity = arrow.opacity * 0.25;
+        }
+        drawArrow(ctx, { ...arrow, opacity: effectiveOpacity }, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress, false);
+        if (lineIdx >= 0 && drawList[i].progress >= 1) {
+          videoHitCache.arrows.push(computeArrowHitShape(arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], lineIdx));
+        }
       }
 
       // Preview emphasis: bell-gradient line + pulsing loss circle, half-sine envelope.
@@ -775,6 +931,7 @@ export function renderVideoOverlay(state: OverlayState): void {
       videoArrowState.animated = [];
       if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
       ensurePulseTimer('video', false, () => renderVideoOverlay(state));
+      videoHitCache.arrows = [];
     }
   }
 

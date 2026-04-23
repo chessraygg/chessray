@@ -569,6 +569,12 @@ canvas#video-overlay {
   pointer-events: none;
 }
 
+/* Arrow canvas accepts clicks so users can click arrows / click-to-reset
+ * during PV animation, mirroring the actual-board overlay interaction. */
+.board-container canvas#cv-arrow-canvas {
+  pointer-events: auto;
+}
+
 /* ── Piece grid with SVG pieces ── */
 
 .piece-grid {

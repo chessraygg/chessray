@@ -7,7 +7,7 @@ import type { PipelineResult } from '../shared/types.js';
 import { applyUciMoves, uciToSan } from '@chessray/core';
 import { lossToColor } from '../shared/arrows.js';
 import { loadPrefs, savePrefs } from './preferences.js';
-import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow } from './canvas-renderer.js';
+import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow, videoHitCache, vboardHitCache, hitTestArrows, hitTestAnimBoard } from './canvas-renderer.js';
 import { preloadPieceImages } from './piece-svg.js';
 import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid, setFpsBudgetMs, setActiveFpsDisplay, renderDebugHistoryNav, formatDebugReport, type DebugHistoryNavState } from './debug-panel.js';
 import { loadHistory, pushSlowFrame, clearHistory, snapshotToResult, type DebugSnapshot } from './debug-history.js';
@@ -49,6 +49,7 @@ const state: OverlayState = {
   vboardOverlayVisible: true,
   pvPreviewLineIndex: null,
   pvBoardState: null,
+  hoveredArrowIndex: null,
   panelScale: 1,
   boardScale: 1,
   displayInfo: null,
@@ -221,6 +222,103 @@ function initOverlay(): void {
     });
     userPanel.addEventListener('mouseleave', () => {
       window.chessRay.setMousePassthrough(true);
+    });
+  }
+
+  // Interactive arrows on the actual-board overlay canvas.
+  // The canvas must accept pointer events for hit-testing to work; window-level
+  // click-through is still managed by setMousePassthrough and only disabled
+  // while the mouse is actually over a hot region (arrow or animated board).
+  if (state.videoCanvas) {
+    state.videoCanvas.style.pointerEvents = 'auto';
+    let videoHotRegion = false;
+    const clearHotRegion = (): void => {
+      if (videoHotRegion) {
+        videoHotRegion = false;
+        window.chessRay.setMousePassthrough(true);
+      }
+      if (state.hoveredArrowIndex !== null) {
+        state.hoveredArrowIndex = null;
+        renderVideoOverlay(state);
+        renderArrows(state);
+      }
+      if (state.videoCanvas) state.videoCanvas.style.cursor = '';
+    };
+    state.videoCanvas.addEventListener('mousemove', (e) => {
+      const px = e.clientX;
+      const py = e.clientY;
+      const overAnimBoard = state.pvBoardState !== null && hitTestAnimBoard(videoHitCache, px, py);
+      const hoveredArrow = state.pvBoardState === null ? hitTestArrows(videoHitCache, px, py) : null;
+      const inHotRegion = overAnimBoard || hoveredArrow !== null;
+      if (inHotRegion && !videoHotRegion) {
+        videoHotRegion = true;
+        window.chessRay.setMousePassthrough(false);
+      } else if (!inHotRegion && videoHotRegion) {
+        videoHotRegion = false;
+        window.chessRay.setMousePassthrough(true);
+      }
+      if (state.videoCanvas) {
+        state.videoCanvas.style.cursor = inHotRegion ? 'pointer' : '';
+      }
+      if (hoveredArrow !== state.hoveredArrowIndex) {
+        state.hoveredArrowIndex = hoveredArrow;
+        renderVideoOverlay(state);
+        renderArrows(state);
+      }
+    });
+    state.videoCanvas.addEventListener('mouseleave', clearHotRegion);
+    state.videoCanvas.addEventListener('click', (e) => {
+      const px = e.clientX;
+      const py = e.clientY;
+      if (state.pvBoardState !== null) {
+        if (hitTestAnimBoard(videoHitCache, px, py)) stopPvLine();
+        return;
+      }
+      const hovered = hitTestArrows(videoHitCache, px, py);
+      if (hovered !== null) triggerLine(hovered);
+    });
+  }
+
+  // Interactive arrows on the virtual board canvas (inside the panel).
+  // Passthrough is already handled by the panel's hover listeners, so we only
+  // need hit-testing + cursor feedback + click dispatch.
+  if (state.canvas) {
+    const vboard = state.canvas;
+    const clientToCanvas = (e: MouseEvent): { x: number; y: number } => {
+      const rect = vboard.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left) * 200 / rect.width,
+        y: (e.clientY - rect.top) * 200 / rect.height,
+      };
+    };
+    vboard.addEventListener('mousemove', (e) => {
+      const { x, y } = clientToCanvas(e);
+      const playing = (window as any).__chessrayPvPlaying;
+      const overAnimBoard = playing && hitTestAnimBoard(vboardHitCache, x, y);
+      const hoveredArrow = !playing ? hitTestArrows(vboardHitCache, x, y) : null;
+      vboard.style.cursor = (overAnimBoard || hoveredArrow !== null) ? 'pointer' : '';
+      if (hoveredArrow !== state.hoveredArrowIndex) {
+        state.hoveredArrowIndex = hoveredArrow;
+        renderVideoOverlay(state);
+        renderArrows(state);
+      }
+    });
+    vboard.addEventListener('mouseleave', () => {
+      vboard.style.cursor = '';
+      if (state.hoveredArrowIndex !== null) {
+        state.hoveredArrowIndex = null;
+        renderVideoOverlay(state);
+        renderArrows(state);
+      }
+    });
+    vboard.addEventListener('click', (e) => {
+      const { x, y } = clientToCanvas(e);
+      if ((window as any).__chessrayPvPlaying) {
+        if (hitTestAnimBoard(vboardHitCache, x, y)) stopPvLine();
+        return;
+      }
+      const hovered = hitTestArrows(vboardHitCache, x, y);
+      if (hovered !== null) triggerLine(hovered);
     });
   }
 
@@ -1262,19 +1360,8 @@ function initOverlay(): void {
         // (userLockedLine can be reset by processPendingResult on eval-FEN change,
         // which caused the toggle to need two clicks to take effect).
         const playingThis = state.lineVisible && state.selectedLineIndex === idx;
-        if (playingThis) {
-          userLockedLine = -1;
-          (window as any).__chessrayPvPlayStop?.();
-          state.arrowsVisible = true;
-          state.lineVisible = false;
-          renderArrows(state);
-          renderVideoOverlay(state);
-          updateCompactMoves();
-        } else {
-          userLockedLine = idx;
-          selectLine(idx);
-          updateCompactMoves();
-        }
+        if (playingThis) stopPvLine();
+        else triggerLine(idx);
       });
       // Fit text to container width
       const label = el.querySelector('.compact-label') as HTMLElement;
@@ -1385,6 +1472,28 @@ function selectLine(index: number): void {
     renderArrows(state);
     renderVideoOverlay(state);
   }
+}
+
+/** User clicked an arrow — lock to that line and play its PV animation.
+ *  Mirrors the compact-pill click path so both entry points behave identically. */
+function triggerLine(index: number): void {
+  userLockedLine = index;
+  state.hoveredArrowIndex = null;
+  selectLine(index);
+  (window as any).__chessrayUpdateCompactMoves?.();
+}
+
+/** User clicked the animated board (or compact pill while a line is playing) —
+ *  stop playback and restore the arrow view. */
+function stopPvLine(): void {
+  userLockedLine = -1;
+  state.hoveredArrowIndex = null;
+  (window as any).__chessrayPvPlayStop?.();
+  state.arrowsVisible = true;
+  state.lineVisible = false;
+  renderArrows(state);
+  renderVideoOverlay(state);
+  (window as any).__chessrayUpdateCompactMoves?.();
 }
 
 function processPendingResult(): void {
