@@ -43,6 +43,11 @@ export interface OverlayState {
   /** Line index of the arrow currently under the mouse (either canvas), or null.
    *  Drives hover emphasis: hovered arrow → opacity 1.0, others → dimmed. */
   hoveredArrowIndex: number | null;
+  /** User-configurable arrow knobs. `arrowMaxWidth` is the best-move (rank 0)
+   *  width at the canonical 192px board; other ranks scale proportionally.
+   *  `arrowMaxOpacity` is the uniform alpha applied to every arrow. */
+  arrowMaxWidth: number;
+  arrowMaxOpacity: number;
   panelScale: number;
   boardScale: number;
   displayInfo: {
@@ -812,13 +817,17 @@ export function renderArrows(state: OverlayState): void {
     return;
   }
 
-  const animated = updateAnimatedArrows(targetArrows, vboardArrowState, () => renderArrows(state));
+  // Apply user opacity pref to the fade-in target so animated.fadeOpacity ramps
+  // toward the user's max, and keep user width pref as a widthScale multiplier.
+  const scaledTargets = targetArrows.map(a => ({ ...a, opacity: state.arrowMaxOpacity }));
+  const animated = updateAnimatedArrows(scaledTargets, vboardArrowState, () => renderArrows(state));
   const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
 
   const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
   vboardHitCache.arrows = [];
   vboardHitCache.animBoardRect = null;
   const hoveredIdx = state.hoveredArrowIndex;
+  const userWidthMult = state.arrowMaxWidth / 5;
   for (let i = drawList.length - 1; i >= 0; i--) {
     const isLineArrow = !!drawList[i].arrow.label;
     const arrow = drawList[i].arrow;
@@ -828,9 +837,9 @@ export function renderArrows(state: OverlayState): void {
       if (lineIdx === hoveredIdx) effectiveOpacity = 1.0;
       else effectiveOpacity = arrow.opacity * 0.25;
     }
-    drawArrow(ctx, { ...arrow, opacity: effectiveOpacity }, virtualBoard, 1, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow);
+    drawArrow(ctx, { ...arrow, opacity: effectiveOpacity }, virtualBoard, userWidthMult, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow);
     if (lineIdx >= 0 && drawList[i].progress >= 1) {
-      vboardHitCache.arrows.push(computeArrowHitShape(arrow, virtualBoard, 1, state.displayFlipped, offsets[i], lineIdx));
+      vboardHitCache.arrows.push(computeArrowHitShape(arrow, virtualBoard, userWidthMult, state.displayFlipped, offsets[i], lineIdx));
     }
   }
 
@@ -952,9 +961,12 @@ export function renderVideoOverlay(state: OverlayState): void {
 
     if (state.arrowsVisible || state.pvPreviewLineIndex !== null) {
       const targetArrows = getActiveArrows(state);
-      const animated = updateAnimatedArrows(targetArrows, videoArrowState, () => renderVideoOverlay(state));
+      // Apply user opacity pref as the fade-in target.
+      const scaledTargets = targetArrows.map(a => ({ ...a, opacity: state.arrowMaxOpacity }));
+      const animated = updateAnimatedArrows(scaledTargets, videoArrowState, () => renderVideoOverlay(state));
       const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
-      const arrowScale = (bw + bh) / 2 / 192;
+      const userWidthMult = state.arrowMaxWidth / 5;
+      const arrowScale = (bw + bh) / 2 / 192 * userWidthMult;
       const isPreview = state.pvPreviewLineIndex !== null;
       const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
       videoHitCache.arrows = [];

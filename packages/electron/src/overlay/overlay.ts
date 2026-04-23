@@ -50,6 +50,8 @@ const state: OverlayState = {
   pvPreviewLineIndex: null,
   pvBoardState: null,
   hoveredArrowIndex: null,
+  arrowMaxWidth: 5,
+  arrowMaxOpacity: 0.85,
   panelScale: 1,
   boardScale: 1,
   displayInfo: null,
@@ -201,6 +203,8 @@ function initOverlay(): void {
   state.lineVisible = false;
   state.pvDepth = prefs.pvDepth;
   state.evalBarVisible = prefs.evalBarVisible;
+  state.arrowMaxWidth = prefs.arrowMaxWidth;
+  state.arrowMaxOpacity = prefs.arrowMaxOpacity;
 
   state.videoCanvas = document.getElementById('video-overlay') as HTMLCanvasElement;
   userPanel = document.getElementById('user-panel') as HTMLDivElement;
@@ -1183,6 +1187,36 @@ function initOverlay(): void {
     changeDetectCheckbox.addEventListener('change', () => {
       savePrefs({ changeDetect: changeDetectCheckbox.checked });
       window.chessRay.setChangeDetect(changeDetectCheckbox.checked);
+    });
+  }
+
+  // ── Arrow size / opacity sliders ──
+  const arrowWidthSlider = document.getElementById('cv-arrow-max-width') as HTMLInputElement | null;
+  const arrowWidthVal = document.getElementById('cv-arrow-max-width-val');
+  if (arrowWidthSlider && arrowWidthVal) {
+    arrowWidthSlider.value = String(state.arrowMaxWidth);
+    arrowWidthVal.textContent = String(state.arrowMaxWidth);
+    arrowWidthSlider.addEventListener('input', () => {
+      const v = parseInt(arrowWidthSlider.value, 10);
+      state.arrowMaxWidth = v;
+      arrowWidthVal.textContent = String(v);
+      savePrefs({ arrowMaxWidth: v });
+      renderArrows(state);
+      renderVideoOverlay(state);
+    });
+  }
+  const arrowOpacitySlider = document.getElementById('cv-arrow-max-opacity') as HTMLInputElement | null;
+  const arrowOpacityVal = document.getElementById('cv-arrow-max-opacity-val');
+  if (arrowOpacitySlider && arrowOpacityVal) {
+    arrowOpacitySlider.value = String(Math.round(state.arrowMaxOpacity * 100));
+    arrowOpacityVal.textContent = String(Math.round(state.arrowMaxOpacity * 100));
+    arrowOpacitySlider.addEventListener('input', () => {
+      const pct = parseInt(arrowOpacitySlider.value, 10);
+      state.arrowMaxOpacity = pct / 100;
+      arrowOpacityVal.textContent = String(pct);
+      savePrefs({ arrowMaxOpacity: state.arrowMaxOpacity });
+      renderArrows(state);
+      renderVideoOverlay(state);
     });
   }
 

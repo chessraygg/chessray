@@ -146,6 +146,16 @@
           <label data-tip="Skip recognition when board pixels haven't changed (faster but may miss subtle changes)">Change detect</label>
           <input type="checkbox" id="cv-change-detect" checked>
         </div>
+        <div class="pv-depth-row">
+          <label data-tip="Best-move arrow width (pixels at the canonical board size). Other ranks scale proportionally.">Arrow size</label>
+          <input type="range" id="cv-arrow-max-width" min="3" max="10" value="5" step="1">
+          <span id="cv-arrow-max-width-val">5</span>
+        </div>
+        <div class="pv-depth-row">
+          <label data-tip="Uniform opacity applied to every arrow (color still carries quality).">Arrow opacity</label>
+          <input type="range" id="cv-arrow-max-opacity" min="20" max="100" value="85" step="5">
+          <span id="cv-arrow-max-opacity-val">85</span><span style="font-size:8px;color:var(--text-faint)">%</span>
+        </div>
       </div>
 
       <div class="section-body debug-section" id="debug-section" data-section-id="debug" data-section-title="Debug">

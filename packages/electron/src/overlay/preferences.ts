@@ -39,6 +39,12 @@ export interface Prefs {
   gravityUp: boolean;
   /** Debug section's board-preview image scale, percent of panel width (25..200). */
   debugImgScale: number;
+  /** Best-move (rank 0) arrow width at the canonical 192px board size. Other
+   *  ranks scale proportionally, preserving the current 5:4:3 ratio. */
+  arrowMaxWidth: number;
+  /** Uniform alpha applied to every arrow. Color carries quality; this knob
+   *  just adjusts overall presence. */
+  arrowMaxOpacity: number;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -72,6 +78,8 @@ export const DEFAULT_PREFS: Prefs = {
   sectionLayout: null,
   gravityUp: true,
   debugImgScale: 100,
+  arrowMaxWidth: 5,
+  arrowMaxOpacity: 0.85,
 };
 
 export function loadPrefs(): Prefs {
