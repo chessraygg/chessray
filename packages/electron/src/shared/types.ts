@@ -37,7 +37,12 @@ export interface PipelineResult {
     to: string;      // algebraic square (destination)
     uci: string;     // full UCI string (includes promotion piece)
     san: string;     // SAN notation for display
-    loss_cp: number; // centipawn loss vs best move from previous eval
+    /** Centipawn loss vs the previous position's best move. `null` means the
+     *  move was detected but its quality isn't known yet (eval still running,
+     *  or move not in top_moves). Renderers should skip the quality badge
+     *  until this resolves to a number rather than defaulting to 0 (which
+     *  would falsely paint a green-checkmark "excellent" marker). */
+    loss_cp: number | null;
   } | null;
   detection_status?: string; // human-readable detection status for debug display
   board_image_url?: string; // data URL of the cropped board for debug display

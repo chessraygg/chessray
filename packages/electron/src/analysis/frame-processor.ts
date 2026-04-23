@@ -674,7 +674,10 @@ export class FrameProcessor {
             to: seqMove.uci.slice(2, 4),
             uci: seqMove.uci,
             san: seqMove.san,
-            loss_cp: lossCp ?? 0,
+            // null = "eval hasn't resolved this move's quality yet". Renderers
+            // skip the marker until this becomes a real number (otherwise a
+            // coerced 0 would paint a false green-checkmark).
+            loss_cp: lossCp,
           };
           if (lossCp !== null) {
             log(`Sequential move: ${seqMove.san} (${seqMove.uci}) loss=${lossCp}cp`);

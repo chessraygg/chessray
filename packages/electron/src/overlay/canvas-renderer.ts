@@ -853,9 +853,12 @@ export function renderArrows(state: OverlayState): void {
 
   // Mark the played move's target square (on the moved piece) with a loss-colored dot
   const userSizeScale = state.overlaySize / 5;
-  if (state.currentResult?.played_move) {
-    const pm = state.currentResult.played_move;
-    drawPlayedMoveMarker(ctx, pm.to, pm.loss_cp, virtualBoard, state.displayFlipped, 1, userSizeScale, state.overlayOpacity);
+  // Skip the quality marker while loss is still unknown (eval pending) —
+  // rendering anything would either misleadingly claim "excellent" or paint
+  // a fake colored disc.
+  const pmVboard = state.currentResult?.played_move;
+  if (pmVboard && pmVboard.loss_cp !== null) {
+    drawPlayedMoveMarker(ctx, pmVboard.to, pmVboard.loss_cp, virtualBoard, state.displayFlipped, 1, userSizeScale, state.overlayOpacity);
   }
 
   const targetArrows = getActiveArrows(state);
@@ -1010,9 +1013,9 @@ export function renderVideoOverlay(state: OverlayState): void {
     videoHitCache.animBoardRect = null;
     // Mark the played move's target square (on the moved piece) with a loss-colored dot
     const userSizeScaleVideo = state.overlaySize / 5;
-    if (result.played_move) {
-      const pm = result.played_move;
-      drawPlayedMoveMarker(ctx, pm.to, pm.loss_cp, boardRect, state.displayFlipped, 1, userSizeScaleVideo, state.overlayOpacity);
+    const pmVideo = result.played_move;
+    if (pmVideo && pmVideo.loss_cp !== null) {
+      drawPlayedMoveMarker(ctx, pmVideo.to, pmVideo.loss_cp, boardRect, state.displayFlipped, 1, userSizeScaleVideo, state.overlayOpacity);
     }
 
     if (state.arrowsVisible || state.pvPreviewLineIndex !== null) {
