@@ -615,7 +615,8 @@ function drawPlayedMoveMarker(
   ctx.font = `bold ${fontSize}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const text = `−${(lossCp / 100).toFixed(1)}`;
+  // Disc color already encodes "this is a cp loss" — no minus sign needed.
+  const text = (lossCp / 100).toFixed(1);
   ctx.globalAlpha = glyphAlpha;
   ctx.lineJoin = 'round';
   ctx.lineWidth = Math.max(2.5, fontSize * 0.22);
