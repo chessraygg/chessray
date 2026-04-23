@@ -1214,14 +1214,28 @@ function initOverlay(): void {
     savePrefs({ collapsed: c });
   }
 
+  // Remember the expanded-mode height so entering compact shrinks to fit and
+  // exiting restores the user's previous size.
+  let savedExpandedHeight: number | null = null;
   function setCompactMode(on: boolean): void {
     if (on && collapsed) setCollapsed(false);
     compactMode = on;
     userPanel?.classList.toggle('compact', on);
     compactBtn?.classList.toggle('active', on);
-    // compact-moves is always visible now
     savePrefs({ compactMode: on });
-    if (on) updateCompactMoves();
+    if (on) {
+      updateCompactMoves();
+      if (userPanel) {
+        savedExpandedHeight = userPanel.offsetHeight;
+        // Board fills width, so ~square; add room for compact-moves, status, hint, padding
+        const w = userPanel.offsetWidth;
+        const height = Math.round(w + 96);
+        userPanel.style.height = `${height}px`;
+      }
+    } else if (userPanel && savedExpandedHeight !== null) {
+      userPanel.style.height = `${savedExpandedHeight}px`;
+      savedExpandedHeight = null;
+    }
   }
 
   if (collapsed) setCollapsed(true);
