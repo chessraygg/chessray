@@ -35,6 +35,7 @@
     .ws-card:hover .section-header .actions { opacity: 1; }
     .ws-card.dragging { opacity: 0.45; }
     .ws-card.drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+    .ws-card.hidden { display: none; }
 
     .grip {
       display: inline-block;
@@ -81,14 +82,34 @@
     .tune-content { padding: 10px 12px; flex: 1; overflow: auto; }
     .tune-content[data-tab-pane] { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
 
-    /* Compact mode */
-    .ws-panel.compact { width: 260px; height: 290px; }
+    /* Compact mode — strip chrome only. Visibility of each card is controlled
+       by the Sections menu (.hidden class) and survives the toggle, so the
+       user picks what stays in the compact view by hiding the rest first. */
+    .ws-panel.compact { width: 280px; height: auto; max-height: 720px; }
     .ws-panel.compact .top-bar { display: none; }
-    .ws-panel.compact .ws-body { grid-template-columns: 1fr; grid-template-rows: 1fr; }
-    .ws-panel.compact .ws-card:not(.board-card) { display: none; }
+    .ws-panel.compact .ws-body {
+      display: flex;
+      flex-direction: column;
+      grid-template-columns: none;
+      grid-template-rows: none;
+      gap: 1px;
+    }
+    .ws-panel.compact .ws-card { flex: 0 0 auto; }
+    .ws-panel.compact .ws-card.span-2 { grid-column: auto; }
     .ws-panel.compact .section-header { display: none; }
+    .ws-panel.compact .ws-card .section-body { padding: 4px; }
     .ws-panel.compact .board-meta { display: none; }
     .ws-panel.compact .virtual-board { max-width: none; }
+    .compact-hint { display: none; }
+    .ws-panel.compact .compact-hint {
+      display: block;
+      text-align: center;
+      font: 8px/1 var(--sans);
+      color: var(--text-faint);
+      opacity: 0.5;
+      padding: 3px 0 1px;
+      user-select: none;
+    }
   </style>
 </head>
 <body>
@@ -139,12 +160,12 @@
 
       <div class="menu" id="m-sections">
         <div class="menu-label">Visible sections</div>
-        <label class="menu-item"><input type="checkbox" checked>Board</label>
-        <label class="menu-item"><input type="checkbox" checked>Eval</label>
-        <label class="menu-item"><input type="checkbox" checked>Lines</label>
-        <label class="menu-item"><input type="checkbox" checked>Tuning</label>
-        <label class="menu-item"><input type="checkbox">Tools</label>
-        <label class="menu-item"><input type="checkbox">Diagnostics</label>
+        <label class="menu-item"><input type="checkbox" data-section="board" checked>Board</label>
+        <label class="menu-item"><input type="checkbox" data-section="eval" checked>Eval</label>
+        <label class="menu-item"><input type="checkbox" data-section="lines" checked>Lines</label>
+        <label class="menu-item"><input type="checkbox" data-section="tune" checked>Tuning</label>
+        <label class="menu-item"><input type="checkbox" data-section="tools">Tools</label>
+        <label class="menu-item"><input type="checkbox" data-section="diag">Diagnostics</label>
         <div class="menu-divider"></div>
         <div class="menu-item">Reset layout</div>
       </div>
@@ -172,7 +193,7 @@
     </div>
 
     <div class="ws-body">
-      <div class="ws-card board-card" draggable="true">
+      <div class="ws-card board-card" data-section="board" draggable="true">
         <div class="section-header">
           <span class="grip">⋮⋮</span>Board
           <div class="actions">
@@ -194,7 +215,7 @@
         </div>
       </div>
 
-      <div class="ws-card eval-card" draggable="true">
+      <div class="ws-card eval-card" data-section="eval" draggable="true">
         <div class="section-header">
           <span class="grip">⋮⋮</span>Eval
           <div class="actions"><button class="icon-btn" title="Hide">×</button></div>
@@ -210,7 +231,7 @@
         </div>
       </div>
 
-      <div class="ws-card lines-card" draggable="true">
+      <div class="ws-card lines-card" data-section="lines" draggable="true">
         <div class="section-header">
           <span class="grip">⋮⋮</span>Lines
           <div class="actions"><button class="icon-btn" title="Hide">×</button></div>
@@ -220,7 +241,7 @@
         </div>
       </div>
 
-      <div class="ws-card tune-card span-2" draggable="true">
+      <div class="ws-card tune-card span-2" data-section="tune" draggable="true">
         <div class="section-header">
           <span class="grip">⋮⋮</span>Tuning
           <div class="actions"><button class="icon-btn" title="Hide">×</button></div>
@@ -251,18 +272,84 @@
           </div>
         </div>
       </div>
+
+      <div class="ws-card tools-card hidden" data-section="tools" draggable="true">
+        <div class="section-header">
+          <span class="grip">⋮⋮</span>Tools
+          <div class="actions"><button class="icon-btn" title="Hide">×</button></div>
+        </div>
+        <div class="section-body" style="padding:8px 10px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:rgba(255,255,255,0.03);border-radius:3px;font-size:11px;color:var(--text-dim)">♞ Lichess analysis<button style="margin-left:auto;padding:3px 8px;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);border-radius:3px;font-size:10px;cursor:pointer">Open</button></div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--text-dim);padding:0 8px"><input type="checkbox" checked>Auto-sync to Lichess</label>
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:rgba(255,255,255,0.03);border-radius:3px;font-size:11px;color:var(--text-dim)">⎘ Copy FEN<button style="margin-left:auto;padding:3px 8px;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);border-radius:3px;font-size:10px;cursor:pointer">Copy</button></div>
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:rgba(255,255,255,0.03);border-radius:3px;font-size:11px;color:var(--text-dim)">● Record frames<button style="margin-left:auto;padding:3px 8px;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);border-radius:3px;font-size:10px;cursor:pointer">Start</button></div>
+        </div>
+      </div>
+
+      <div class="ws-card diag-card span-2 hidden" data-section="diag" draggable="true">
+        <div class="section-header">
+          <span class="grip">⋮⋮</span>Diagnostics
+          <div class="actions"><button class="icon-btn" title="Hide">×</button></div>
+        </div>
+        <div class="section-body" style="padding:0;display:flex;flex-direction:column">
+          <div class="tabs" data-tabs="diag">
+            <div class="tab active" data-tab="image">Image</div>
+            <div class="tab" data-tab="fen">FEN</div>
+            <div class="tab" data-tab="hl">Highlights</div>
+            <div class="tab" data-tab="time">Timing</div>
+          </div>
+          <div style="padding:10px 12px;flex:1;overflow:auto">
+            <div data-tab-pane="image">
+              <div style="aspect-ratio:1.4;background:#1a1a1a url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Crect width='4' height='4' fill='%23222'/%3E%3Crect x='4' y='4' width='4' height='4' fill='%23222'/%3E%3C/svg%3E&quot;);border:1px solid var(--border);border-radius:3px"></div>
+              <div class="row" style="margin-top:8px"><label>Img size</label><input type="range" min="25" max="200" value="100"><span class="val">100%</span></div>
+            </div>
+            <div data-tab-pane="fen" style="display:none">
+              <div style="font-family:ui-monospace,monospace;font-size:10px;padding:6px 8px;background:rgba(0,0,0,0.3);border-radius:3px;color:var(--text-dim);word-break:break-all">r2q1rk1/pp2bppp/2n1pn2/3p4/3P4/2NBPN2/PP3PPP/R1BQ1RK1 w - - 0 12</div>
+              <div style="margin-top:6px;font-size:10px;color:var(--text-faint)">orientation: White at bottom · OCR ✓ · pawn-dir ↑</div>
+            </div>
+            <div data-tab-pane="hl" style="display:none;font-size:10px;color:var(--text-dim);font-family:ui-monospace,monospace;line-height:1.5">
+              <div>last move: <span style="color:var(--accent)">e7-d5</span> · score 0.92</div>
+              <div>candidates: e7-e6 (0.41) · d6-d5 (0.18)</div>
+            </div>
+            <div data-tab-pane="time" style="display:none;font-size:10px;color:var(--text-dim);font-family:ui-monospace,monospace;line-height:1.6">
+              <div>capture 12ms · board 24ms · pieces 142ms</div>
+              <div>fen 3ms · eval 320ms <span style="color:var(--accent)">●</span></div>
+              <div>total 501ms · fps 2.0</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+    <div class="compact-hint">double-click to expand</div>
   </div>
 
   <script type="module">
     import { renderBoard, renderLines, attachMenuToggle, setupTabs, bindSliders } from '../mock.js';
     renderBoard(document.getElementById('board'));
     renderLines(document.getElementById('lines'));
-    setupTabs('[data-tabs]');
+    setupTabs('.ws-card .section-body');
     bindSliders();
     attachMenuToggle('m-sections-btn', 'm-sections');
     attachMenuToggle('m-display-btn', 'm-display');
     attachMenuToggle('m-tools-btn', 'm-tools');
+
+    // Sections menu ⇄ card .hidden state (and per-card × hide buttons)
+    function setSectionVisible(id, visible) {
+      const card = document.querySelector(`.ws-card[data-section="${id}"]`);
+      const cb = document.querySelector(`#m-sections input[data-section="${id}"]`);
+      if (card) card.classList.toggle('hidden', !visible);
+      if (cb) cb.checked = visible;
+    }
+    document.querySelectorAll('#m-sections input[data-section]').forEach((cb) => {
+      cb.addEventListener('change', () => setSectionVisible(cb.dataset.section, cb.checked));
+    });
+    document.querySelectorAll('.ws-card .section-header .icon-btn[title="Hide"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const card = btn.closest('.ws-card');
+        if (card?.dataset.section) setSectionVisible(card.dataset.section, false);
+      });
+    });
 
     // anchor menus under their buttons
     ['sections','display','tools'].forEach((id) => {
@@ -303,6 +390,9 @@
     });
     document.getElementById('topbar-compact').addEventListener('click', () => {
       panel.classList.toggle('compact');
+    });
+    panel.addEventListener('dblclick', () => {
+      if (panel.classList.contains('compact')) panel.classList.remove('compact');
     });
   </script>
 </body>
