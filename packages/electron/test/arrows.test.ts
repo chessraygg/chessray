@@ -34,9 +34,13 @@ describe('lossToColor', () => {
 });
 
 describe('rankToWidth', () => {
-  it('returns decreasing widths for ranks 0, 1, 2', () => {
-    expect(rankToWidth(0)).toBeGreaterThan(rankToWidth(1));
-    expect(rankToWidth(1)).toBeGreaterThan(rankToWidth(2));
+  // Uniform width by design: we don't encode engine-preference order in arrow
+  // thickness. The list of top_moves itself communicates rank; arrows are
+  // drawn at the same size regardless of rank.
+  it('returns the same width for every rank', () => {
+    expect(rankToWidth(0)).toBe(rankToWidth(1));
+    expect(rankToWidth(1)).toBe(rankToWidth(2));
+    expect(rankToWidth(5)).toBe(rankToWidth(0));
   });
 });
 
@@ -72,10 +76,10 @@ describe('computeArrows', () => {
     expect(arrows[0].loss_cp).toBe(0);
   });
 
-  it('arrows have decreasing width', () => {
+  it('arrows have equal width regardless of rank', () => {
     const arrows = computeArrows(topMoves);
-    expect(arrows[0].width).toBeGreaterThan(arrows[1].width);
-    expect(arrows[1].width).toBeGreaterThan(arrows[2].width);
+    expect(arrows[0].width).toBe(arrows[1].width);
+    expect(arrows[1].width).toBe(arrows[2].width);
   });
 
   it('arrows have correct from/to squares', () => {

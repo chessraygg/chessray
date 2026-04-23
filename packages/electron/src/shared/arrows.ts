@@ -27,17 +27,18 @@ export function lossToColor(lossCp: number): string {
 }
 
 /**
- * Map move rank (0=best, 1=second, 2=third) to arrow width.
+ * Arrow width — uniform across all top-move ranks.
+ * Color (loss) carries quality, and we no longer shrink alternative-line
+ * arrows by rank: the engine's preference order is communicated by the list
+ * itself, not by shrinking the arrows.
  */
-export function rankToWidth(rank: number): number {
-  const widths = [5, 4, 3];
-  return widths[Math.min(rank, widths.length - 1)];
+export function rankToWidth(_rank: number): number {
+  return 5;
 }
 
 /**
- * Map move rank to opacity.
- * Uniform across all ranks so color (loss) carries 100% of the quality signal
- * and width carries rank. Opacity is just "presence", tuned for readability.
+ * Arrow opacity — uniform across all top-move ranks. Color carries quality,
+ * opacity is just overall "presence", tuned for readability.
  */
 export function rankToOpacity(_rank: number): number {
   return 0.85;
