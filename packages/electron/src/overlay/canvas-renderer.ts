@@ -646,10 +646,13 @@ export function drawArrow(
   const lineWidth = arrow.width * widthScale;
   const wStart = Math.max(lineWidth * 0.2, 1.5);
   const wTip = wStart + (lineWidth - wStart) * t;
-  // Head length scales with the current tip width so that during fade-in
-  // (small progress → thin tip) the head stays proportional and can't pull
-  // endX,endY behind the source.
-  const headLength = wTip * 3;
+  // Head is a triangle whose base exactly matches the ribbon tip width (so
+  // there's no perpendicular gap at the join) and whose length along the
+  // shaft is 2× the tip width (classic 2:1 pointy arrowhead). Everything
+  // scales with the current tip width, so during fade-in the head stays
+  // proportional and endX,endY can't land behind the source.
+  const headShaft = wTip * 2;   // head length along shaft (endX→tip)
+  const headBase = wTip;        // head base width at endX (= ribbon tip width)
 
   // Compute perpendicular offset for the control point (curve)
   const dx = x2 - x1;
@@ -668,9 +671,9 @@ export function drawArrow(
   // For a quadratic bezier, the tangent at t=1 is the direction from control point to end.
   const tipAngle = Math.atan2(y2 - my, x2 - mx);
 
-  // Shorten the curve so it ends before the arrowhead (unless no arrowhead)
-  const endX = noArrowhead ? x2 : x2 - headLength * Math.cos(tipAngle);
-  const endY = noArrowhead ? y2 : y2 - headLength * Math.sin(tipAngle);
+  // Ribbon ends exactly at the head's base plane (no along-shaft sliver).
+  const endX = noArrowhead ? x2 : x2 - headShaft * Math.cos(tipAngle);
+  const endY = noArrowhead ? y2 : y2 - headShaft * Math.sin(tipAngle);
 
   ctx.save();
   const r = parseInt(arrow.color.slice(1, 3), 16);
@@ -749,15 +752,19 @@ export function drawArrow(
     ctx.fill();
   }
 
-  // Arrowhead — same length as the gap between x2,y2 and endX,endY (headLength
-  // was computed from the current tip width, so head and ribbon stay in sync).
+  // Arrowhead — triangle from (x2,y2) back to base vertices placed exactly at
+  // the ribbon's end plane (endX,endY) offset perpendicular by the ribbon's
+  // tip half-width. Base width = wTip so ribbon and head meet flush.
   if (!noArrowhead) {
+    const halfBase = headBase / 2;
+    const perpX = -Math.sin(tipAngle);
+    const perpY = Math.cos(tipAngle);
     ctx.globalAlpha = arrow.opacity;
     ctx.fillStyle = arrow.color;
     ctx.beginPath();
     ctx.moveTo(x2, y2);
-    ctx.lineTo(x2 - headLength * Math.cos(tipAngle - Math.PI / 6), y2 - headLength * Math.sin(tipAngle - Math.PI / 6));
-    ctx.lineTo(x2 - headLength * Math.cos(tipAngle + Math.PI / 6), y2 - headLength * Math.sin(tipAngle + Math.PI / 6));
+    ctx.lineTo(endX + perpX * halfBase, endY + perpY * halfBase);
+    ctx.lineTo(endX - perpX * halfBase, endY - perpY * halfBase);
     ctx.closePath();
     ctx.fill();
   }
