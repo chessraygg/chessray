@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Arrow design alternatives</title>
+  <link rel="stylesheet" href="./shared.css">
+  <style>
+    body {
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 80px;
+      gap: 0;
+    }
+    h1 { font-size: 18px; margin: 0 0 4px; font-weight: 600; letter-spacing: 0.02em; }
+    .subtitle { color: var(--text-dim); font-size: 12px; margin-bottom: 28px; max-width: 640px; text-align: center; line-height: 1.5; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+      max-width: 1200px;
+      width: 100%;
+    }
+    .tile {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .tile.highlight { border-color: var(--accent); }
+    .tile h2 {
+      font-size: 13px;
+      font-weight: 600;
+      margin: 0;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .tile .tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-dim);
+      font-weight: 400;
+      letter-spacing: 0.02em;
+    }
+    .tile.highlight .tag { background: var(--accent-soft); color: var(--accent); }
+    .tile p { margin: 0; font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+    .board-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    .board-wrap canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin: 0 0 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+    .control input[type="range"] { width: 100px; }
+    .control label { color: var(--text-dim); }
+  </style>
+</head>
+<body>
+  <div class="playground-label">arrows <a href="./index.html">← playground</a></div>
+
+  <h1>Arrow design alternatives</h1>
+  <div class="subtitle">
+    Same three moves (e2e4, d2d4, g1f3) drawn in each style, ranked best → worst with the current loss-color palette.
+    Scroll to compare. Tweak board darkness to see legibility on bright/dark squares.
+  </div>
+
+  <div class="controls">
+    <div class="control">
+      <label>board brightness</label>
+      <input type="range" id="bgLight" min="0" max="100" value="35">
+    </div>
+    <div class="control">
+      <label>arrow scale</label>
+      <input type="range" id="scale" min="60" max="160" value="100">
+    </div>
+    <div class="control">
+      <label><input type="checkbox" id="flipped"> flipped</label>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <script>
+    // ── Demo data ──
+    // Three arrows with descending rank (best move thickest + fully opaque).
+    const MOVES = [
+      { from: 'e2', to: 'e4', rank: 0, loss_cp: 0 },
+      { from: 'd2', to: 'd4', rank: 1, loss_cp: 15 },
+      { from: 'g1', to: 'f3', rank: 2, loss_cp: 45 },
+    ];
+
+    function lossToColor(lossCp) {
+      // Mirrors shared/arrows.ts lossToColor — green→yellow→orange→red ramp.
+      const stops = [
+        { loss: 0,   color: [34, 197, 94] },   // green
+        { loss: 20,  color: [132, 204, 22] },  // lime
+        { loss: 50,  color: [234, 179, 8] },   // yellow
+        { loss: 100, color: [249, 115, 22] },  // orange
+        { loss: 200, color: [239, 68, 68] },   // red
+      ];
+      if (lossCp <= stops[0].loss) return stops[0].color;
+      if (lossCp >= stops[stops.length - 1].loss) return stops[stops.length - 1].color;
+      for (let i = 1; i < stops.length; i++) {
+        if (lossCp <= stops[i].loss) {
+          const a = stops[i - 1], b = stops[i];
+          const t = (lossCp - a.loss) / (b.loss - a.loss);
+          return [
+            Math.round(a.color[0] + (b.color[0] - a.color[0]) * t),
+            Math.round(a.color[1] + (b.color[1] - a.color[1]) * t),
+            Math.round(a.color[2] + (b.color[2] - a.color[2]) * t),
+          ];
+        }
+      }
+      return stops[0].color;
+    }
+
+    const rankWidths = [7, 5.5, 4];
+    const rankOpacities = [1.0, 0.82, 0.65];
+
+    // ── Geometry helpers ──
+    function squareCenter(sq, size, flipped) {
+      let file = sq.charCodeAt(0) - 97;
+      let rank = parseInt(sq[1], 10) - 1;
+      if (flipped) { file = 7 - file; rank = 7 - rank; }
+      const sq_ = size / 8;
+      return { x: file * sq_ + sq_ / 2, y: (7 - rank) * sq_ + sq_ / 2, sq: sq_ };
+    }
+
+    function drawBoard(ctx, size, brightness) {
+      // Darker cooler board so arrow colors pop; `brightness` tunes overall lightness.
+      const base = 20 + brightness * 0.4;       // dark squares
+      const light = base + 18;                  // light squares
+      for (let r = 0; r < 8; r++) {
+        for (let f = 0; f < 8; f++) {
+          const isLight = (r + f) % 2 === 0;
+          const v = Math.round(isLight ? light : base);
+          ctx.fillStyle = `rgb(${v},${v - 2},${v - 4})`;
+          ctx.fillRect(f * size / 8, r * size / 8, size / 8, size / 8);
+        }
+      }
+    }
+
+    // ── Arrow renderers ──
+    // Each takes (ctx, fromXY, toXY, color, width, opacity, extras)
+    // and renders the arrow on the given canvas context.
+
+    /** 1. Baseline — current app style (gradient shaft + solid head + circle label). */
+    function drawBaseline(ctx, p1, p2, rgb, width, opacity) {
+      const head = width * 3;
+      const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const endX = p2.x - head * Math.cos(angle);
+      const endY = p2.y - head * Math.sin(angle);
+      const grad = ctx.createLinearGradient(p1.x, p1.y, endX, endY);
+      grad.addColorStop(0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${opacity * 0.15})`);
+      grad.addColorStop(1, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${opacity})`);
+      ctx.save();
+      ctx.lineWidth = width;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = grad;
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(endX, endY); ctx.stroke();
+      ctx.globalAlpha = opacity;
+      ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      ctx.beginPath();
+      ctx.moveTo(p2.x, p2.y);
+      ctx.lineTo(p2.x - head * Math.cos(angle - Math.PI / 6), p2.y - head * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(p2.x - head * Math.cos(angle + Math.PI / 6), p2.y - head * Math.sin(angle + Math.PI / 6));
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    /** 2. Solid flat — Lichess-inspired: uniform opacity, arrowhead continuous with shaft, no gradient. */
+    function drawSolidFlat(ctx, p1, p2, rgb, width, opacity) {
+      const head = width * 2.4;
+      const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const endX = p2.x - head * Math.cos(angle);
+      const endY = p2.y - head * Math.sin(angle);
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      ctx.strokeStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      ctx.lineWidth = width;
+      ctx.lineCap = 'butt';
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(endX, endY); ctx.stroke();
+      // Wider flat arrowhead (like a pennant).
+      const spread = head * 1.1;
+      ctx.beginPath();
+      ctx.moveTo(p2.x, p2.y);
+      ctx.lineTo(p2.x - head * Math.cos(angle - Math.PI / 5.5) - spread * 0.1 * Math.cos(angle),
+                 p2.y - head * Math.sin(angle - Math.PI / 5.5) - spread * 0.1 * Math.sin(angle));
+      ctx.lineTo(p2.x - head * Math.cos(angle + Math.PI / 5.5) - spread * 0.1 * Math.cos(angle),
+                 p2.y - head * Math.sin(angle + Math.PI / 5.5) - spread * 0.1 * Math.sin(angle));
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    /** 3. Outlined bold — solid fill + dark outer stroke for legibility over any square. */
+    function drawOutlined(ctx, p1, p2, rgb, width, opacity) {
+      const head = width * 2.6;
+      const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const endX = p2.x - head * Math.cos(angle);
+      const endY = p2.y - head * Math.sin(angle);
+      const outlineW = 2;
+
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      // Outline (dark).
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.lineWidth = width + outlineW * 2;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(endX, endY); ctx.stroke();
+      // Fill (colored).
+      ctx.strokeStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      ctx.lineWidth = width;
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(endX, endY); ctx.stroke();
+
+      // Arrowhead: outline then fill.
+      function headPath() {
+        ctx.beginPath();
+        ctx.moveTo(p2.x, p2.y);
+        ctx.lineTo(p2.x - head * Math.cos(angle - Math.PI / 6), p2.y - head * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(p2.x - head * Math.cos(angle + Math.PI / 6), p2.y - head * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+      }
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = outlineW * 2;
+      ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+      headPath(); ctx.stroke();
+      ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      headPath(); ctx.fill();
+      ctx.restore();
+    }
+
+    /** 4. Neon glow — solid shaft with a colored shadowBlur halo. High drama. */
+    function drawNeon(ctx, p1, p2, rgb, width, opacity) {
+      const head = width * 2.4;
+      const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const endX = p2.x - head * Math.cos(angle);
+      const endY = p2.y - head * Math.sin(angle);
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.shadowColor = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.9)`;
+      ctx.shadowBlur = width * 2.5;
+      ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},1)`;
+      ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},1)`;
+      ctx.lineWidth = width * 0.75;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(endX, endY); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p2.x, p2.y);
+      ctx.lineTo(p2.x - head * Math.cos(angle - Math.PI / 7), p2.y - head * Math.sin(angle - Math.PI / 7));
+      ctx.lineTo(p2.x - head * Math.cos(angle + Math.PI / 7), p2.y - head * Math.sin(angle + Math.PI / 7));
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    /** 5. Tapered ribbon — width grows from source (thin) to target (full), brush-stroke feel. */
+    function drawTapered(ctx, p1, p2, rgb, width, opacity) {
+      const segments = 30;
+      const head = width * 2.2;
+      const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const endX = p2.x - head * Math.cos(angle);
+      const endY = p2.y - head * Math.sin(angle);
+      const nx = -Math.sin(angle), ny = Math.cos(angle);
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      ctx.beginPath();
+      // Left edge (thin → wide).
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const w = width * (0.2 + 0.8 * t) / 2;
+        const cx = p1.x + (endX - p1.x) * t;
+        const cy = p1.y + (endY - p1.y) * t;
+        const x = cx + nx * w, y = cy + ny * w;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      // Right edge (wide → thin).
+      for (let i = segments; i >= 0; i--) {
+        const t = i / segments;
+        const w = width * (0.2 + 0.8 * t) / 2;
+        const cx = p1.x + (endX - p1.x) * t;
+        const cy = p1.y + (endY - p1.y) * t;
+        const x = cx - nx * w, y = cy - ny * w;
+        ctx.lineTo(x, y);
+      }
+      ctx.closePath(); ctx.fill();
+      // Arrowhead.
+      ctx.beginPath();
+      ctx.moveTo(p2.x, p2.y);
+      ctx.lineTo(p2.x - head * Math.cos(angle - Math.PI / 6), p2.y - head * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(p2.x - head * Math.cos(angle + Math.PI / 6), p2.y - head * Math.sin(angle + Math.PI / 6));
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    /** 6. Chevron head — shaft + 3 stacked chevron marks pointing forward at the tip. */
+    function drawChevron(ctx, p1, p2, rgb, width, opacity) {
+      const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const chevSize = width * 2.2;
+      const chevGap = width * 1.3;
+      const totalHead = chevSize + chevGap * 2;
+      const endX = p2.x - totalHead * Math.cos(angle) * 0.3;
+      const endY = p2.y - totalHead * Math.sin(angle) * 0.3;
+
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.strokeStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      ctx.lineWidth = width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      // Shaft stops short of chevrons.
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+
+      // Three chevrons at the tip, increasing intensity.
+      for (let i = 0; i < 3; i++) {
+        const bx = p2.x - (2 - i) * chevGap * Math.cos(angle);
+        const by = p2.y - (2 - i) * chevGap * Math.sin(angle);
+        ctx.globalAlpha = opacity * (0.5 + i * 0.25);
+        ctx.beginPath();
+        ctx.moveTo(bx - chevSize * Math.cos(angle - Math.PI / 4), by - chevSize * Math.sin(angle - Math.PI / 4));
+        ctx.lineTo(bx, by);
+        ctx.lineTo(bx - chevSize * Math.cos(angle + Math.PI / 4), by - chevSize * Math.sin(angle + Math.PI / 4));
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    /** 7. Minimal ghost — thin 2–3px line + small filled triangle. Low-chrome, unobtrusive. */
+    function drawMinimal(ctx, p1, p2, rgb, width, opacity) {
+      const thin = Math.max(2, width * 0.35);
+      const head = thin * 4;
+      const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const endX = p2.x - head * Math.cos(angle);
+      const endY = p2.y - head * Math.sin(angle);
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.strokeStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      ctx.lineWidth = thin;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(endX, endY); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p2.x, p2.y);
+      ctx.lineTo(p2.x - head * Math.cos(angle - Math.PI / 6), p2.y - head * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(p2.x - head * Math.cos(angle + Math.PI / 6), p2.y - head * Math.sin(angle + Math.PI / 6));
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    /** 8. Double-stroke — outer halo stroke + inner solid stroke (subtle outline without darkness). */
+    function drawDoubleStroke(ctx, p1, p2, rgb, width, opacity) {
+      const head = width * 2.6;
+      const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const endX = p2.x - head * Math.cos(angle);
+      const endY = p2.y - head * Math.sin(angle);
+      ctx.save();
+
+      // Soft outer halo (slightly brighter version of the color, low alpha).
+      ctx.globalAlpha = opacity * 0.35;
+      ctx.strokeStyle = `rgba(${Math.min(255, rgb[0] + 80)},${Math.min(255, rgb[1] + 80)},${Math.min(255, rgb[2] + 80)},1)`;
+      ctx.lineWidth = width + 6;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(endX, endY); ctx.stroke();
+
+      // Solid inner stroke.
+      ctx.globalAlpha = opacity;
+      ctx.strokeStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      ctx.lineWidth = width;
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(endX, endY); ctx.stroke();
+
+      // Head.
+      ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      ctx.beginPath();
+      ctx.moveTo(p2.x, p2.y);
+      ctx.lineTo(p2.x - head * Math.cos(angle - Math.PI / 6), p2.y - head * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(p2.x - head * Math.cos(angle + Math.PI / 6), p2.y - head * Math.sin(angle + Math.PI / 6));
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    // ── Variants & render loop ──
+    const VARIANTS = [
+      {
+        key: 'baseline', title: 'Baseline (current)', tag: 'ship', highlight: false,
+        blurb: 'Gradient shaft (transparent→opaque), solid triangular head. What ships today.',
+        fn: drawBaseline,
+      },
+      {
+        key: 'solid-flat', title: 'Solid flat', tag: 'lichess-like', highlight: false,
+        blurb: 'Uniform opacity, wider pennant head, no gradient. Crisp and readable.',
+        fn: drawSolidFlat,
+      },
+      {
+        key: 'outlined', title: 'Outlined bold', tag: 'legible', highlight: true,
+        blurb: 'Solid color wrapped in a dark outline. Stays legible over bright or busy squares.',
+        fn: drawOutlined,
+      },
+      {
+        key: 'neon', title: 'Neon glow', tag: 'dramatic',
+        blurb: 'Shadow-blurred halo in the arrow color. High-impact, can feel busy with many arrows.',
+        fn: drawNeon,
+      },
+      {
+        key: 'tapered', title: 'Tapered ribbon', tag: 'directional', highlight: true,
+        blurb: 'Width grows from thin at source to full at target. Reads direction instantly.',
+        fn: drawTapered,
+      },
+      {
+        key: 'chevron', title: 'Chevron tail', tag: 'distinct',
+        blurb: 'Three stacked chevrons at the tip instead of a filled triangle. Unusual, very distinctive.',
+        fn: drawChevron,
+      },
+      {
+        key: 'minimal', title: 'Minimal', tag: 'low-chrome',
+        blurb: 'Thin line + small triangle. Good when arrows should whisper, not shout.',
+        fn: drawMinimal,
+      },
+      {
+        key: 'double-stroke', title: 'Double stroke', tag: 'soft halo',
+        blurb: 'Outer halo in a lighter tint of the same color + solid inner core. Pops without a black outline.',
+        fn: drawDoubleStroke,
+      },
+    ];
+
+    const grid = document.getElementById('grid');
+    for (const v of VARIANTS) {
+      const tile = document.createElement('div');
+      tile.className = 'tile' + (v.highlight ? ' highlight' : '');
+      tile.innerHTML = `
+        <h2>${v.title} <span class="tag">${v.tag || ''}</span></h2>
+        <div class="board-wrap"><canvas data-key="${v.key}"></canvas></div>
+        <p>${v.blurb}</p>
+      `;
+      grid.appendChild(tile);
+    }
+
+    let bgLight = 35;
+    let scale = 1.0;
+    let flipped = false;
+
+    function render() {
+      for (const v of VARIANTS) {
+        const c = grid.querySelector(`canvas[data-key="${v.key}"]`);
+        if (!c) continue;
+        const rect = c.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const size = Math.max(rect.width, rect.height);
+        c.width = size * dpr;
+        c.height = size * dpr;
+        const ctx = c.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        drawBoard(ctx, size, bgLight);
+
+        for (const m of MOVES) {
+          const p1 = squareCenter(m.from, size, flipped);
+          const p2 = squareCenter(m.to, size, flipped);
+          const rgb = lossToColor(m.loss_cp);
+          const w = rankWidths[m.rank] * scale * (size / 200);
+          const o = rankOpacities[m.rank];
+          v.fn(ctx, p1, p2, rgb, w, o);
+        }
+      }
+    }
+
+    document.getElementById('bgLight').addEventListener('input', (e) => {
+      bgLight = parseInt(e.target.value, 10);
+      render();
+    });
+    document.getElementById('scale').addEventListener('input', (e) => {
+      scale = parseInt(e.target.value, 10) / 100;
+      render();
+    });
+    document.getElementById('flipped').addEventListener('change', (e) => {
+      flipped = e.target.checked;
+      render();
+    });
+
+    window.addEventListener('resize', render);
+    window.addEventListener('load', render);
+    render();
+  </script>
+</body>
+</html>
