@@ -245,29 +245,6 @@ function setEvalBarTarget(state: OverlayState, target: number): void {
   }
 }
 
-// ── PV preview emphasis ──
-// The previewed move's line uses a spatial sine bell (0 → peak → 0 along the
-// length) AND its overall opacity (line + loss circle) is multiplied by a
-// half-sine pulse over time. Other arrows render normally.
-const PV_PULSE_MS = 1600;
-function pulseFactor(): number {
-  const t = (Date.now() % PV_PULSE_MS) / PV_PULSE_MS;
-  return Math.sin(Math.PI * t); // 0 → 1 → 0
-}
-const pulseTimers = { vboard: 0 as any, video: 0 as any };
-function ensurePulseTimer(
-  key: 'vboard' | 'video',
-  active: boolean,
-  onTick: () => void,
-): void {
-  if (active && !pulseTimers[key]) {
-    pulseTimers[key] = setInterval(onTick, 33);
-  } else if (!active && pulseTimers[key]) {
-    clearInterval(pulseTimers[key]);
-    pulseTimers[key] = 0;
-  }
-}
-
 function arrowKey(a: ArrowDescriptor): string {
   return `${a.from}-${a.to}`;
 }
@@ -889,7 +866,6 @@ export function renderArrows(state: OverlayState): void {
     // (e.g. after playback, loss-threshold change, visibility toggle) are
     // matched by from-to and stay steady instead of re-growing from source.
     if (vboardArrowState.timer) { clearInterval(vboardArrowState.timer); vboardArrowState.timer = 0; }
-    ensurePulseTimer('vboard', false, () => renderArrows(state));
     vboardHitCache.arrows = [];
     vboardHitCache.animBoardRect = null;
     return;
@@ -921,24 +897,23 @@ export function renderArrows(state: OverlayState): void {
     }
   }
 
-  // Preview emphasis: bell-gradient line + pulsing loss circle, half-sine envelope.
-  // Drawn on top of the normal arrows; other arrows render unchanged.
-  ensurePulseTimer('vboard', isPreview, () => renderArrows(state));
+  // Preview emphasis — render the highlighted line's arrow at full opacity
+  // over the normal arrows. No pulsing; just a steady, clearly-emphasized
+  // preview. Loss marker draws on the destination at the same steady alpha.
   if (isPreview) {
     const previewArrow = getPreviewArrow(state);
     if (previewArrow && state.currentResult?.evaluation?.top_moves?.length) {
-      const pulse = pulseFactor();
       drawArrow(
         ctx,
-        { ...previewArrow, opacity: previewArrow.opacity * pulse },
-        virtualBoard, 1, state.displayFlipped,
-        0, 1, true /* noArrowhead */, true /* bellGradient */,
+        previewArrow,
+        virtualBoard, userWidthMult, state.displayFlipped,
+        0, 1, false, false,
       );
       const moves = state.currentResult.evaluation.top_moves;
       const idx = Math.min(state.pvPreviewLineIndex!, moves.length - 1);
       const move = moves[idx];
       const to = move.move.slice(2, 4);
-      drawPlayedMoveMarker(ctx, to, move.loss_cp, virtualBoard, state.displayFlipped, pulse, userSizeScale, state.overlayOpacity);
+      drawPlayedMoveMarker(ctx, to, move.loss_cp, virtualBoard, state.displayFlipped, 1, userSizeScale, state.overlayOpacity);
     }
   }
 }
@@ -977,7 +952,6 @@ export function renderVideoOverlay(state: OverlayState): void {
     videoHitCache.arrows = [];
     videoHitCache.animBoardRect = null;
     if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
-    ensurePulseTimer('video', false, () => renderVideoOverlay(state));
     logEvalBarTransition('video', false, `low confidence: ${(recogConfidence * 100).toFixed(0)}%`);
     return;
   }
@@ -1067,23 +1041,21 @@ export function renderVideoOverlay(state: OverlayState): void {
         }
       }
 
-      // Preview emphasis: bell-gradient line + pulsing loss circle, half-sine envelope.
-      // Other arrows above render unchanged.
-      ensurePulseTimer('video', isPreview, () => renderVideoOverlay(state));
-      if (isPreview) {
+      // Preview emphasis — render the highlighted line's arrow at full
+      // opacity (no pulse, no bell gradient). Steady and clear.
+        if (isPreview) {
         const previewArrow = getPreviewArrow(state);
         if (previewArrow && result.evaluation?.top_moves?.length) {
-          const pulse = pulseFactor();
           drawArrow(
             ctx,
-            { ...previewArrow, opacity: previewArrow.opacity * pulse },
+            previewArrow,
             boardRect, arrowScale, state.displayFlipped,
-            0, 1, true /* noArrowhead */, true /* bellGradient */,
+            0, 1, false, false,
           );
           const idx = Math.min(state.pvPreviewLineIndex!, result.evaluation.top_moves.length - 1);
           const move = result.evaluation.top_moves[idx];
           const to = move.move.slice(2, 4);
-          drawPlayedMoveMarker(ctx, to, move.loss_cp, boardRect, state.displayFlipped, pulse, userSizeScaleVideo, state.overlayOpacity);
+          drawPlayedMoveMarker(ctx, to, move.loss_cp, boardRect, state.displayFlipped, 1, userSizeScaleVideo, state.overlayOpacity);
         }
       }
     } else {
@@ -1091,8 +1063,7 @@ export function renderVideoOverlay(state: OverlayState): void {
       // arrowsVisible=false with no preview). Pause the fade timer but keep
       // `.animated` so the same arrows resume steady when they reappear.
       if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
-      ensurePulseTimer('video', false, () => renderVideoOverlay(state));
-      videoHitCache.arrows = [];
+        videoHitCache.arrows = [];
     }
   }
 
