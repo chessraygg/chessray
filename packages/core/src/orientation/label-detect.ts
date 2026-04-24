@@ -15,6 +15,7 @@
 
 import type { PixelBuffer } from '../board/pixel-utils.js';
 import type { OrientationResult } from './orientation.js';
+import { vendorUrl } from '../vendor/resolver.js';
 
 export interface LabelStrip {
   /** Which edge strip contains labels */
@@ -62,8 +63,8 @@ async function getSession(): Promise<any> {
     if (typeof document !== 'undefined') {
       // Browser (Electron) path: fetch from vendor protocol
       const [modelResp, dictResp] = await Promise.all([
-        fetch('chess-vendor://paddle-ocr/en_PP-OCRv5_mobile_rec_infer.onnx'),
-        fetch('chess-vendor://paddle-ocr/ppocrv5_en_dict.txt'),
+        fetch(vendorUrl('paddle-ocr/en_PP-OCRv5_mobile_rec_infer.onnx')),
+        fetch(vendorUrl('paddle-ocr/ppocrv5_en_dict.txt')),
       ]);
       const modelBuf = await modelResp.arrayBuffer();
       session = await ort.InferenceSession.create(modelBuf, {

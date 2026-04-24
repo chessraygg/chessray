@@ -1,0 +1,44 @@
+/**
+ * Vite config for the MV3 extension build.
+ *
+ * - @crxjs/vite-plugin reads src/manifest.ts, follows the entry points it
+ *   declares, and emits a valid MV3 bundle with rewritten paths.
+ * - vite-plugin-static-copy brings the repo-root `vendor/` directory into the
+ *   build so the offscreen doc can load Stockfish/ONNX/YOLO/OCR assets via
+ *   `chrome.runtime.getURL('vendor/…')` at runtime.
+ */
+
+import { defineConfig } from 'vite';
+import { crx } from '@crxjs/vite-plugin';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import manifest from './src/manifest.ts';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(__dirname, '..', '..');
+
+export default defineConfig({
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    target: 'chrome116',
+    rollupOptions: {
+      input: {
+        offscreen: resolve(__dirname, 'src/offscreen/offscreen.html'),
+      },
+    },
+  },
+  plugins: [
+    crx({ manifest }),
+    viteStaticCopy({
+      // Single target with the parent dir as src puts each subdir (stockfish,
+      // onnxruntime-web, yolo-chess, paddle-ocr) under dist/vendor/<name>/…
+      // Per-subdir targets with globbed src double-nest the path — the plugin
+      // preserves the relative path from src's parent, not the glob root.
+      targets: [
+        { src: resolve(repoRoot, 'vendor'), dest: '.' },
+      ],
+    }),
+  ],
+});

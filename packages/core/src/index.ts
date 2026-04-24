@@ -1,4 +1,5 @@
 export * from './types.js';
+export * from './vendor/resolver.js';
 export * from './fen/fen.js';
 export * from './fen/move-notation.js';
 export * from './board/board-detect.js';
