@@ -815,7 +815,10 @@ function initOverlay(): void {
   }
 
   function pvCycleStep(): void {
-    // Validate that our cached PV still matches the live eval — restart if stale
+    // If the cached PV has diverged from the live eval (deeper search changed
+    // this line's moves at the same index), stop instead of silently restarting
+    // the same line from step 1 — user sees "animation reset" without any
+    // sense that the line's content has actually changed.
     const liveResult = state.currentResult;
     if (liveResult?.evaluation?.top_moves?.length) {
       const idx = Math.min(pvCycleLineIndex, liveResult.evaluation.top_moves.length - 1);
@@ -824,8 +827,7 @@ function initOverlay(): void {
       const stale = depth > livePv.length ||
         pvCyclePv.slice(0, depth).some((m, i) => m !== livePv[i]);
       if (stale) {
-        if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
-        pvCycleStart();
+        stopPvLine();
         return;
       }
     }
