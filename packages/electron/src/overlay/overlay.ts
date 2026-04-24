@@ -1287,44 +1287,20 @@ function initOverlay(): void {
     });
   }
 
-  // ── Frame rate range (auto-tuned within [min, max]) ──
-  const fpsMinSlider = document.getElementById('cv-fps-min') as HTMLInputElement | null;
-  const fpsMinVal = document.getElementById('cv-fps-min-val');
+  // ── Frame rate ceiling (auto-tuner floor is hardcoded to 1) ──
   const fpsMaxSlider = document.getElementById('cv-fps-max') as HTMLInputElement | null;
   const fpsMaxVal = document.getElementById('cv-fps-max-val');
-  // Migration: if a user had a fixed targetFps, preserve it as the active
-  // starting point inside the new range.
-  fpsRange.min = Math.max(1, prefs.fpsMin ?? 1);
-  fpsRange.max = Math.max(fpsRange.min, prefs.fpsMax ?? 5);
+  fpsRange.min = 1;
+  fpsRange.max = Math.max(1, prefs.fpsMax ?? 5);
   setActiveFps(clamp(prefs.targetFps ?? fpsRange.min, fpsRange.min, fpsRange.max));
-  if (fpsMinSlider && fpsMinVal) {
-    fpsMinSlider.value = String(fpsRange.min);
-    fpsMinVal.textContent = String(fpsRange.min);
-    fpsMinSlider.addEventListener('input', () => {
-      const v = parseInt(fpsMinSlider.value, 10);
-      fpsRange.min = v;
-      if (fpsRange.max < v) {
-        fpsRange.max = v;
-        if (fpsMaxSlider && fpsMaxVal) { fpsMaxSlider.value = String(v); fpsMaxVal.textContent = String(v); }
-      }
-      fpsMinVal.textContent = String(v);
-      savePrefs({ fpsMin: fpsRange.min, fpsMax: fpsRange.max });
-      // Re-clamp active FPS into the new range
-      setActiveFps(clamp(activeFps, fpsRange.min, fpsRange.max));
-    });
-  }
   if (fpsMaxSlider && fpsMaxVal) {
     fpsMaxSlider.value = String(fpsRange.max);
     fpsMaxVal.textContent = String(fpsRange.max);
     fpsMaxSlider.addEventListener('input', () => {
       const v = parseInt(fpsMaxSlider.value, 10);
-      fpsRange.max = v;
-      if (fpsRange.min > v) {
-        fpsRange.min = v;
-        if (fpsMinSlider && fpsMinVal) { fpsMinSlider.value = String(v); fpsMinVal.textContent = String(v); }
-      }
-      fpsMaxVal.textContent = String(v);
-      savePrefs({ fpsMin: fpsRange.min, fpsMax: fpsRange.max });
+      fpsRange.max = Math.max(1, v);
+      fpsMaxVal.textContent = String(fpsRange.max);
+      savePrefs({ fpsMax: fpsRange.max });
       setActiveFps(clamp(activeFps, fpsRange.min, fpsRange.max));
     });
   }

@@ -23,9 +23,7 @@ export interface Prefs {
   compactMode: boolean;
   /** @deprecated kept for migration only — superseded by fpsMin/fpsMax. */
   targetFps: number;
-  /** Lower bound of the auto-tuned FPS range. */
-  fpsMin: number;
-  /** Upper bound of the auto-tuned FPS range. */
+  /** Upper bound of the auto-tuned FPS range. Floor is hardcoded to 1. */
   fpsMax: number;
   changeDetect: boolean;
   collapsedSections: string[];
@@ -59,7 +57,6 @@ export const DEFAULT_PREFS: Prefs = {
   vboardOverlayVisible: true,
   compactMode: false,
   targetFps: 2,
-  fpsMin: 1,
   fpsMax: 5,
   changeDetect: true,
   pvDepth: 10,
