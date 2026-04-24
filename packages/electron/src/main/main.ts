@@ -456,6 +456,12 @@ ipcMain.on('set-change-detect', (_e, enabled: boolean) => {
   }
 });
 
+ipcMain.on('set-manual-flip', (_e, v: boolean | null) => {
+  if (analysisWindow && !analysisWindow.isDestroyed()) {
+    analysisWindow.webContents.send('set-manual-flip', v);
+  }
+});
+
 ipcMain.on('set-target-fps', (_e, fps: number) => {
   if (analysisWindow && !analysisWindow.isDestroyed()) {
     analysisWindow.webContents.send('set-target-fps', fps);

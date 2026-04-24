@@ -64,6 +64,12 @@ const api = {
   onSetChangeDetect: (cb: (enabled: boolean) => void) =>
     ipcRenderer.on('set-change-detect', (_e, enabled: boolean) => cb(enabled)),
 
+  // Manual orientation override (null = auto-detect, true/false = user choice)
+  setManualFlip: (v: boolean | null) =>
+    ipcRenderer.send('set-manual-flip', v),
+  onSetManualFlip: (cb: (v: boolean | null) => void) =>
+    ipcRenderer.on('set-manual-flip', (_e, v: boolean | null) => cb(v)),
+
   // Frame rate
   setTargetFps: (fps: number) =>
     ipcRenderer.send('set-target-fps', fps),

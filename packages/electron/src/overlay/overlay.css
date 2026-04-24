@@ -759,6 +759,19 @@ canvas#video-overlay {
 .orientation-badge {
   font-size: 10px;
   color: var(--text-muted);
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 3px;
+  transition: background 0.1s, color 0.1s;
+}
+.orientation-badge:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+/* Active manual-override indicator */
+.orientation-badge.manual {
+  color: var(--accent);
+  background: var(--accent-soft, rgba(34, 197, 94, 0.15));
 }
 
 .orient-arrow {

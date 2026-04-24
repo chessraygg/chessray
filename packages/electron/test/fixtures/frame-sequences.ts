@@ -30,7 +30,7 @@ export interface FrameSequenceCase {
 
 const SQUARE_RE = /^[a-h][1-8]$/;
 const VALID_TURNS = new Set(['w', 'b', null]);
-const VALID_SOURCES = new Set(['label', 'pawn_move', 'piece_count', null]);
+const VALID_SOURCES = new Set(['label', 'manual', 'piece_count', null]);
 
 function validateFrame(entry: any, seqName: string, i: number): FrameEntry {
   const prefix = `frame-sequences.yaml[${seqName}].frames[${i}]`;
@@ -50,7 +50,7 @@ function validateFrame(entry: any, seqName: string, i: number): FrameEntry {
   if (typeof exp.flipped !== 'boolean')
     throw new Error(`${prefix}: expected.flipped must be a boolean`);
   if (!VALID_SOURCES.has(exp.orientation_source ?? null))
-    throw new Error(`${prefix}: expected.orientation_source must be one of label/pawn_move/piece_count or null`);
+    throw new Error(`${prefix}: expected.orientation_source must be one of label/manual/piece_count or null`);
   if (exp.detection_status !== null && typeof exp.detection_status !== 'string')
     throw new Error(`${prefix}: expected.detection_status must be null or a string`);
   if (exp.played_move !== null) {

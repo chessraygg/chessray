@@ -52,6 +52,9 @@ export interface OverlayState {
   overlayOpacity: number;
   /** Minimum alpha for the actual-board eval bar when the eval is stale. */
   evalBarStaleOpacity: number;
+  /** User-supplied orientation override (null = auto). Display-only in the
+   *  renderer — the pipeline enforces it via IPC; here it's used for UI state. */
+  manualOrientationFlip: boolean | null;
   panelScale: number;
   boardScale: number;
   displayInfo: {

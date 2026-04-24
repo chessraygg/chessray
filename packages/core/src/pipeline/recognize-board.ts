@@ -27,7 +27,7 @@ export interface DisambiguationTraceCorrected {
 }
 
 /** Why label detection was skipped */
-export type LabelsSkipReason = 'piece_count' | 'cached';
+export type LabelsSkipReason = 'piece_count' | 'cached' | 'manual';
 
 export interface BoardRecognitionResult {
   /** FEN as read from raw image (before orientation correction) */
@@ -70,7 +70,6 @@ export interface BoardRecognitionResult {
     orientation_ms: number;
     highlights_ms: number;
     disambiguate_ms: number;
-    pawnRefine_ms: number;
     turn_ms: number;
     total_ms: number;
   };
@@ -86,6 +85,9 @@ export async function recognizeBoard(
   cropped: PixelBuffer,
   recognizer: { recognize(imageData: ImageData): Promise<RecognitionResult> },
   cachedOrientation?: { prevFen: string; orientation: OrientationResult } | null,
+  /** User-supplied orientation override. When non-null, bypasses all
+   *  auto-detection and uses the user's choice. */
+  manualFlip?: boolean | null,
 ): Promise<BoardRecognitionResult> {
   const t0 = Date.now();
 
@@ -95,9 +97,7 @@ export async function recognizeBoard(
   const tPieces = Date.now() - t0;
 
   // Step 2: Detect orientation (before highlights — disambiguation needs flip info)
-  // Use cached orientation when the position is similar to the previous one
-  // (same game, just a few moves played). Only re-detect when the board
-  // changes significantly (new game, different stream).
+  // Priority: manual override > cached (same game) > piece_count (dense) > labels+fallback.
   let t = Date.now();
   const pieceCount = rawFen.replace(/[0-8/]/g, '').length;
   const pieceCountReliable = pieceCount >= 20;
@@ -105,7 +105,10 @@ export async function recognizeBoard(
   let labelsResult: BoardRecognitionResult['labels'];
   let labelDetectionResult: LabelDetectionResult | null = null;
   const similarity = cachedOrientation ? fenSimilarity(cachedOrientation.prevFen, rawFen) : 0;
-  if (cachedOrientation && similarity > 0.5) {
+  if (manualFlip !== null && manualFlip !== undefined) {
+    orientation = { flipped: manualFlip, source: 'manual' };
+    labelsResult = { skipped: true, reason: 'manual' };
+  } else if (cachedOrientation && similarity > 0.5) {
     orientation = cachedOrientation.orientation;
     labelsResult = { skipped: true, reason: 'cached' };
   } else if (pieceCountReliable) {
@@ -127,56 +130,10 @@ export async function recognizeBoard(
   t = Date.now();
   const firstAttempt = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians, orientation.flipped);
   let highlightedSquares = firstAttempt.highlighted;
-  let disambiguationTrace: DisambiguationTrace = firstAttempt.trace;
-  // When the initial orientation guess (piece_count with low piece count) is
-  // unreliable AND no legal pair was found, retry with the flipped orientation
-  // so pawn_move refinement below can pick up the correct flip.
-  if (highlightedSquares.length === 0 && hlResult.highlighted.length > 0
-      && orientation.source === 'piece_count' && !pieceCountReliable) {
-    const flippedTry = disambiguateHighlights(hlResult.highlighted, rawFen, hlResult.scores, hlResult.colors, hlResult.medians, !orientation.flipped);
-    if (flippedTry.highlighted.length === 2) {
-      highlightedSquares = flippedTry.highlighted;
-      disambiguationTrace = flippedTry.trace;
-    }
-  }
+  const disambiguationTrace: DisambiguationTrace = firstAttempt.trace;
   // Raw detection found candidates but disambiguation couldn't form a legal pair
   const invalidHighlights = hlResult.highlighted.length > 0 && highlightedSquares.length === 0;
   const tDisambiguate = Date.now() - t;
-
-  // Step 4: Refine orientation using pawn move direction from highlights.
-  // Only needed for sparse positions (<20 pieces) where piece_count is unreliable.
-  // With 20+ pieces, piece_count is reliable. Labels and cache are always reliable.
-  t = Date.now();
-  if (orientation.source === 'piece_count' && !pieceCountReliable && highlightedSquares.length === 2) {
-    const fenRows = rawFen.split('/');
-    const fenBoard: (string | null)[] = new Array(64).fill(null);
-    for (let r = 0; r < 8; r++) {
-      let f = 0;
-      for (const ch of fenRows[r]) {
-        if (ch >= '1' && ch <= '8') f += parseInt(ch);
-        else { fenBoard[r * 8 + f] = ch; f++; }
-      }
-    }
-    const [idx0, idx1] = highlightedSquares;
-    const p0 = fenBoard[idx0];
-    const p1 = fenBoard[idx1];
-    let pawn: string | null = null;
-    let fromRow = -1, toRow = -1;
-    if (p0 && (p0 === 'P' || p0 === 'p') && !p1) {
-      pawn = p0; toRow = Math.floor(idx0 / 8); fromRow = Math.floor(idx1 / 8);
-    } else if (p1 && (p1 === 'P' || p1 === 'p') && !p0) {
-      pawn = p1; toRow = Math.floor(idx1 / 8); fromRow = Math.floor(idx0 / 8);
-    }
-    if (pawn && fromRow !== toRow) {
-      const movedDown = toRow > fromRow;
-      const pawnFlipped = pawn === 'P' ? movedDown : !movedDown;
-      if (pawnFlipped !== orientation.flipped) {
-        orientation = { flipped: pawnFlipped, source: 'pawn_move' };
-      }
-    }
-  }
-
-  const tPawnRefine = Date.now() - t;
 
   // Step 5: Correct for flip
   const correctedFen = orientation.flipped ? flipFen(rawFen) : rawFen;
@@ -259,7 +216,6 @@ export async function recognizeBoard(
       orientation_ms: tOrientation,
       highlights_ms: tHighlights,
       disambiguate_ms: tDisambiguate,
-      pawnRefine_ms: tPawnRefine,
       turn_ms: tTurn,
       total_ms: tTotal,
     },

@@ -90,7 +90,6 @@ export interface PipelineResult {
       orientation_ms: number;
       highlights_ms: number;
       disambiguate_ms: number;
-      pawn_refine_ms: number;
       turn_ms: number;
     } | null;
     /** Building the full FEN string. */

@@ -103,6 +103,11 @@ window.chessRay.onSetChangeDetect((enabled: boolean) => {
   processor.setChangeDetect(enabled);
 });
 
+window.chessRay.onSetManualFlip((v: boolean | null) => {
+  debugLog(`Manual orientation override: ${v === null ? 'auto' : v ? 'white top' : 'white bottom'}`);
+  processor.setManualFlip(v);
+});
+
 window.chessRay.onSetTargetFps((fps: number) => {
   debugLog(`Target FPS changed to ${fps}`);
   setTargetFps(fps);

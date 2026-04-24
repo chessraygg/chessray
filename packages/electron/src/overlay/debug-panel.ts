@@ -249,7 +249,7 @@ export function updateDebugPanel(
     const orientation = dbg.flipped ? 'white top' : 'white bottom';
     const sourceNames: Record<string, string> = {
       label: 'coord labels',
-      pawn_move: 'pawn move',
+      manual: 'manual override',
       piece_count: 'piece positions',
     };
     const sourceLabel = sourceNames[dbg.orientation_source ?? ''] ?? '?';
@@ -538,7 +538,6 @@ export function formatDebugReport(
       lines.push(`  orientation:  ${rb.orientation_ms}`);
       lines.push(`  highlights:   ${rb.highlights_ms}`);
       lines.push(`  disambiguate: ${rb.disambiguate_ms}`);
-      lines.push(`  pawn refine:  ${rb.pawn_refine_ms}`);
       lines.push(`  turn:         ${rb.turn_ms}`);
     }
     lines.push(`FEN build:      ${ft.fen_build_ms}`);
@@ -704,7 +703,6 @@ function renderFrameTiming(container: HTMLElement, result: PipelineResult): void
         { key: 'orient', label: 'orientation', ms: rb.orientation_ms },
         { key: 'highlights', label: 'highlights', ms: rb.highlights_ms },
         { key: 'disamb', label: 'disambiguate', ms: rb.disambiguate_ms },
-        { key: 'pawn', label: 'pawn refine', ms: rb.pawn_refine_ms },
         { key: 'turn', label: 'turn', ms: rb.turn_ms },
       ]
     : [{ key: 'recog-cached', label: 'recog (cached)', ms: ft.recog_ms, dim: true }];

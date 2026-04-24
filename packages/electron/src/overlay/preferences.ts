@@ -48,6 +48,10 @@ export interface Prefs {
    *  (position changed; engine is re-evaluating). Lower = more subtle, but
    *  easy to lose track of. Only applies to the actual-board overlay. */
   evalBarStaleOpacity: number;
+  /** User-supplied orientation override. null = auto-detect. true = white at
+   *  top (flipped). false = white at bottom. Auto-reset to null when the
+   *  position changes significantly (new game). */
+  manualOrientationFlip: boolean | null;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -82,6 +86,7 @@ export const DEFAULT_PREFS: Prefs = {
   overlaySize: 5,
   overlayOpacity: 0.85,
   evalBarStaleOpacity: 0.75,
+  manualOrientationFlip: null,
 };
 
 export function loadPrefs(): Prefs {

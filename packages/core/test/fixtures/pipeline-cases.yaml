@@ -102,31 +102,6 @@
   expected_square_colors:
     light: [218, 192, 158]
     dark: [170, 120, 93]
-- file: test-carlsen-titled2.png
-  orientation: white top
-  highlighted:
-    - g5
-    - g6
-  turn: b
-  bbox:
-    x: 47
-    'y': 115
-    width: 699
-    height: 699
-  squareSize: 88
-  expectedFen: 1K6/7k/7p/8/8/1P6/PR6/r7
-  orientation_source: pawn_move
-  expected_labels:
-    skipped: false
-    result: null
-  expected_candidates:
-    - square: g5
-      score: 305.4
-    - square: g6
-      score: 217.1
-  expected_square_colors:
-    light: [239, 208, 170]
-    dark: [180, 123, 91]
 - file: test-eric-rosen.png
   orientation: white bottom
   highlighted:

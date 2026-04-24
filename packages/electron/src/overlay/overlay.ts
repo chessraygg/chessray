@@ -4,7 +4,7 @@
  */
 
 import type { PipelineResult } from '../shared/types.js';
-import { applyUciMoves, uciToSan } from '@chessray/core';
+import { applyUciMoves, uciToSan, fenSimilarity } from '@chessray/core';
 import { lossToColor } from '../shared/arrows.js';
 import { loadPrefs, savePrefs } from './preferences.js';
 import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow, videoHitCache, vboardHitCache, hitTestArrows, hitTestAnimBoard } from './canvas-renderer.js';
@@ -53,6 +53,7 @@ const state: OverlayState = {
   overlaySize: 5,
   overlayOpacity: 0.85,
   evalBarStaleOpacity: 0.75,
+  manualOrientationFlip: null,
   panelScale: 1,
   boardScale: 1,
   displayInfo: null,
@@ -288,6 +289,10 @@ function initOverlay(): void {
   state.overlaySize = prefs.overlaySize;
   state.overlayOpacity = prefs.overlayOpacity;
   state.evalBarStaleOpacity = prefs.evalBarStaleOpacity;
+  state.manualOrientationFlip = prefs.manualOrientationFlip;
+  // Push the stored override to the analysis pipeline on startup so the
+  // first frame renders at the right orientation.
+  window.chessRay.setManualFlip(state.manualOrientationFlip);
 
   state.videoCanvas = document.getElementById('video-overlay') as HTMLCanvasElement;
   userPanel = document.getElementById('user-panel') as HTMLDivElement;
@@ -1510,6 +1515,29 @@ function initOverlay(): void {
     }
   });
 
+  // ── Orientation badge click: toggle manual orientation override ──
+  // First click: pin the opposite of whatever's currently detected (i.e. flip
+  // the board). Second click: return to auto-detection. The override is also
+  // auto-cleared in processPendingResult when the position changes enough to
+  // look like a new game (FEN similarity < 0.5).
+  const orientationBadge = document.getElementById('cv-orientation-badge');
+  orientationBadge?.addEventListener('click', () => {
+    if (state.manualOrientationFlip === null) {
+      // Pin to the opposite of what we're currently rendering
+      const detected = state.displayFlipped;
+      state.manualOrientationFlip = !detected;
+    } else {
+      state.manualOrientationFlip = null;
+    }
+    orientationBadge.classList.toggle('manual', state.manualOrientationFlip !== null);
+    savePrefs({ manualOrientationFlip: state.manualOrientationFlip });
+    window.chessRay.setManualFlip(state.manualOrientationFlip);
+  });
+  // Reflect the initial pref on the badge.
+  if (state.manualOrientationFlip !== null) {
+    orientationBadge?.classList.add('manual');
+  }
+
   // ── Window controls ──
   const closeBtn = document.getElementById('cv-close-btn');
   closeBtn?.addEventListener('click', () => window.chessRay.closeApp());
@@ -1621,6 +1649,17 @@ function processPendingResult(): void {
   // Stop playback immediately when recognition FEN changes (before eval arrives)
   const recogFen = result.recognition?.fen ?? null;
   if (recogFen && recogFen !== lastRecogFen) {
+    // Manual orientation override auto-resets when the new position is too
+    // dissimilar to look like the same game (new game detected).
+    if (state.manualOrientationFlip !== null && lastRecogFen) {
+      const similarity = fenSimilarity(lastRecogFen, recogFen);
+      if (similarity < 0.5) {
+        state.manualOrientationFlip = null;
+        savePrefs({ manualOrientationFlip: null });
+        window.chessRay.setManualFlip(null);
+        document.getElementById('cv-orientation-badge')?.classList.remove('manual');
+      }
+    }
     lastRecogFen = recogFen;
     (window as any).__chessrayPvPlayStop?.();
     // Snap old PV arrows away so they don't fade out over the new position

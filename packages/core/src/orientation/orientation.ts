@@ -1,6 +1,6 @@
 import type { PixelBuffer } from '../board/pixel-utils.js';
 
-export type OrientationSource = 'label' | 'pawn_move' | 'piece_count';
+export type OrientationSource = 'label' | 'manual' | 'piece_count';
 
 export interface OrientationResult {
   flipped: boolean;

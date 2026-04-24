@@ -112,6 +112,8 @@ export class FrameProcessor {
   private maxDepth: number;
   private multiPvMax: number;
   private changeDetectEnabled: boolean;
+  /** User-supplied orientation override. null = use auto-detection. */
+  private manualFlip: boolean | null = null;
 
   constructor(private deps: FrameProcessorDeps) {
     this.maxDepth = deps.maxDepth ?? DEFAULT_MAX_DEPTH;
@@ -152,6 +154,12 @@ export class FrameProcessor {
   setMaxDepth(d: number): void { this.maxDepth = d; }
   setMultiPvMax(n: number): void { this.multiPvMax = n; }
   setChangeDetect(on: boolean): void { this.changeDetectEnabled = on; }
+  setManualFlip(v: boolean | null): void {
+    this.manualFlip = v;
+    // Clear the orientation cache so the next frame re-evaluates with the
+    // new override (or re-runs auto-detection when cleared to null).
+    this.cachedOrientation = null;
+  }
 
   /** First (shallowest) pass gets a small quick-look count; every deeper pass
    *  uses the user's selected max. No ramp. */
@@ -266,7 +274,7 @@ export class FrameProcessor {
       let highlightTurn: Turn | null = null;
       let invalidHighlights = false;
       let tRecog = 0;
-      let brTiming: { pieces_ms: number; orientation_ms: number; highlights_ms: number; disambiguate_ms: number; pawnRefine_ms: number; turn_ms: number; total_ms: number } | null = null;
+      let brTiming: { pieces_ms: number; orientation_ms: number; highlights_ms: number; disambiguate_ms: number; turn_ms: number; total_ms: number } | null = null;
       let detectionStatus: string | undefined;
       const prevHighlightedSquares = [...this.lastHighlightedSquares];
 
@@ -283,7 +291,7 @@ export class FrameProcessor {
       } else {
         t = Date.now();
         if (recognizer) {
-          const boardResult = await recognizeBoard(cropped, recognizer as Parameters<typeof recognizeBoard>[1], this.cachedOrientation);
+          const boardResult = await recognizeBoard(cropped, recognizer as Parameters<typeof recognizeBoard>[1], this.cachedOrientation, this.manualFlip);
           brTiming = boardResult.timing;
 
           // Always capture highlight debug info, even on mid-animation frames
@@ -418,7 +426,6 @@ export class FrameProcessor {
               orientation_ms: brTiming.orientation_ms,
               highlights_ms: brTiming.highlights_ms,
               disambiguate_ms: brTiming.disambiguate_ms,
-              pawn_refine_ms: brTiming.pawnRefine_ms,
               turn_ms: brTiming.turn_ms,
             }
           : null;
@@ -468,7 +475,7 @@ export class FrameProcessor {
       if (brTiming) {
         const rt = recognition?.timing;
         const yolo = rt ? `yolo=${rt.prep_ms}+${rt.infer_ms}+${rt.post_ms}` : '';
-        recogDetail = `recog=${tRecog}ms(${yolo} orient=${brTiming.orientation_ms} hl=${brTiming.highlights_ms} disamb=${brTiming.disambiguate_ms} pawn=${brTiming.pawnRefine_ms} turn=${brTiming.turn_ms})`;
+        recogDetail = `recog=${tRecog}ms(${yolo} orient=${brTiming.orientation_ms} hl=${brTiming.highlights_ms} disamb=${brTiming.disambiguate_ms} turn=${brTiming.turn_ms})`;
       } else {
         recogDetail = `recog=${tRecog}ms [cached]`;
       }
