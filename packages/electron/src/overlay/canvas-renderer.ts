@@ -50,6 +50,8 @@ export interface OverlayState {
    *  against the 5px baseline). `overlayOpacity` is the uniform alpha. */
   overlaySize: number;
   overlayOpacity: number;
+  /** Minimum alpha for the actual-board eval bar when the eval is stale. */
+  evalBarStaleOpacity: number;
   panelScale: number;
   boardScale: number;
   displayInfo: {
@@ -1095,7 +1097,7 @@ export function renderVideoOverlay(state: OverlayState): void {
   if (state.evalBarVisible && result.evaluation?.top_moves?.length) {
     const isStale = !!result.stale_eval;
     ctx.save();
-    if (isStale) ctx.globalAlpha = 0.65;
+    if (isStale) ctx.globalAlpha = state.evalBarStaleOpacity;
 
     const sideScore = result.evaluation.top_moves[0].score_cp;
     const turn = result.evaluation.fen?.split(' ')[1] || 'w';

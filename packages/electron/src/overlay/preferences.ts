@@ -44,6 +44,10 @@ export interface Prefs {
   /** Uniform alpha applied to every on-board decoration (arrows, step labels,
    *  played-move markers). Color carries quality; this is just presence. */
   overlayOpacity: number;
+  /** Minimum opacity for the actual-board eval bar when the eval is stale
+   *  (position changed; engine is re-evaluating). Lower = more subtle, but
+   *  easy to lose track of. Only applies to the actual-board overlay. */
+  evalBarStaleOpacity: number;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -77,6 +81,7 @@ export const DEFAULT_PREFS: Prefs = {
   debugImgScale: 100,
   overlaySize: 5,
   overlayOpacity: 0.85,
+  evalBarStaleOpacity: 0.75,
 };
 
 export function loadPrefs(): Prefs {

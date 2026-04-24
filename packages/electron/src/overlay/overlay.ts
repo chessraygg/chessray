@@ -52,6 +52,7 @@ const state: OverlayState = {
   hoveredArrowIndex: null,
   overlaySize: 5,
   overlayOpacity: 0.85,
+  evalBarStaleOpacity: 0.75,
   panelScale: 1,
   boardScale: 1,
   displayInfo: null,
@@ -286,6 +287,7 @@ function initOverlay(): void {
   state.evalBarVisible = prefs.evalBarVisible;
   state.overlaySize = prefs.overlaySize;
   state.overlayOpacity = prefs.overlayOpacity;
+  state.evalBarStaleOpacity = prefs.evalBarStaleOpacity;
 
   state.videoCanvas = document.getElementById('video-overlay') as HTMLCanvasElement;
   userPanel = document.getElementById('user-panel') as HTMLDivElement;
@@ -1283,6 +1285,19 @@ function initOverlay(): void {
       overlayOpacityVal.textContent = String(pct);
       savePrefs({ overlayOpacity: state.overlayOpacity });
       renderArrows(state);
+      renderVideoOverlay(state);
+    });
+  }
+  const evalStaleSlider = document.getElementById('cv-eval-stale-opacity') as HTMLInputElement | null;
+  const evalStaleVal = document.getElementById('cv-eval-stale-opacity-val');
+  if (evalStaleSlider && evalStaleVal) {
+    evalStaleSlider.value = String(Math.round(state.evalBarStaleOpacity * 100));
+    evalStaleVal.textContent = String(Math.round(state.evalBarStaleOpacity * 100));
+    evalStaleSlider.addEventListener('input', () => {
+      const pct = parseInt(evalStaleSlider.value, 10);
+      state.evalBarStaleOpacity = pct / 100;
+      evalStaleVal.textContent = String(pct);
+      savePrefs({ evalBarStaleOpacity: state.evalBarStaleOpacity });
       renderVideoOverlay(state);
     });
   }

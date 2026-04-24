@@ -146,6 +146,11 @@
           <input type="range" id="cv-overlay-opacity" min="20" max="100" value="85" step="5">
           <span id="cv-overlay-opacity-val">85</span><span style="font-size:8px;color:var(--text-faint)">%</span>
         </div>
+        <div class="pv-depth-row">
+          <label data-tip="Eval bar opacity on the actual-board overlay while the eval is stale (position changed, engine is catching up). Higher = easier to follow; lower = more subtle.">Stale eval</label>
+          <input type="range" id="cv-eval-stale-opacity" min="30" max="100" value="75" step="5">
+          <span id="cv-eval-stale-opacity-val">75</span><span style="font-size:8px;color:var(--text-faint)">%</span>
+        </div>
       </div>
 
       <div class="section-body debug-section" id="debug-section" data-section-id="debug" data-section-title="Debug">
