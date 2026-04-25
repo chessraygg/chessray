@@ -1542,6 +1542,19 @@ function initOverlay(): void {
   const closeBtn = document.getElementById('cv-close-btn');
   closeBtn?.addEventListener('click', () => window.chessRay.closeApp());
 
+  // Hide panel: button + global hotkey toggle (Cmd/Ctrl+Shift+H, registered in main).
+  // Hides only the user panel (controls); the canvas overlay arrows continue.
+  const hideBtn = document.getElementById('cv-hide-btn');
+  function setPanelHidden(hidden: boolean): void {
+    if (!userPanel) return;
+    userPanel.style.display = hidden ? 'none' : '';
+  }
+  hideBtn?.addEventListener('click', () => setPanelHidden(true));
+  window.chessRay.onTogglePanel(() => {
+    if (!userPanel) return;
+    setPanelHidden(userPanel.style.display !== 'none' ? true : false);
+  });
+
   // Lichess analysis — toggle floating window + sync control
   const lichessBtn = document.getElementById('cv-lichess-btn');
   const lichessSyncCheckbox = document.getElementById('cv-lichess-sync') as HTMLInputElement | null;

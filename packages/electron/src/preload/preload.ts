@@ -80,6 +80,10 @@ const api = {
   onResetPanelPosition: (cb: () => void) =>
     ipcRenderer.on('reset-panel-position', () => cb()),
 
+  // Panel show/hide toggle (driven by global shortcut + dock menu)
+  onTogglePanel: (cb: () => void) =>
+    ipcRenderer.on('toggle-panel', () => cb()),
+
   // Frame recording (test fixture capture)
   startRecording: () => ipcRenderer.send('start-recording'),
   stopRecording: () => ipcRenderer.send('stop-recording'),

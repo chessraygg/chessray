@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, protocol, screen, session, shell, systemPreferences } from 'electron';
+import { app, BrowserWindow, desktopCapturer, globalShortcut, ipcMain, Menu, protocol, screen, session, shell, systemPreferences } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { platform } from './platform.js';
@@ -240,6 +240,13 @@ async function switchDisplay(displayId: number): Promise<void> {
   buildDockMenu();
 }
 
+/** Toggle overlay user-panel visibility (canvas overlay arrows continue regardless). */
+function togglePanel(): void {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('toggle-panel');
+  }
+}
+
 /** Build the dock menu with display list and panel reset */
 function buildDockMenu(): void {
   if (process.platform !== 'darwin') return;
@@ -270,6 +277,12 @@ function buildDockMenu(): void {
         overlayWindow.webContents.send('reset-panel-position');
       }
     },
+  });
+
+  template.push({
+    label: 'Show/Hide Panel',
+    accelerator: 'CommandOrControl+Shift+H',
+    click: togglePanel,
   });
 
   (app as any).dock?.setMenu(Menu.buildFromTemplate(template));
@@ -548,6 +561,12 @@ app.whenReady().then(() => {
     callback({});
   });
 
+  // Global hotkey to toggle the overlay user-panel without focusing the app.
+  // Same accelerator as the "Show/Hide Panel" dock menu entry.
+  if (!globalShortcut.register('CommandOrControl+Shift+H', togglePanel)) {
+    fs.appendFileSync(LOG, `[chessray] Failed to register CommandOrControl+Shift+H global shortcut\n`);
+  }
+
   const screenStatus = platform.getScreenCaptureStatus(systemPreferences);
   fs.writeFileSync(LOG, `[chessray] App ready. Screen status=${screenStatus} platform=${process.platform} (trying capture)\n`);
   getScreenSourceId(activeDisplayId!)
@@ -560,6 +579,10 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (platform.quitOnAllWindowsClosed) app.quit();
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
 
 
