@@ -1,0 +1,300 @@
+/* v2 — actual-board-driven panel
+   Reuses ../shared.css design tokens (--bg, --accent, etc.) but defines its
+   own panel layout from scratch. */
+
+/* ── Panel chrome (slim) ─────────────────────────────────────────── */
+.r2 {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  user-select: none;
+}
+
+/* primary column = the move list (or settings/debug in drawer mode) */
+.r2-col {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* secondary column appears in sidecar mode only */
+.r2-side {
+  width: 320px;
+  border-left: 1px solid var(--border);
+  display: none;
+  flex-direction: column;
+  min-width: 0;
+}
+.r2.has-side .r2-side { display: flex; }
+
+/* ── Header ──────────────────────────────────────────────────────── */
+.r2-head {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 4px 0 10px;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.22);
+  flex-shrink: 0;
+}
+.r2-turn {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
+}
+.r2-turn.b { background: #1a1a1a; box-shadow: 0 0 0 1px #555; }
+.r2-meta {
+  font-size: 10px;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+  font-family: ui-monospace, monospace;
+  margin-left: 4px;
+}
+.r2-meta b {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+.r2-spacer { flex: 1; }
+.r2-btn {
+  width: 24px; height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: all 0.12s;
+  font-size: 12px;
+  line-height: 1;
+}
+.r2-btn:hover { background: var(--bg-hover); color: var(--text); }
+.r2-btn.active { color: var(--accent); background: var(--accent-soft); }
+.r2-btn.danger:hover { background: rgba(239,68,68,0.18); color: var(--bad); }
+.r2-btn svg { width: 13px; height: 13px; }
+
+/* ── Move list (the hero) ────────────────────────────────────────── */
+.r2-moves {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  gap: 2px;
+}
+.r2-row {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  position: relative;
+  border-left: 2px solid transparent;
+  transition: background 0.1s, border-color 0.1s;
+}
+.r2-row:hover { background: rgba(255,255,255,0.04); }
+.r2-row.selected {
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+}
+.r2-row .rank {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-family: ui-monospace, monospace;
+  text-align: center;
+}
+.r2-row.selected .rank { color: var(--accent); }
+.r2-row .san {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+  font-family: 'Charter', 'Georgia', serif;
+}
+.r2-row .san em {
+  font-style: normal;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: 400;
+  margin-left: 8px;
+  letter-spacing: 0;
+}
+.r2-row .score {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.r2-row.pos .score { color: #86efac; }
+.r2-row.neg .score { color: #fca5a5; }
+.r2-row.selected .score { color: var(--accent); font-weight: 600; }
+
+/* tiny "playing on board" indicator next to selected row */
+.r2-row .playing {
+  position: absolute;
+  right: 4px; top: -4px;
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--bg);
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid var(--accent);
+  display: none;
+}
+.r2-row.selected .playing { display: inline-block; }
+
+/* ── Surface (settings / debug) ──────────────────────────────────── */
+.r2-surface {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.r2-surface-head {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 8px;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+.r2-back {
+  width: 20px; height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 12px;
+}
+.r2-back:hover { color: var(--text); background: var(--bg-hover); }
+.r2-surface-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ── Settings groups ─────────────────────────────────────────────── */
+.r2-group {
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.r2-group:last-child { border-bottom: 0; }
+.r2-group-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+.r2-knob {
+  display: grid;
+  grid-template-columns: 76px 1fr 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+.r2-knob label { color: var(--text-dim); }
+.r2-knob input[type=range] { width: 100%; accent-color: var(--accent); }
+.r2-knob input[type=checkbox] { accent-color: var(--accent); justify-self: start; margin: 0; }
+.r2-knob .v {
+  text-align: right;
+  color: var(--text);
+  font-family: ui-monospace, monospace;
+  font-size: 10.5px;
+}
+.r2-knob .v small { color: var(--text-faint); margin-left: 2px; }
+
+/* "show on screen" — three line switches */
+.r2-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.r2-switch input { accent-color: var(--accent); margin: 0; }
+.r2-switch span { flex: 1; }
+
+/* Tools */
+.r2-toolbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.r2-toolbtn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Debug surface ───────────────────────────────────────────────── */
+.r2-debug-img {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  display: block;
+  background: #0a0a0a;
+}
+.r2-fen {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  word-break: break-all;
+  padding: 4px 0;
+  line-height: 1.5;
+}
+.r2-kv {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 4px 10px;
+  font-size: 10.5px;
+  padding: 4px 0;
+}
+.r2-kv dt { color: var(--text-faint); }
+.r2-kv dd {
+  margin: 0;
+  color: var(--text-dim);
+  font-family: ui-monospace, monospace;
+  word-break: break-word;
+}
+.r2-debug-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+.r2-debug-actions .r2-toolbtn {
+  flex: 1;
+  justify-content: center;
+  font-size: 10px;
+  padding: 5px 8px;
+}

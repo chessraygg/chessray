@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>v2 — Drawer</title>
+  <link rel="stylesheet" href="../shared.css">
+  <link rel="stylesheet" href="./v2.css">
+</head>
+<body>
+  <div class="playground-label">
+    chessray · v2 — drawer
+    <a href="./index.html">← back</a>
+    <a href="./sidecar.html">sidecar →</a>
+  </div>
+
+  <div class="r2" id="panel">
+    <div class="r2-col">
+      <!-- header (always visible) -->
+      <div class="r2-head">
+        <span class="r2-turn b" id="turn-dot"></span>
+        <span class="r2-meta"><b id="depth">d24</b> · <b id="lines-count">5</b> lines · <b id="fps">3.2</b> fps</span>
+        <span class="r2-spacer"></span>
+        <button class="r2-btn" id="btn-settings" title="Settings">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2"/><path d="M13.4 9.5l1.4 1.1-1.4 2.4-1.7-.5a5.6 5.6 0 0 1-1.4.8l-.4 1.7H7.1l-.4-1.7a5.6 5.6 0 0 1-1.4-.8l-1.7.5-1.4-2.4 1.4-1.1a5.6 5.6 0 0 1 0-1.6L2.2 6.6 3.6 4.2l1.7.5a5.6 5.6 0 0 1 1.4-.8l.4-1.7h2.8l.4 1.7c.5.2 1 .5 1.4.8l1.7-.5 1.4 2.4-1.4 1.1c.1.5.1 1.1 0 1.6z"/></svg>
+        </button>
+        <button class="r2-btn" id="btn-debug" title="Diagnostics">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="6" height="8" rx="3"/><path d="M2 6h2M2 9h2M2 12h2M12 6h2M12 9h2M12 12h2M8 2v3M5 4l-1-1M11 4l1-1"/></svg>
+        </button>
+        <button class="r2-btn" title="Hide panel">−</button>
+        <button class="r2-btn danger" title="Close">×</button>
+      </div>
+
+      <!-- moves view -->
+      <div class="r2-moves" id="view-moves"></div>
+
+      <!-- settings view (hidden until ⚙) -->
+      <div class="r2-surface" id="view-settings" style="display:none">
+        <div class="r2-surface-head">
+          <button class="r2-back" data-back>←</button>
+          <span class="r2-surface-title">Settings</span>
+        </div>
+        <div id="settings-body"></div>
+      </div>
+
+      <!-- debug view (hidden until 🐛) -->
+      <div class="r2-surface" id="view-debug" style="display:none">
+        <div class="r2-surface-head">
+          <button class="r2-back" data-back>←</button>
+          <span class="r2-surface-title">Diagnostics</span>
+        </div>
+        <div id="debug-body" style="padding:8px 10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./mock-data.js"></script>
+  <script src="./render.js"></script>
+  <script>
+    renderMoves('#view-moves');
+    renderSettings('#settings-body');
+    renderDebug('#debug-body');
+
+    const views = {
+      moves:    document.querySelector('#view-moves'),
+      settings: document.querySelector('#view-settings'),
+      debug:    document.querySelector('#view-debug'),
+    };
+    const btns = {
+      settings: document.querySelector('#btn-settings'),
+      debug:    document.querySelector('#btn-debug'),
+    };
+    function show(name) {
+      for (const k of Object.keys(views)) {
+        views[k].style.display = (k === name) ? (name === 'moves' ? 'flex' : 'flex') : 'none';
+      }
+      btns.settings.classList.toggle('active', name === 'settings');
+      btns.debug.classList.toggle('active', name === 'debug');
+    }
+    btns.settings.addEventListener('click', () => show(views.settings.style.display === 'none' ? 'settings' : 'moves'));
+    btns.debug.addEventListener('click',    () => show(views.debug.style.display    === 'none' ? 'debug'    : 'moves'));
+    document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => show('moves')));
+  </script>
+</body>
+</html>
