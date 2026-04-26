@@ -8,26 +8,12 @@
 <body>
   <canvas id="video-overlay"></canvas>
 
-  <!-- Hidden virtual-board host: kept so the canvas-renderer + ResizeObserver
-       wiring stays valid. The on-screen actual-board overlay is the canonical
-       view; this element exists only because vboardOverlayVisible / pvCycle
-       still write to it. Off-screen so it doesn't visually compete. -->
-  <div class="vboard-host" aria-hidden="true">
-    <div class="board-fit" id="cv-board-fit">
-      <div class="board-container">
-        <div class="piece-grid" id="cv-debug-grid"></div>
-        <canvas id="cv-arrow-canvas" width="200" height="200"></canvas>
-      </div>
-    </div>
-  </div>
-
   <div class="panel user-panel" id="user-panel">
     <!-- Slim header: turn · depth · ⚙ ⚧ — × -->
     <div class="r2-head" id="cv-main-toggles">
       <span class="r2-turn-dot turn-dot" id="cv-turn-dot"></span>
       <span class="r2-meta">
         <span class="r2-meta-depth" id="cv-eval-depth"></span>
-        <span class="r2-meta-label" id="cv-eval-label" hidden></span>
         <span class="orientation-badge r2-meta-orient" id="cv-orientation-badge" data-tip="Click to flip the board manually. Click again to return to auto-detection. Resets automatically on a new game." data-tip-pos="below">
           <span class="orient-arrow" id="cv-pawn-dir"></span>
         </span>
@@ -46,6 +32,18 @@
     <div class="panel-body" id="cv-panel-body">
       <!-- ── Moves view (default) ─────────────────────────────────── -->
       <div class="r2-view r2-view-moves" id="r2-view-moves">
+        <div class="r2-board-block">
+          <div class="board-fit" id="cv-board-fit">
+            <div class="board-container">
+              <div class="piece-grid" id="cv-debug-grid"></div>
+              <canvas id="cv-arrow-canvas" width="200" height="200"></canvas>
+            </div>
+          </div>
+          <div class="eval-bar">
+            <div class="eval-bar-fill" id="cv-eval-fill" style="width:50%"></div>
+            <div class="eval-bar-label" id="cv-eval-label"></div>
+          </div>
+        </div>
         <div class="r2-moves" id="cv-best-moves"></div>
       </div>
 
@@ -196,11 +194,6 @@
       <span id="cv-turn-text"></span>
       <span id="cv-compact-hint"></span>
       <div id="cv-compact-moves"></div>
-      <!-- Eval bar: in-panel duplicate of the on-screen one. Hidden but
-           still updated by debug-panel.updateDebugPanel. -->
-      <div class="eval-bar">
-        <div class="eval-bar-fill" id="cv-eval-fill" style="width:50%"></div>
-      </div>
     </div>
 
     <div class="resize-grip bottom-right" id="cv-resize-grip-br"></div>

@@ -1151,32 +1151,28 @@ canvas#video-overlay {
   flex-direction: column;
 }
 
-/* Hidden virtual-board host (off-screen, but sized so ResizeObserver fires). */
-.vboard-host {
-  position: absolute;
-  left: -10000px;
-  top: 0;
-  width: 200px;
-  height: 200px;
-  pointer-events: none;
-  visibility: hidden;
+/* In-moves board block: virtual board + eval bar above the move list */
+.r2-board-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
-.vboard-host .board-fit { width: 200px; height: 200px; }
-.vboard-host .board-container {
-  position: relative;
-  width: 200px;
-  height: 200px;
-  display: grid;
+.r2-board-block .board-fit {
+  flex: 0 0 auto;
+  width: 168px;
+  height: 168px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.vboard-host .piece-grid {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  grid-template-rows: repeat(8, 1fr);
-  width: 100%; height: 100%;
-}
-.vboard-host #cv-arrow-canvas {
-  position: absolute; inset: 0;
-  width: 200px; height: 200px;
+.r2-board-block .eval-bar {
+  width: 100%;
+  max-width: 240px;
+  height: 12px;
 }
 
 /* Header */
@@ -1266,11 +1262,20 @@ canvas#video-overlay {
 .r2-view[hidden] { display: none; }
 
 /* Move list (the hero view) */
-.r2-view-moves { padding: 6px; overflow: auto; }
+.r2-view-moves {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
 .r2-moves {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: 6px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 /* Re-style the existing .move-line markup emitted by debug-panel.renderBestMoves
    so the rest of the codebase doesn't need to change. */
