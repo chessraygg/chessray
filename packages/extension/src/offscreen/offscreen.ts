@@ -234,6 +234,11 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
         await new Promise(r => setTimeout(r, 4000));
       } finally {
         (processor as unknown as { deps: { sendResult: typeof orig } }).deps.sendResult = orig;
+        // Stop iterative deepening so its frame-result broadcasts don't
+        // keep flooding open extension surfaces (popup / side panel) after
+        // we've returned from the test handler.
+        const ac = (processor as unknown as { evalAbortController: AbortController | null }).evalAbortController;
+        ac?.abort();
       }
       const last = captured[captured.length - 1];
       const summary = {
