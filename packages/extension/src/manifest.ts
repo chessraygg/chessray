@@ -16,11 +16,9 @@ export default defineManifest({
   action: {
     default_title: 'Chessray',
   },
-  // No side_panel in manifest. Empirically, having side_panel.default_path
-  // here makes Chrome auto-open the panel on action click and suppress
-  // chrome.action.onClicked — even with no setPanelBehavior call. We
-  // need onClicked to fire (only event that grants activeTab), so we
-  // configure + open the panel from inside onClicked instead.
+  side_panel: {
+    default_path: 'src/popup/popup.html',
+  },
   background: {
     service_worker: 'src/background/service-worker.ts',
     type: 'module',
@@ -32,6 +30,7 @@ export default defineManifest({
     'tabCapture',
     'activeTab',
     'sidePanel',
+    'contextMenus',
   ],
   commands: {
     'toggle-capture': {

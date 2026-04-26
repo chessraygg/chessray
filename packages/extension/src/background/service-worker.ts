@@ -152,26 +152,50 @@ note('SW startup');
 // which is the only event that grants activeTab. With both omitted,
 // onClicked fires on toolbar click and we open the panel ourselves.
 
+async function recordInvocation(tabId: number, source: string): Promise<void> {
+  note(`invoked source=${source} tab=${tabId}`);
+  lastInvokedTabId = tabId;
+  await chrome.storage.session.set({ __chessrayInvokedTab: tabId }).catch(() => {});
+}
+
 chrome.action.onClicked.addListener(async (tab) => {
-  note(`action.onClicked tab=${tab.id} url=${(tab.url ?? '').slice(0, 60)}`);
+  note(`action.onClicked tab=${tab.id}`);
   if (tab.id == null) return;
-  lastInvokedTabId = tab.id;
-  await chrome.storage.session.set({ __chessrayInvokedTab: tab.id }).catch(() => {});
-  try {
-    await chrome.sidePanel.setOptions({
-      tabId: tab.id,
-      path: 'src/popup/popup.html',
-      enabled: true,
-    });
-    note(`sidePanel.setOptions ok`);
-  } catch (err) {
-    note(`sidePanel.setOptions FAILED: ${String(err)}`);
-  }
+  await recordInvocation(tab.id, 'action');
   try {
     await chrome.sidePanel.open({ tabId: tab.id });
     note(`sidePanel.open ok`);
   } catch (err) {
     note(`sidePanel.open FAILED: ${String(err)}`);
+  }
+});
+
+// Context-menu fallback. If chrome.action.onClicked refuses to fire
+// (some Chrome versions appear to suppress it when the side panel is
+// configured), the user can right-click the page and pick "Chessray:
+// Capture this tab" — context-menu invocation also grants activeTab.
+chrome.runtime.onInstalled.addListener(() => {
+  try {
+    chrome.contextMenus.create({
+      id: 'chessray-capture',
+      title: 'Chessray: Capture this tab',
+      contexts: ['page', 'frame', 'video', 'image'],
+    });
+    note('contextMenus.create ok');
+  } catch (err) {
+    note(`contextMenus.create FAILED: ${String(err)}`);
+  }
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  note(`contextMenu.onClicked id=${info.menuItemId} tab=${tab?.id}`);
+  if (info.menuItemId !== 'chessray-capture' || tab?.id == null) return;
+  await recordInvocation(tab.id, 'context-menu');
+  try {
+    await chrome.sidePanel.open({ tabId: tab.id });
+    note(`sidePanel.open ok (from context menu)`);
+  } catch (err) {
+    note(`sidePanel.open FAILED (context): ${String(err)}`);
   }
 });
 
