@@ -84,6 +84,10 @@ const api = {
   onTogglePanel: (cb: () => void) =>
     ipcRenderer.on('toggle-panel', () => cb()),
 
+  // Wipe saved prefs and reload the overlay (dock-menu "Reset All Settings")
+  onResetAllSettings: (cb: () => void) =>
+    ipcRenderer.on('reset-all-settings', () => cb()),
+
   // Frame recording (test fixture capture)
   startRecording: () => ipcRenderer.send('start-recording'),
   stopRecording: () => ipcRenderer.send('stop-recording'),

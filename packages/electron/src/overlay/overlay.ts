@@ -1555,6 +1555,13 @@ function initOverlay(): void {
     setPanelHidden(userPanel.style.display !== 'none' ? true : false);
   });
 
+  // Reset all settings: wipe saved prefs and reload so the renderer comes back
+  // up with DEFAULT_PREFS. Confirmation already happened in the main process.
+  window.chessRay.onResetAllSettings(() => {
+    try { localStorage.removeItem('chessray-prefs'); } catch { /* ignore */ }
+    location.reload();
+  });
+
   // Lichess analysis — toggle floating window + sync control
   const lichessBtn = document.getElementById('cv-lichess-btn');
   const lichessSyncCheckbox = document.getElementById('cv-lichess-sync') as HTMLInputElement | null;

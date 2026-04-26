@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer, globalShortcut, ipcMain, Menu, protocol, screen, session, shell, systemPreferences } from 'electron';
+import { app, BrowserWindow, desktopCapturer, dialog, globalShortcut, ipcMain, Menu, protocol, screen, session, shell, systemPreferences } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { platform } from './platform.js';
@@ -283,6 +283,25 @@ function buildDockMenu(): void {
     label: 'Show/Hide Panel',
     accelerator: 'CommandOrControl+Shift+H',
     click: togglePanel,
+  });
+
+  template.push({
+    label: 'Reset All Settings…',
+    click: async () => {
+      if (!overlayWindow || overlayWindow.isDestroyed()) return;
+      const { response } = await dialog.showMessageBox(overlayWindow, {
+        type: 'warning',
+        buttons: ['Cancel', 'Reset'],
+        defaultId: 0,
+        cancelId: 0,
+        title: 'Reset all settings',
+        message: 'Reset all panel settings to defaults?',
+        detail: 'Clears your saved layout, panel size/position, sliders, hidden sections, and all other preferences. The display capture choice is preserved.',
+      });
+      if (response === 1) {
+        overlayWindow.webContents.send('reset-all-settings');
+      }
+    },
   });
 
   (app as any).dock?.setMenu(Menu.buildFromTemplate(template));
