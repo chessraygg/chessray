@@ -133,9 +133,19 @@ chrome.action.onClicked.addListener(async (tab) => {
   lastInvokedTabId = tab.id;
   await chrome.storage.session.set({ __chessrayInvokedTab: tab.id }).catch(() => {});
   try {
+    // Explicitly configure the panel for this tab. We deliberately
+    // omit `side_panel.default_path` from manifest because that flag
+    // makes Chrome auto-open the panel on action click and suppress
+    // onClicked entirely — which is exactly what we DON'T want
+    // (no onClicked → no activeTab grant → tabCapture rejects).
+    await chrome.sidePanel.setOptions({
+      tabId: tab.id,
+      path: 'src/popup/popup.html',
+      enabled: true,
+    });
     await chrome.sidePanel.open({ tabId: tab.id });
   } catch (err) {
-    console.error('[chessray] sidePanel.open:', err);
+    console.error('[chessray] sidePanel open failed:', err);
   }
 });
 
