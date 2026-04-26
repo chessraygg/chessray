@@ -129,14 +129,15 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
  *  if they've since switched tabs in the same window. */
 let lastInvokedTabId: number | undefined;
 
-// Make Chrome auto-open the side panel on action click. We also keep an
-// onClicked listener — different Chrome versions handle this combo
-// differently (some fire onClicked alongside the auto-open, some don't).
-// Whichever path fires, lastInvokedTabId gets stamped.
-chrome.runtime.onInstalled.addListener(() => {
-  void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
-    .catch((err) => console.error('[chessray] setPanelBehavior:', err));
-});
+// Crucial: do NOT call setPanelBehavior({openPanelOnActionClick: true}).
+// That flag makes Chrome auto-open the panel on action click and
+// SUPPRESSES chrome.action.onClicked entirely — and onClicked is the
+// only event that grants activeTab. We need both: the panel to open AND
+// onClicked to fire. The pattern that gives us both is:
+//   - keep side_panel.default_path in manifest (so the panel exists)
+//   - leave openPanelOnActionClick at default (false)
+//   - open the panel ourselves from inside onClicked (which is allowed
+//     because onClicked is a user gesture)
 
 chrome.action.onClicked.addListener(async (tab) => {
   if (tab.id == null) return;
@@ -145,8 +146,7 @@ chrome.action.onClicked.addListener(async (tab) => {
   try {
     await chrome.sidePanel.open({ tabId: tab.id });
   } catch (err) {
-    // Panel may already be open from openPanelOnActionClick — that's fine.
-    if (!String(err).includes('already')) console.error('[chessray] sidePanel.open:', err);
+    console.error('[chessray] sidePanel.open:', err);
   }
 });
 
