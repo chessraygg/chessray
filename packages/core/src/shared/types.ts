@@ -1,4 +1,15 @@
-import type { BoardBBox, RecognitionResult, EvalResult, Turn, OrientationSource, DisambiguationTraceCorrected } from '@chessray/core';
+// Lifted from packages/electron/src/shared/types.ts so the analysis runtime
+// + overlay UI can be shared between Electron and the Chrome extension.
+// All host-agnostic — talks only about pipeline/eval shapes.
+
+import type {
+  BoardBBox,
+  RecognitionResult,
+  EvalResult,
+  Turn,
+} from '../types.js';
+import type { OrientationSource } from '../orientation/orientation.js';
+import type { DisambiguationTraceCorrected } from '../pipeline/recognize-board.js';
 
 /** Detected end-of-game state */
 export type GameOver = 'checkmate' | 'stalemate';

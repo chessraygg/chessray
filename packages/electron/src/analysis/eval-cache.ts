@@ -1,5 +1,5 @@
 import type { EvalResult } from '@chessray/core';
-import type { ArrowDescriptor } from '../shared/types.js';
+import type { ArrowDescriptor } from '@chessray/core';
 
 export const EVAL_START_DEPTH = 16;
 export const EVAL_DEPTH_STEP = 4;

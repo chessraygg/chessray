@@ -3,7 +3,7 @@
  * exceeded the FPS budget (1000 / targetFps). Survives app restart via
  * localStorage so the user can inspect what slowed past sessions.
  */
-import type { PipelineResult } from '../shared/types.js';
+import type { PipelineResult } from '@chessray/core';
 
 const STORAGE_KEY = 'chessray-debug-history-v1';
 export const MAX_ENTRIES = 10;

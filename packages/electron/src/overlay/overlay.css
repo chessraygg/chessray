@@ -616,7 +616,7 @@ canvas#video-overlay {
 
 /* Square background colors are set inline by renderBoardGrid using the
  * detected real-board theme (with brightening when the grid has class
- * "analysis"). See packages/electron/src/shared/colors.ts. */
+ * "analysis"). See packages/core/src/shared/colors.ts. */
 
 /* ── Compact mode ── */
 

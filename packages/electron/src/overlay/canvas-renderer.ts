@@ -1,7 +1,6 @@
-import type { ArrowDescriptor, GameOver, PipelineResult } from '../shared/types.js';
+import type { ArrowDescriptor, GameOver, PipelineResult } from '@chessray/core';
 import type { Turn } from '@chessray/core';
-import { computeCurveOffsets, lossToColor } from '../shared/arrows.js';
-import { rgbToCss, squareColorPalette, type RGB } from '../shared/colors.js';
+import { computeCurveOffsets, lossToColor, rgbToCss, squareColorPalette, type RGB } from '@chessray/core';
 import { pieceImages } from './piece-svg.js';
 
 export interface PvBoardState {

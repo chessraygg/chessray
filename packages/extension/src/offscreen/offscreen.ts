@@ -14,7 +14,12 @@
  */
 
 import './vendor.ts';
-import * as ort from 'onnxruntime-web';
+// Default `onnxruntime-web` resolves to ort.bundle.min.mjs (WASM only).
+// The /webgpu subpath gives us ort.webgpu.bundle.min.mjs, which keeps the
+// WASM EP for non-GPU ops while exposing the WebGPU EP that core's YOLO
+// recognizer requests first. Without this, every Chrome session silently
+// falls back to WASM and inference is ~10× slower.
+import * as ort from 'onnxruntime-web/webgpu';
 import {
   StockfishEngine,
   YoloPieceRecognizer,

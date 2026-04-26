@@ -1,6 +1,6 @@
-import type { PipelineResult } from '../shared/types.js';
+import type { PipelineResult } from '@chessray/core';
 import { uciToSan } from '@chessray/core';
-import { rgbToCss, squareColorPalette, type RGB } from '../shared/colors.js';
+import { rgbToCss, squareColorPalette, type RGB } from '@chessray/core';
 import { savePrefs } from './preferences.js';
 import { pieceSvg } from './piece-svg.js';
 

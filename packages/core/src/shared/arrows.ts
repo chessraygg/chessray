@@ -1,4 +1,4 @@
-import type { EvalMove, Turn } from '@chessray/core';
+import type { EvalMove, Turn } from '../types.js';
 import type { ArrowDescriptor } from './types.js';
 
 /**

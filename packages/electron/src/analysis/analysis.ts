@@ -5,7 +5,7 @@
  */
 
 import type { PixelBuffer } from '@chessray/core';
-import type { PipelineResult } from '../shared/types.js';
+import type { PipelineResult } from '@chessray/core';
 import { setMultiPvMax } from './eval-cache.js';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
 import { initAndStartCapture, stopCapture, setTargetFps, type FrameMeta } from './frame-capture.js';

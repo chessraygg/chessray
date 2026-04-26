@@ -6,8 +6,8 @@ import {
   computeArrows,
   squareToPixel,
   arrowGeometry,
-} from '../src/shared/arrows.js';
-import type { EvalMove } from '@chessray/core';
+  type EvalMove,
+} from '@chessray/core';
 
 describe('lossToColor', () => {
   it('returns green for 0 cp loss', () => {

@@ -22,7 +22,7 @@ import type {
   PixelBuffer, EvalResult, RecognitionResult, BoardBBox,
   OrientationSource, Turn,
 } from '@chessray/core';
-import type { PipelineResult, ArrowDescriptor, GameOver } from '../shared/types.js';
+import type { PipelineResult, ArrowDescriptor, GameOver } from '@chessray/core';
 
 import {
   EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH,
@@ -30,7 +30,7 @@ import {
   cacheGet, cachePut,
 } from './eval-cache.js';
 import { sampleBoardPixels, sampleFrameOutsideBbox, boardUnchanged } from './change-detect.js';
-import { computeArrows } from '../shared/arrows.js';
+import { computeArrows } from '@chessray/core';
 
 /** ImageData-like shape — compatible with the real DOM `ImageData` (renderer)
  *  and with a plain `{ data, width, height }` object (Node tests). */

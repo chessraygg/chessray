@@ -3,9 +3,9 @@
  * Port of content/overlay.ts adapted for Electron (no Shadow DOM, screen coords).
  */
 
-import type { PipelineResult } from '../shared/types.js';
+import type { PipelineResult } from '@chessray/core';
 import { applyUciMoves, uciToSan, fenSimilarity } from '@chessray/core';
-import { lossToColor } from '../shared/arrows.js';
+import { lossToColor } from '@chessray/core';
 import { loadPrefs, savePrefs } from './preferences.js';
 import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow, videoHitCache, vboardHitCache, hitTestArrows, hitTestAnimBoard } from './canvas-renderer.js';
 import { preloadPieceImages } from './piece-svg.js';
