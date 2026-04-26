@@ -16,7 +16,10 @@ body {
   background: #171717;
   color: #e5e5e5;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  overflow-x: hidden;
+  /* panel.css sets body{overflow:hidden} — fine for the Electron
+     overlay window, fatal here. Restore vertical scrolling. */
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
 }
 
 #cap-bar {
