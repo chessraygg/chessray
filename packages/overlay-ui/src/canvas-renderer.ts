@@ -1033,23 +1033,6 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.strokeStyle = 'rgba(255, 0, 255, 0.7)';
     ctx.lineWidth = 2;
     ctx.strokeRect(bx, by, bw, bh);
-    // Debug: also stamp the geometry values next to the box. With this
-    // we can see at-a-glance whether the offset is in the bbox, the
-    // frame dims, or somewhere downstream.
-    ctx.fillStyle = 'rgba(255, 0, 255, 0.85)';
-    ctx.font = '11px ui-monospace, monospace';
-    const fd = result.frame_dimensions;
-    const lines = [
-      `bbox=(${bbox.x},${bbox.y},${bbox.width}x${bbox.height})`,
-      `frame=${fd ? `${fd.width}x${fd.height}` : 'n/a'}`,
-      `vw=${vw} vh=${vh} dpr=${window.devicePixelRatio}`,
-      `→ rect=(${bx.toFixed(0)},${by.toFixed(0)},${bw.toFixed(0)}x${bh.toFixed(0)})`,
-    ];
-    let yPos = by + bh + 14;
-    for (const line of lines) {
-      ctx.fillText(line, bx, yPos);
-      yPos += 13;
-    }
   }
 
   // During PV animation, draw analysis board (background + pieces + animated arrow)
