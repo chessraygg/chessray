@@ -1799,10 +1799,12 @@ function processPendingResult(): void {
  * CSS, and runs initOverlay + IPC listener registration.
  */
 export function mountOverlay(api: ChessRayAPI): void {
-  // 1. Capture the host bridge for module-scoped use; also expose on the
-  //    window object as a debugging aid (legacy contract).
+  // 1. Capture the host bridge for module-scoped use. We deliberately don't
+  //    reassign window.chessRay — Electron's contextBridge.exposeInMainWorld
+  //    makes it read-only and the assignment throws. Hosts that haven't
+  //    already populated window.chessRay (e.g. extension content script)
+  //    are still fully wired through the module-scoped pointer.
   chessRay = api;
-  (window as unknown as { chessRay: ChessRayAPI }).chessRay = api;
 
   // 2. Inject the panel structure into the document. Hosts only need a body.
   if (!document.getElementById('user-panel')) {
