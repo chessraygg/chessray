@@ -110,13 +110,19 @@ function shortUrl(): string {
 startBtn.disabled = true;
 setStatus('…');
 async function bootstrap(): Promise<void> {
-  const [state, stored] = await Promise.all([
+  const [state, stored, traceResp] = await Promise.all([
     chrome.runtime.sendMessage({ type: 'get-capture-state' } satisfies ExtensionMessage)
       .catch(() => ({ running: false })),
     chrome.storage.session.get('__chessrayPopupStatus').catch(() => ({})),
+    chrome.runtime.sendMessage({ type: 'get-trace' } satisfies ExtensionMessage)
+      .catch(() => ({ trace: [] })),
   ]);
   await preloadTabId();
   startBtn.disabled = false;
+  // Show the last few SW events at the bottom so we can verify whether
+  // chrome.action.onClicked fired when the user clicked the toolbar.
+  const traceLines: string[] = traceResp?.trace?.slice(-6) ?? [];
+  const traceTail = traceLines.length ? '\n— SW trace —\n' + traceLines.join('\n') : '\n(no SW events yet)';
   if (state?.running) {
     setStatus(`Running (tab ${state.tabId ?? '?'})`);
     startBtn.classList.add('running');
@@ -130,9 +136,9 @@ async function bootstrap(): Promise<void> {
     return;
   }
   if (cachedTabId === null) {
-    setStatus(`No http(s) tab · build ${BUILD}`, true);
+    setStatus(`No http(s) tab · build ${BUILD}${traceTail}`, true);
   } else {
-    setStatus(`Idle · build ${BUILD} · tab ${cachedTabId} · ${shortUrl()}`);
+    setStatus(`Idle · build ${BUILD} · ${cachedTabSource} · tab ${cachedTabId} · ${shortUrl()}${traceTail}`);
   }
 }
 void bootstrap();

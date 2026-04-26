@@ -16,15 +16,11 @@ export default defineManifest({
   action: {
     default_title: 'Chessray',
   },
-  // Restore default_path so the side panel reliably opens on action
-  // click. We also call sidePanel.setPanelBehavior({openPanelOnActionClick})
-  // in the SW. action.onClicked may or may not fire alongside this in
-  // current Chrome — the SW handler is defensive: it handles both
-  // (onClicked grants activeTab if it fires; the panel's Start button
-  // also re-invokes via context menu if activeTab is missing).
-  side_panel: {
-    default_path: 'src/popup/popup.html',
-  },
+  // No side_panel in manifest. Empirically, having side_panel.default_path
+  // here makes Chrome auto-open the panel on action click and suppress
+  // chrome.action.onClicked — even with no setPanelBehavior call. We
+  // need onClicked to fire (only event that grants activeTab), so we
+  // configure + open the panel from inside onClicked instead.
   background: {
     service_worker: 'src/background/service-worker.ts',
     type: 'module',

@@ -74,6 +74,10 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     getCaptureState().then(sendResponse);
     return true;
   }
+  if (msg.type === 'get-trace') {
+    sendResponse({ trace });
+    return false;
+  }
   if (msg.type === 'get-target-tab') {
     (async () => {
       // Prefer the tab the user invoked the action on (activeTab grant
@@ -129,24 +133,45 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
  *  if they've since switched tabs in the same window. */
 let lastInvokedTabId: number | undefined;
 
-// Crucial: do NOT call setPanelBehavior({openPanelOnActionClick: true}).
-// That flag makes Chrome auto-open the panel on action click and
-// SUPPRESSES chrome.action.onClicked entirely — and onClicked is the
-// only event that grants activeTab. We need both: the panel to open AND
-// onClicked to fire. The pattern that gives us both is:
-//   - keep side_panel.default_path in manifest (so the panel exists)
-//   - leave openPanelOnActionClick at default (false)
-//   - open the panel ourselves from inside onClicked (which is allowed
-//     because onClicked is a user gesture)
+// Trace ring buffer — every meaningful event the SW sees gets logged
+// here. The side panel reads it via 'get-trace' and shows it inline so
+// we can see in production whether onClicked is firing, what tab id it
+// passes, etc., without needing devtools.
+const trace: string[] = [];
+function note(s: string): void {
+  const ts = new Date().toISOString().slice(11, 19);
+  trace.push(`${ts} ${s}`);
+  if (trace.length > 30) trace.shift();
+  void chrome.storage.session.set({ __chessrayTrace: trace }).catch(() => {});
+}
+note('SW startup');
+
+// Crucial: do NOT have side_panel.default_path in manifest, and do NOT
+// call setPanelBehavior({openPanelOnActionClick: true}). Either of those
+// makes Chrome auto-open the panel and suppress chrome.action.onClicked,
+// which is the only event that grants activeTab. With both omitted,
+// onClicked fires on toolbar click and we open the panel ourselves.
 
 chrome.action.onClicked.addListener(async (tab) => {
+  note(`action.onClicked tab=${tab.id} url=${(tab.url ?? '').slice(0, 60)}`);
   if (tab.id == null) return;
   lastInvokedTabId = tab.id;
   await chrome.storage.session.set({ __chessrayInvokedTab: tab.id }).catch(() => {});
   try {
-    await chrome.sidePanel.open({ tabId: tab.id });
+    await chrome.sidePanel.setOptions({
+      tabId: tab.id,
+      path: 'src/popup/popup.html',
+      enabled: true,
+    });
+    note(`sidePanel.setOptions ok`);
   } catch (err) {
-    console.error('[chessray] sidePanel.open:', err);
+    note(`sidePanel.setOptions FAILED: ${String(err)}`);
+  }
+  try {
+    await chrome.sidePanel.open({ tabId: tab.id });
+    note(`sidePanel.open ok`);
+  } catch (err) {
+    note(`sidePanel.open FAILED: ${String(err)}`);
   }
 });
 
