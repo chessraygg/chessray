@@ -32,6 +32,24 @@ canvas#video-overlay {
   pointer-events: none;
 }
 
+/* ── Scrollbars ──
+ * macOS Chromium follows the system "Show scroll bars" setting; with a mouse
+ * attached this defaults to "Always", which clutters the panel's section
+ * bodies. Force overlay-style: invisible at rest, faint on container hover,
+ * darker on direct hover. Using ::-webkit-scrollbar (Chromium-only is fine,
+ * Electron is Chromium). */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+*:hover > ::-webkit-scrollbar-thumb,
+:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); }
+::-webkit-scrollbar-corner { background: transparent; }
+
 /* ── Panel base ── */
 
 .panel {
