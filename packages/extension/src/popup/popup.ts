@@ -123,11 +123,27 @@ async function bootstrap(): Promise<void> {
   }
   if (cachedTabId === null) {
     setStatus('No http(s) tab to capture', true);
+  } else if (cachedTabSource !== 'sw-target' && cachedTabSource !== 'override') {
+    setStatus(
+      `Ready, but you need to click the Chessray toolbar icon first.\n` +
+      `(Side panel was opened without invoking the extension. Chrome won't\n` +
+      `permit tab capture until you click the toolbar icon for the tab\n` +
+      `you want to analyze. Tab: ${shortUrl()})`,
+      true,
+    );
   } else {
     setStatus(`Idle · ${cachedTabSource} · tab ${cachedTabId} · ${shortUrl()}`);
   }
 }
 void bootstrap();
+
+// When the SW updates the invoked tab id (i.e., the user finally clicks
+// the toolbar icon), refresh the side panel's status so the "click
+// toolbar icon" warning goes away on its own without a panel reload.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'session') return;
+  if ('__chessrayInvokedTab' in changes) void bootstrap();
+});
 
 // ── Frame-result + display-info plumbing ───────────────────────────────
 const frameResultListeners: Array<(r: unknown) => void> = [];
@@ -162,7 +178,32 @@ function setStatus(msg: string, isError = false): void {
   }).catch(() => {});
 }
 
+// Visible click counter — proves the click handler is reaching at all.
+// If the user reports "no response" but the counter doesn't tick, the
+// button isn't receiving events; if it ticks but status doesn't change
+// after, the failure is downstream.
+let clickCount = 0;
+function bumpClicks(): void {
+  clickCount++;
+  startBtn.textContent = `Start [${clickCount}]`;
+}
+
 startBtn.addEventListener('click', () => {
+  bumpClicks();
+  // If the side panel was opened any way other than via my Chessray
+  // toolbar icon (e.g. Chrome's own side-panel chevron), Chrome never
+  // ran chrome.action.onClicked → activeTab was never granted →
+  // tabCapture WILL reject. Block early with a clear instruction.
+  if (cachedTabSource !== 'sw-target' && cachedTabSource !== 'override') {
+    setStatus(
+      `Click the Chessray icon in the toolbar first.\n` +
+      `(Side panel was opened without invoking the extension — Chrome\n` +
+      `won't allow tab capture until you click the toolbar icon for\n` +
+      `the tab you want to analyze. Current source: ${cachedTabSource})`,
+      true,
+    );
+    return;
+  }
   if (cachedTabId === null) {
     setStatus('No http(s) tab found to capture', true);
     void preloadTabId();
