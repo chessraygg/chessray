@@ -10,3 +10,6 @@ export * from './debug-history.js';
 export * from './piece-svg.js';
 export * from './preferences.js';
 export * from './split-layout.js';
+export * from './mount-overlay.js';
+export * from './host-api.js';
+export * from './panel-template.js';

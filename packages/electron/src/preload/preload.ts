@@ -1,7 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ChessRayAPI } from '@chessray/overlay-ui';
 
 /** Typed API exposed to renderer processes via window.chessRay */
-const api = {
+const api: ChessRayAPI = {
   // Analysis renderer: receive capture commands
   onStartCapture: (cb: (sourceId: string) => void) =>
     ipcRenderer.on('start-capture', (_e, sourceId: string) => cb(sourceId)),
@@ -120,4 +121,6 @@ const api = {
 
 contextBridge.exposeInMainWorld('chessRay', api);
 
-export type ChessRayAPI = typeof api;
+// Re-export so existing electron-side imports keep resolving without
+// changes; the canonical definition now lives in @chessray/overlay-ui.
+export type { ChessRayAPI };
