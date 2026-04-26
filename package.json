@@ -29,11 +29,13 @@
     "vite": "^6.0.0"
   },
   "devDependencies": {
+    "@puppeteer/browsers": "^2.10.0",
     "@resvg/resvg-js": "^2.6.2",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
     "js-yaml": "^4.1.1",
     "pngjs": "^7.0.0",
+    "puppeteer-core": "^24.42.0",
     "tsx": "^4.21.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"

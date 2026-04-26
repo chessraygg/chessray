@@ -18,3 +18,5 @@ test-results/
 *.traineddata
 packages/*/tsconfig.tsbuildinfo
 scripts/local/
+# Chrome for Testing (used by the local extension smoke-test harness).
+chrome/
