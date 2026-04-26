@@ -310,3 +310,20 @@ const bridge: ChessRayAPI = {
 };
 
 mountOverlay(bridge);
+
+// Relay pref changes to the captured tab's content script so the on-page
+// overlay (border/box, arrow opacity/size, eval-bar opacity, etc.) keeps
+// up with what the user just toggled in the side panel. Side panel and
+// content script each have their own localStorage; without this bridge,
+// every setting only takes effect inside the (hidden) side-panel canvas.
+const origSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = (key: string, value: string): void => {
+  origSetItem(key, value);
+  if (key !== 'chessray-prefs' || cachedTabId == null) return;
+  try {
+    const prefs = JSON.parse(value) as Record<string, unknown>;
+    void chrome.tabs.sendMessage(cachedTabId, {
+      type: 'prefs-update', prefs,
+    } satisfies ExtensionMessage).catch(() => { /* content script may be missing */ });
+  } catch { /* ignore parse errors */ }
+};

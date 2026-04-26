@@ -43,6 +43,11 @@ export type ExtensionMessage =
    *  the SW on every open. */
   | { type: 'get-capture-state' }
   | { type: 'get-trace' }
+  /** Side panel → content script: a chessray pref changed in the panel,
+   *  apply the same value over here so the on-page overlay stays in
+   *  sync. Both surfaces store prefs in their own localStorage; this
+   *  bridges them. */
+  | { type: 'prefs-update'; prefs: Record<string, unknown> }
   /** Side panel ⇄ SW: which tab was activeTab-granted (i.e. the one
    *  the user clicked the toolbar action on). Side panel uses this
    *  instead of its own chrome.tabs.query so Start always targets the

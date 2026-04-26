@@ -32,7 +32,75 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
     console.log(`[chessray content] frame-result: found=${r.board_detection?.found} arrows=${r.arrows?.length ?? 0} fen=${r.recognition?.fen ?? '-'}`);
     for (const cb of frameResultListeners) cb(msg.result);
   }
+  if (msg.type === 'prefs-update') {
+    // Side panel saved a new pref blob — mirror it into our localStorage
+    // and re-fire the panel's own click handlers so initOverlay's state
+    // updates and the on-page overlay re-renders. Each handler reads the
+    // pref it owns from localStorage on click, so writing localStorage
+    // first then synthesizing clicks reproduces the original flow.
+    try {
+      localStorage.setItem('chessray-prefs', JSON.stringify(msg.prefs));
+      // Synthesize clicks on the panel's toggles so handlers re-apply.
+      // Buttons that maintain a class-based toggle (.active) need their
+      // class set BEFORE synthesizing the click, so the click ends up
+      // matching the new state instead of toggling away from it.
+      applyPrefsToHiddenPanel(msg.prefs);
+    } catch (err) {
+      console.error('[chessray content] prefs-update failed:', err);
+    }
+  }
 });
+
+/**
+ * Mirror prefs that have a corresponding panel UI control. We prefer
+ * setting input.value / checkbox.checked + dispatching 'input'/'change'
+ * (matches what real user interaction does — the panel's own listeners
+ * then update state and re-render). Clicks on toggle buttons use the
+ * same pattern.
+ */
+function applyPrefsToHiddenPanel(prefs: Record<string, unknown>): void {
+  const setRange = (id: string, value: number): void => {
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    if (!el) return;
+    el.value = String(value);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  const setCheckbox = (id: string, value: boolean): void => {
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    if (!el) return;
+    if (el.checked !== value) {
+      el.checked = value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  };
+  const clickIfStateMismatch = (id: string, expected: boolean, isActiveSelector = '.active'): void => {
+    const el = document.getElementById(id) as HTMLButtonElement | null;
+    if (!el) return;
+    const currentlyActive = el.matches(isActiveSelector);
+    if (currentlyActive !== expected) el.click();
+  };
+
+  if (typeof prefs.borderVisible === 'boolean') {
+    clickIfStateMismatch('cv-border-btn', prefs.borderVisible);
+  }
+  if (typeof prefs.overlaySize === 'number') setRange('cv-overlay-size', prefs.overlaySize);
+  if (typeof prefs.overlayOpacity === 'number') setRange('cv-overlay-opacity', Math.round(prefs.overlayOpacity * 100));
+  if (typeof prefs.evalBarStaleOpacity === 'number') setRange('cv-eval-stale-opacity', Math.round(prefs.evalBarStaleOpacity * 100));
+  if (typeof prefs.lossThreshold === 'number') setRange('cv-loss-threshold', prefs.lossThreshold);
+  if (typeof prefs.pvDepth === 'number') setRange('cv-pv-depth', prefs.pvDepth);
+  if (typeof prefs.pvGrowDelaySec === 'number') setRange('cv-pv-grow-delay', prefs.pvGrowDelaySec);
+  if (typeof prefs.pvPreviewSec === 'number') setRange('cv-pv-preview-sec', prefs.pvPreviewSec);
+  if (typeof prefs.showMovesDelaySec === 'number') setRange('cv-show-moves-delay', prefs.showMovesDelaySec);
+  if (typeof prefs.autoDelaySec === 'number') setRange('cv-auto-delay', prefs.autoDelaySec);
+  if (typeof prefs.pvAutoplay === 'boolean') setCheckbox('cv-pv-autoplay', prefs.pvAutoplay);
+  if (typeof prefs.changeDetect === 'boolean') setCheckbox('cv-change-detect', prefs.changeDetect);
+  if (typeof prefs.overlayVisible === 'boolean') {
+    clickIfStateMismatch('cv-overlay-btn', prefs.overlayVisible);
+  }
+  if (typeof prefs.evalBarVisible === 'boolean') {
+    clickIfStateMismatch('cv-eval-btn', prefs.evalBarVisible);
+  }
+}
 
 function applySetting(setting: ExtensionSetting): void {
   const m: ExtensionMessage = { type: 'apply-setting', setting };
