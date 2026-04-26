@@ -80,6 +80,16 @@ body {
   transform: none !important;
 }
 
+/* The on-screen overlay canvas (#video-overlay) belongs to the captured
+   PAGE, not the side panel. mountOverlay still injects it into the
+   document because the renderer's wiring depends on the element being
+   present, but in the side panel it's irrelevant — and panel.css's
+   default position:fixed top:0 left:0 puts a 300x150 invisible canvas
+   smack on top of the Start/Stop bar, eating clicks. Force-hide it. */
+canvas#video-overlay {
+  display: none !important;
+}
+
 /* The board canvas / piece grid sits inside .r2-board-block; let it
    size to the popup width naturally. */
 .r2-board-block {
