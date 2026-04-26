@@ -135,7 +135,11 @@ function createOverlayWindow(): BrowserWindow {
     const display = getActiveDisplay();
     sendDisplayInfoForDisplay(display);
   };
-  win.webContents.once('did-finish-load', sendDisplayInfo);
+  // .on (not .once): location.reload() — used by Reset All Settings — fires a
+  // fresh did-finish-load and the renderer's displayInfo state is null until
+  // it receives the IPC again. Without this, the menu-bar Y offset is lost
+  // and arrows render 25px too low after a reset.
+  win.webContents.on('did-finish-load', sendDisplayInfo);
   win.on('move', sendDisplayInfo);
   win.on('resize', sendDisplayInfo);
 

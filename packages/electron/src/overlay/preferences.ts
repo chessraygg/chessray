@@ -59,7 +59,7 @@ export const DEFAULT_PREFS: Prefs = {
   borderVisible: false,
   autoDelaySec: 5,
   pvAutoplay: false,
-  pvGrowDelaySec: 3,
+  pvGrowDelaySec: 1,
   pvPreviewSec: 1,
   showMovesDelaySec: 0,
   vboardOverlayVisible: true,
