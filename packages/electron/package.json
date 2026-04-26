@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@chessray/core": "*",
+    "@chessray/overlay-ui": "*",
     "@chessray/runtime": "*"
   },
   "devDependencies": {

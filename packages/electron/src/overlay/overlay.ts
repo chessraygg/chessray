@@ -6,12 +6,17 @@
 import type { PipelineResult } from '@chessray/core';
 import { applyUciMoves, uciToSan, fenSimilarity } from '@chessray/core';
 import { lossToColor } from '@chessray/core';
-import { loadPrefs, savePrefs } from './preferences.js';
-import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow, videoHitCache, vboardHitCache, hitTestArrows, hitTestAnimBoard } from './canvas-renderer.js';
-import { preloadPieceImages } from './piece-svg.js';
-import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid, setFpsBudgetMs, setActiveFpsDisplay, renderDebugHistoryNav, formatDebugReport, type DebugHistoryNavState } from './debug-panel.js';
-import { loadHistory, pushSlowFrame, clearHistory, snapshotToResult, type DebugSnapshot } from './debug-history.js';
-import { pieceSvg } from './piece-svg.js';
+import {
+  loadPrefs, savePrefs,
+  type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay,
+  resetVideoArrowAnimation, drawArrow, videoHitCache, vboardHitCache,
+  hitTestArrows, hitTestAnimBoard,
+  preloadPieceImages, pieceSvg,
+  setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid,
+  setFpsBudgetMs, setActiveFpsDisplay, renderDebugHistoryNav,
+  formatDebugReport, type DebugHistoryNavState,
+  loadHistory, pushSlowFrame, clearHistory, snapshotToResult, type DebugSnapshot,
+} from '@chessray/overlay-ui';
 
 /// <reference path="../shared/window.d.ts" />
 

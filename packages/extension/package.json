@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@chessray/core": "*",
+    "@chessray/overlay-ui": "*",
     "@chessray/runtime": "*",
     "chess.js": "^1.4.0",
     "onnxruntime-web": "^1.24.3"
