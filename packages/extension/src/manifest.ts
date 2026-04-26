@@ -14,8 +14,14 @@ export default defineManifest({
   description: pkg.description,
   minimum_chrome_version: '116',
   action: {
-    default_popup: 'src/popup/popup.html',
+    // No default_popup: the toolbar click opens the side panel via the
+    // SW's action.onClicked listener. Side panels don't close on
+    // focus-loss the way popups do, so the Start/Stop UI + status stay
+    // visible while Chrome's tab-share indicator does its thing.
     default_title: 'Chessray',
+  },
+  side_panel: {
+    default_path: 'src/popup/popup.html',
   },
   background: {
     service_worker: 'src/background/service-worker.ts',
@@ -27,6 +33,7 @@ export default defineManifest({
     'storage',
     'tabCapture',
     'activeTab',
+    'sidePanel',
   ],
   commands: {
     'toggle-capture': {

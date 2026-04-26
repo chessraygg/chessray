@@ -5,11 +5,14 @@
 html, body {
   margin: 0;
   padding: 0;
+  height: 100%;
 }
 
 body {
-  width: 320px;
-  min-width: 320px;
+  /* Side panel: fills the panel viewport. No fixed width — Chrome
+     allocates ~480px by default and the user can drag-resize. */
+  width: 100%;
+  min-width: 280px;
   background: #171717;
   color: #e5e5e5;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;

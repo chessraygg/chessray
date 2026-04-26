@@ -96,6 +96,19 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
   return false;
 });
 
+// Toolbar click → open the side panel. The action click itself grants
+// activeTab on the active tab; the side panel's Start button uses that
+// grant to call chrome.tabCapture.getMediaStreamId successfully. Side
+// panels don't close on focus-loss, so the user sees real-time status
+// updates instead of a popup that vanishes the moment Chrome's tab-share
+// indicator takes focus.
+chrome.runtime.onInstalled.addListener(() => {
+  // Make the side panel available on every page; specific tab gating can
+  // come later if we want chess-site-only behavior.
+  void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+    .catch((err) => console.error('[chessray] sidePanel.setPanelBehavior:', err));
+});
+
 // Keyboard shortcut path. Firing a chrome.commands shortcut counts as
 // user-invocation per Chrome's docs (same class of grant as a toolbar
 // click), so we get activeTab → tabCapture access from inside the SW
