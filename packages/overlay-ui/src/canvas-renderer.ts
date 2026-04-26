@@ -985,21 +985,41 @@ export function renderVideoOverlay(state: OverlayState): void {
     state.videoCanvas.style.height = vh + 'px';
   }
 
-  // Frame is in physical pixels, overlay canvas is in CSS pixels.
-  // Divide by devicePixelRatio to convert frame → CSS pixels.
-  // The overlay window may be offset from the top of the display (e.g. macOS
-  // menu bar pushes it down). Compute the offset relative to the display origin,
-  // not the absolute screen position (which differs on secondary monitors).
-  const dpr = state.displayInfo?.scaleFactor ?? window.devicePixelRatio;
-  const overlayY = state.displayInfo?.overlayBounds?.y ?? 0;
-  const displayY = state.displayInfo?.displayBounds?.y ?? 0;
-  const overlayYOffset = overlayY - displayY;
-
+  // Two coordinate systems converge here:
+  //   - Electron host: bbox is in the captured display's *physical* pixels,
+  //     overlay canvas covers the work area in CSS pixels offset by the
+  //     menu bar — divide by scaleFactor and subtract overlayYOffset.
+  //   - Extension host: bbox is in the captured tab's frame pixels,
+  //     overlay canvas covers the visible viewport — scale by
+  //     viewport/frame so it's correct regardless of DPR, browser
+  //     chrome, or side-panel resize that changed the document width.
   const bbox = result.board_detection.bbox;
-  const bx = bbox.x / dpr;
-  const by = bbox.y / dpr - overlayYOffset;
-  const bw = bbox.width / dpr;
-  const bh = bbox.height / dpr;
+  let bx: number, by: number, bw: number, bh: number;
+  if (state.displayInfo) {
+    const dpr = state.displayInfo.scaleFactor;
+    const overlayY = state.displayInfo.overlayBounds?.y ?? 0;
+    const displayY = state.displayInfo.displayBounds?.y ?? 0;
+    const overlayYOffset = overlayY - displayY;
+    bx = bbox.x / dpr;
+    by = bbox.y / dpr - overlayYOffset;
+    bw = bbox.width / dpr;
+    bh = bbox.height / dpr;
+  } else if (result.frame_dimensions) {
+    const fw = result.frame_dimensions.width;
+    const fh = result.frame_dimensions.height;
+    const sx = vw / Math.max(1, fw);
+    const sy = vh / Math.max(1, fh);
+    bx = bbox.x * sx;
+    by = bbox.y * sy;
+    bw = bbox.width * sx;
+    bh = bbox.height * sy;
+  } else {
+    // Last-resort fallback: assume frame already in CSS pixels.
+    bx = bbox.x;
+    by = bbox.y;
+    bw = bbox.width;
+    bh = bbox.height;
+  }
 
   const boardRect = { x: bx, y: by, width: bw, height: bh };
 
