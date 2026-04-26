@@ -25,6 +25,12 @@ import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
 import '@chessray/overlay-ui/src/panel.css';
 import './popup.css';
 
+// Build stamp baked in by Vite (define in vite.config.ts). Surfaces in
+// the side-panel status so we can tell at a glance which dist Chrome
+// is actually running.
+declare const __CHESSRAY_BUILD__: string;
+const BUILD = typeof __CHESSRAY_BUILD__ !== 'undefined' ? __CHESSRAY_BUILD__ : '?';
+
 const startBtn = document.getElementById('start') as HTMLButtonElement;
 const stopBtn = document.getElementById('stop') as HTMLButtonElement;
 const status = document.getElementById('cap-status')!;
@@ -124,9 +130,9 @@ async function bootstrap(): Promise<void> {
     return;
   }
   if (cachedTabId === null) {
-    setStatus('No http(s) tab to capture', true);
+    setStatus(`No http(s) tab · build ${BUILD}`, true);
   } else {
-    setStatus(`Idle · tab ${cachedTabId} · ${shortUrl()}`);
+    setStatus(`Idle · build ${BUILD} · tab ${cachedTabId} · ${shortUrl()}`);
   }
 }
 void bootstrap();

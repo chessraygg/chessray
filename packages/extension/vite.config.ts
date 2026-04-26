@@ -18,7 +18,14 @@ import manifest from './src/manifest.ts';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..', '..');
 
+// A short build stamp that gets baked into the bundle — visible in the
+// side panel so we can see whether Chrome is running the latest dist.
+const BUILD_STAMP = new Date().toISOString().slice(11, 19); // HH:MM:SS UTC
+
 export default defineConfig({
+  define: {
+    __CHESSRAY_BUILD__: JSON.stringify(BUILD_STAMP),
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
