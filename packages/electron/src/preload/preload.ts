@@ -88,6 +88,19 @@ const api = {
   onResetAllSettings: (cb: () => void) =>
     ipcRenderer.on('reset-all-settings', () => cb()),
 
+  // Trigger the same flows the dock menu does (so the in-panel System group
+  // mirrors the dock menu without re-implementing dialogs / display logic).
+  requestResetPanelPosition: () =>
+    ipcRenderer.send('request-reset-panel-position'),
+  requestResetAllSettings: () =>
+    ipcRenderer.send('request-reset-all-settings'),
+  getDisplays: (): Promise<{ id: number; width: number; height: number; primary: boolean; activeId: number | null }[]> =>
+    ipcRenderer.invoke('get-displays'),
+  switchDisplay: (id: number) =>
+    ipcRenderer.send('switch-display', id),
+  onDisplaysChanged: (cb: () => void) =>
+    ipcRenderer.on('displays-changed', () => cb()),
+
   // Frame recording (test fixture capture)
   startRecording: () => ipcRenderer.send('start-recording'),
   stopRecording: () => ipcRenderer.send('stop-recording'),

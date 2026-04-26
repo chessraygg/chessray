@@ -1461,5 +1461,25 @@ canvas#video-overlay {
   gap: 8px;
 }
 
+/* System group: reset actions + (multi-monitor) display switcher */
+.r2-system-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.r2-display-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.r2-display-switcher .toggle-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(34, 197, 94, 0.12);
+}
+
 /* Hidden legacy host (kept so JS handlers don't trip over null queries) */
 .r2-legacy-hidden { display: none !important; }

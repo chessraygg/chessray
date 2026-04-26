@@ -1593,6 +1593,42 @@ function initOverlay(): void {
       }
     }
   });
+
+  // ── Settings → System group (mirrors the dock menu) ──
+  document.getElementById('cv-reset-panel-btn')?.addEventListener('click', () => {
+    window.chessRay.requestResetPanelPosition();
+  });
+  document.getElementById('cv-reset-all-btn')?.addEventListener('click', () => {
+    // Main shows the same Electron confirm dialog the dock-menu entry uses,
+    // then sends `reset-all-settings` if the user confirms.
+    window.chessRay.requestResetAllSettings();
+  });
+
+  const displaySwitcher = document.getElementById('cv-display-switcher');
+  async function refreshDisplaySwitcher(): Promise<void> {
+    if (!displaySwitcher) return;
+    const displays = await window.chessRay.getDisplays();
+    if (displays.length < 2) {
+      displaySwitcher.hidden = true;
+      displaySwitcher.innerHTML = '';
+      return;
+    }
+    displaySwitcher.hidden = false;
+    const activeId = displays[0]?.activeId ?? null;
+    displaySwitcher.innerHTML = displays.map(d => {
+      const label = `${d.primary ? 'Built-in' : 'Display'} (${d.width}\u00d7${d.height})`;
+      const active = d.id === activeId ? ' active' : '';
+      return `<button class="toggle-btn${active}" data-display-id="${d.id}">${label}</button>`;
+    }).join('');
+    displaySwitcher.querySelectorAll<HTMLButtonElement>('button[data-display-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.dataset.displayId!, 10);
+        window.chessRay.switchDisplay(id);
+      });
+    });
+  }
+  void refreshDisplaySwitcher();
+  window.chessRay.onDisplaysChanged(() => { void refreshDisplaySwitcher(); });
 }
 
 initOverlay();

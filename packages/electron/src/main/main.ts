@@ -240,8 +240,11 @@ async function switchDisplay(displayId: number): Promise<void> {
   const sourceId = await getScreenSourceId(displayId);
   startCapture(sourceId);
 
-  // Update dock menu to reflect new selection
+  // Update dock menu + in-panel display switcher to reflect new selection.
   buildDockMenu();
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('displays-changed');
+  }
 }
 
 /** Toggle overlay user-panel visibility (canvas overlay arrows continue regardless). */
@@ -291,24 +294,29 @@ function buildDockMenu(): void {
 
   template.push({
     label: 'Reset All Settings…',
-    click: async () => {
-      if (!overlayWindow || overlayWindow.isDestroyed()) return;
-      const { response } = await dialog.showMessageBox(overlayWindow, {
-        type: 'warning',
-        buttons: ['Cancel', 'Reset'],
-        defaultId: 0,
-        cancelId: 0,
-        title: 'Reset all settings',
-        message: 'Reset all panel settings to defaults?',
-        detail: 'Clears your saved layout, panel size/position, sliders, hidden sections, and all other preferences. The display capture choice is preserved.',
-      });
-      if (response === 1) {
-        overlayWindow.webContents.send('reset-all-settings');
-      }
-    },
+    click: () => confirmAndResetAllSettings(),
   });
 
   (app as any).dock?.setMenu(Menu.buildFromTemplate(template));
+}
+
+/** Show the reset-all-settings confirmation dialog and, on confirmation,
+ *  tell the overlay renderer to wipe its prefs and reload. Shared by the
+ *  dock menu and the in-panel Settings → System button. */
+async function confirmAndResetAllSettings(): Promise<void> {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const { response } = await dialog.showMessageBox(overlayWindow, {
+    type: 'warning',
+    buttons: ['Cancel', 'Reset'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Reset all settings',
+    message: 'Reset all panel settings to defaults?',
+    detail: 'Clears your saved layout, panel size/position, sliders, hidden sections, and all other preferences. The display capture choice is preserved.',
+  });
+  if (response === 1) {
+    overlayWindow.webContents.send('reset-all-settings');
+  }
 }
 
 // Serve vendor files via custom protocol so renderers can load them
@@ -548,6 +556,32 @@ ipcMain.on('save-frame-artifact', (_e, filename: string, buf: Uint8Array) => {
   }
 });
 
+// In-panel System group — same flows the dock menu offers.
+ipcMain.on('request-reset-panel-position', () => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('reset-panel-position');
+  }
+});
+
+ipcMain.on('request-reset-all-settings', () => {
+  void confirmAndResetAllSettings();
+});
+
+ipcMain.handle('get-displays', () => {
+  const primaryId = screen.getPrimaryDisplay().id;
+  return screen.getAllDisplays().map(d => ({
+    id: d.id,
+    width: d.size.width,
+    height: d.size.height,
+    primary: d.id === primaryId,
+    activeId: activeDisplayId,
+  }));
+});
+
+ipcMain.on('switch-display', (_e, id: number) => {
+  void switchDisplay(id);
+});
+
 // ── App lifecycle ──
 
 // Enforce single instance — quit if another copy is already running
@@ -566,14 +600,20 @@ app.whenReady().then(() => {
   activeDisplayId = savedDisplayExists ? savedDisplayId! : screen.getPrimaryDisplay().id;
   buildDockMenu();
 
-  // Rebuild dock menu when displays change
-  screen.on('display-added', () => buildDockMenu());
+  // Rebuild dock menu + notify the overlay panel when displays change.
+  const notifyDisplaysChanged = (): void => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('displays-changed');
+    }
+  };
+  screen.on('display-added', () => { buildDockMenu(); notifyDisplaysChanged(); });
   screen.on('display-removed', () => {
     // If active display was removed, fall back to primary
     if (activeDisplayId != null && !screen.getAllDisplays().some(d => d.id === activeDisplayId)) {
       switchDisplay(screen.getPrimaryDisplay().id);
     }
     buildDockMenu();
+    notifyDisplaysChanged();
   });
 
   registerVendorProtocol();
