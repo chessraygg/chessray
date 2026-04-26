@@ -36,11 +36,14 @@ async function preloadTabId(): Promise<void> {
   const params = new URLSearchParams(location.search);
   const override = params.get('tabId');
   if (override) { cachedTabId = Number(override); return; }
-  // Only http(s) tabs are real captureable content. In production the
-  // popup-from-toolbar makes currentWindow's active tab the user's tab.
-  // In test (popup-as-tab) the popup itself is active in its window, so
-  // fall back to any http(s) tab in the same window or any http(s) tab
-  // anywhere.
+  // Ask the SW which tab Chrome activeTab-granted. That's the tab the
+  // user clicked the toolbar action on — the only tab tabCapture is
+  // allowed to capture. Falls back to chrome.tabs.query in test contexts
+  // where the SW path isn't wired (popup-as-tab in puppeteer harness).
+  try {
+    const resp = await chrome.runtime.sendMessage({ type: 'get-target-tab' } satisfies ExtensionMessage);
+    if (resp?.tabId != null) { cachedTabId = resp.tabId; return; }
+  } catch { /* SW unreachable; fall through */ }
   const isContent = (t: chrome.tabs.Tab | undefined): boolean =>
     !!t?.url && (t.url.startsWith('http://') || t.url.startsWith('https://'));
   const queries: Array<chrome.tabs.QueryInfo> = [

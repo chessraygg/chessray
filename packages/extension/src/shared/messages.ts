@@ -42,5 +42,10 @@ export type ExtensionMessage =
    *  indicator), so the popup can't trust local state alone — it asks
    *  the SW on every open. */
   | { type: 'get-capture-state' }
+  /** Side panel ⇄ SW: which tab was activeTab-granted (i.e. the one
+   *  the user clicked the toolbar action on). Side panel uses this
+   *  instead of its own chrome.tabs.query so Start always targets the
+   *  tab Chrome will let us capture, even if focus has since moved. */
+  | { type: 'get-target-tab' }
   | { type: 'status'; message: string }
   | { type: 'ping' };

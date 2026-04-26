@@ -74,6 +74,26 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     getCaptureState().then(sendResponse);
     return true;
   }
+  if (msg.type === 'get-target-tab') {
+    (async () => {
+      // Prefer the tab the user invoked the action on (activeTab grant
+      // lives there). Fall back to chrome.storage.session in case the SW
+      // was respawned between action click and panel query.
+      if (lastInvokedTabId != null) {
+        sendResponse({ tabId: lastInvokedTabId });
+        return;
+      }
+      const stored = await chrome.storage.session.get('__chessrayInvokedTab').catch(() => ({}));
+      const stashed = stored?.__chessrayInvokedTab as number | undefined;
+      if (stashed != null) {
+        lastInvokedTabId = stashed;
+        sendResponse({ tabId: stashed });
+        return;
+      }
+      sendResponse({ tabId: null });
+    })();
+    return true;
+  }
   if (msg.type === 'ensure-offscreen') {
     // Test affordance: harness pings here so the offscreen doc exists
     // before it sends 'test-process-frame' directly to offscreen.
@@ -96,17 +116,27 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
   return false;
 });
 
-// Toolbar click → open the side panel. The action click itself grants
-// activeTab on the active tab; the side panel's Start button uses that
-// grant to call chrome.tabCapture.getMediaStreamId successfully. Side
-// panels don't close on focus-loss, so the user sees real-time status
-// updates instead of a popup that vanishes the moment Chrome's tab-share
-// indicator takes focus.
-chrome.runtime.onInstalled.addListener(() => {
-  // Make the side panel available on every page; specific tab gating can
-  // come later if we want chess-site-only behavior.
-  void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
-    .catch((err) => console.error('[chessray] sidePanel.setPanelBehavior:', err));
+// Toolbar click → open the side panel via an explicit chrome.action
+// .onClicked handler. We deliberately DON'T use
+// sidePanel.setPanelBehavior({openPanelOnActionClick: true}) because
+// that flag suppresses the onClicked event, and we want onClicked to
+// fire — that's the canonical "user invoked the extension on this tab"
+// signal Chrome uses to grant activeTab. Without that grant, the side
+// panel's Start button hits "Extension has not been invoked" when it
+// tries chrome.tabCapture.getMediaStreamId.
+/** The tab activeTab was last granted on. Side-panel UI queries this so
+ *  Start always targets the tab the user invoked the extension on, even
+ *  if they've since switched tabs in the same window. */
+let lastInvokedTabId: number | undefined;
+chrome.action.onClicked.addListener(async (tab) => {
+  if (tab.id == null) return;
+  lastInvokedTabId = tab.id;
+  await chrome.storage.session.set({ __chessrayInvokedTab: tab.id }).catch(() => {});
+  try {
+    await chrome.sidePanel.open({ tabId: tab.id });
+  } catch (err) {
+    console.error('[chessray] sidePanel.open:', err);
+  }
 });
 
 // Keyboard shortcut path. Firing a chrome.commands shortcut counts as
