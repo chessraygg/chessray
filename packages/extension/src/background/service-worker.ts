@@ -145,11 +145,9 @@ function note(s: string): void {
 }
 note('SW startup');
 
-// Crucial: do NOT have side_panel.default_path in manifest, and do NOT
-// call setPanelBehavior({openPanelOnActionClick: true}). Either of those
-// makes Chrome auto-open the panel and suppress chrome.action.onClicked,
-// which is the only event that grants activeTab. With both omitted,
-// onClicked fires on toolbar click and we open the panel ourselves.
+// Documented pattern: side_panel.default_path in manifest + no
+// setPanelBehavior call means action.onClicked fires on toolbar click
+// (granting activeTab); the listener below opens the panel manually.
 
 async function recordInvocation(tabId: number, source: string): Promise<void> {
   note(`invoked source=${source} tab=${tabId}`);
