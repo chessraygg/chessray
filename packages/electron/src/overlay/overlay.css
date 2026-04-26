@@ -1135,3 +1135,326 @@ canvas#video-overlay {
   top: 0;
 }
 .cv-tooltip.visible { opacity: 1; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   v2 — actual-board-driven panel
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Panel rewrites a few base rules so the new layout has no chrome padding. */
+.user-panel {
+  padding: 0;
+  width: var(--panel-w);
+  min-width: 260px;
+  height: var(--panel-h, 540px);
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Hidden virtual-board host (off-screen, but sized so ResizeObserver fires). */
+.vboard-host {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 200px;
+  height: 200px;
+  pointer-events: none;
+  visibility: hidden;
+}
+.vboard-host .board-fit { width: 200px; height: 200px; }
+.vboard-host .board-container {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  display: grid;
+}
+.vboard-host .piece-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: 100%; height: 100%;
+}
+.vboard-host #cv-arrow-canvas {
+  position: absolute; inset: 0;
+  width: 200px; height: 200px;
+}
+
+/* Header */
+.r2-head {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 4px 0 8px;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.22);
+  flex-shrink: 0;
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+}
+/* The header turn-dot reuses the global .turn-dot class because debug-panel.ts
+   rewrites className to "turn-dot white|black" each frame; selector targets
+   the dot only when it lives inside the header. */
+.r2-head .turn-dot {
+  width: 7px; height: 7px;
+  border: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+.r2-head .turn-dot.white { background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); }
+.r2-head .turn-dot.black { background: #1a1a1a; box-shadow: 0 0 0 1px #555; }
+.r2-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 10px var(--mono);
+  color: var(--text-faint);
+  margin-left: 4px;
+  letter-spacing: 0.04em;
+}
+.r2-meta-depth { color: var(--text-dim); }
+.r2-meta-depth:empty::before { content: "—"; color: var(--text-faint); }
+.r2-meta-orient {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px; height: 16px;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: 10px;
+  transition: color 0.12s, background 0.12s;
+}
+.r2-meta-orient:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+.r2-meta-orient.manual { color: var(--accent); background: rgba(34, 197, 94, 0.15); }
+.r2-spacer { flex: 1; }
+.r2-btn {
+  width: 24px; height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  font-size: 12px;
+  line-height: 1;
+  font-family: var(--sans);
+}
+.r2-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+.r2-btn.active { color: var(--accent); background: rgba(34, 197, 94, 0.15); }
+.r2-btn.danger:hover { background: rgba(239, 68, 68, 0.18); color: #ef4444; }
+.r2-btn svg { width: 13px; height: 13px; }
+
+/* Panel body / view switching */
+.panel-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.panel-body.hidden { display: none; }
+.r2-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.r2-view[hidden] { display: none; }
+
+/* Move list (the hero view) */
+.r2-view-moves { padding: 6px; overflow: auto; }
+.r2-moves {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* Re-style the existing .move-line markup emitted by debug-panel.renderBestMoves
+   so the rest of the codebase doesn't need to change. */
+.r2-moves .move-line {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background 0.1s, border-color 0.1s;
+  background: transparent !important;   /* override inline accent tint */
+  font-family: var(--sans);
+  font-size: 11px;
+}
+.r2-moves .move-line:hover { background: rgba(255, 255, 255, 0.04) !important; }
+.r2-moves .move-line.selected {
+  background: rgba(34, 197, 94, 0.10) !important;
+  border-left-color: var(--accent);
+}
+.r2-moves .move-line .r2-rank {
+  font: 10px var(--mono);
+  color: var(--text-faint);
+  text-align: center;
+}
+.r2-moves .move-line.selected .r2-rank { color: var(--accent); }
+.r2-moves .move-line .r2-san {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  font-family: 'Charter', 'Georgia', serif;
+}
+.r2-moves .move-line .r2-san em {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: 400;
+  margin-left: 8px;
+  letter-spacing: 0;
+}
+.r2-moves .move-line .r2-score {
+  font: 12px var(--mono);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.r2-moves .move-line.r2-pos .r2-score { color: #86efac; }
+.r2-moves .move-line.r2-neg .r2-score { color: #fca5a5; }
+.r2-moves .move-line.selected .r2-score { color: var(--accent); font-weight: 600; }
+.r2-moves .move-line .r2-loss {
+  font: 9px var(--mono);
+  color: var(--text-faint);
+  margin-left: 4px;
+}
+
+/* Empty / waiting state for the move list */
+.r2-moves:empty::before {
+  content: "Waiting for board...";
+  display: block;
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+/* Surface (settings + debug) */
+.r2-surface-head {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 6px;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+.r2-back {
+  width: 22px; height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+}
+.r2-back:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+.r2-surface-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.r2-surface-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+/* Settings groups */
+.r2-group {
+  padding: 8px 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.r2-group:last-child { border-bottom: 0; }
+.r2-group-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+.r2-group .pv-depth-row {
+  display: grid;
+  grid-template-columns: 76px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+.r2-group .pv-depth-row label { color: var(--text-dim); }
+.r2-group .pv-depth-row input[type=range] { width: 100%; accent-color: var(--accent); }
+.r2-group .pv-depth-row input[type=checkbox] { accent-color: var(--accent); justify-self: start; margin: 0; }
+.r2-group .pv-depth-row > span { font: 10.5px var(--mono); color: var(--text); text-align: right; }
+.r2-group .pv-depth-row .pv-unit { color: var(--text-faint); margin-left: 1px; }
+
+/* "Show on screen" switches (mirror checkboxes, drive hidden icon-toggles) */
+.r2-group .display-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.r2-group .display-toggle input { accent-color: var(--accent); margin: 0; }
+.r2-group .display-toggle span { flex: 1; }
+
+/* Tools group */
+.r2-group .lichess-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.r2-group .toggle-btn {
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s, color 0.12s;
+}
+.r2-group .toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+.r2-group .toggle-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(34,197,94,0.10); }
+.r2-group .lichess-sync-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.r2-group .lichess-sync-label input { accent-color: var(--accent); margin: 0; }
+
+/* Debug surface — restyle the existing classes to fit the new layout */
+.r2-view #debug-section {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Hidden legacy host (kept so JS handlers don't trip over null queries) */
+.r2-legacy-hidden { display: none !important; }

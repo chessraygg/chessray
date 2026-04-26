@@ -1,6 +1,5 @@
 import type { PipelineResult } from '../shared/types.js';
-import { uciToSan, formatMoveLine, type Turn } from '@chessray/core';
-import { lossToColor } from '../shared/arrows.js';
+import { uciToSan } from '@chessray/core';
 import { rgbToCss, squareColorPalette, type RGB } from '../shared/colors.js';
 import { savePrefs } from './preferences.js';
 import { pieceSvg } from './piece-svg.js';
@@ -156,26 +155,28 @@ function renderBestMoves(
     const move = moves[i];
     const origIdx = result.evaluation.top_moves.indexOf(move);
     const scoreStr = move.score_cp >= 0 ? `+${(move.score_cp/100).toFixed(1)}` : (move.score_cp/100).toFixed(1);
-    const lossStr = move.loss_cp > 0 ? ` (\u2212${move.loss_cp}cp)` : '';
+    const lossHtml = move.loss_cp > 0 ? `<span class="r2-loss">\u2212${move.loss_cp}cp</span>` : '';
     const selected = lineVisible && origIdx === selectedLineIndex ? ' selected' : '';
+    const signCls = move.score_cp >= 0 ? ' r2-pos' : ' r2-neg';
 
-    let movesText: string;
+    // Split SAN into "primary" (first move, bold) + "continuation" (next plies, dim).
+    let primarySan: string;
+    let continuation: string;
     if (useSan && fen) {
       const sanMoves = uciToSan(fen, move.pv.slice(0, 5));
-      const turn = fen.split(' ')[1] as Turn || 'w';
-      movesText = formatMoveLine(sanMoves, turn);
+      primarySan = sanMoves[0] ?? move.pv[0] ?? '';
+      continuation = sanMoves.slice(1).join(' ');
     } else {
-      movesText = move.pv.slice(0, 5).join(' ');
+      primarySan = move.pv[0] ?? '';
+      continuation = move.pv.slice(1, 5).join(' ');
     }
+    const continuationHtml = continuation ? `<em>${continuation}</em>` : '';
 
-    // Subtle background matching arrow color gradient
-    const hex = lossToColor(move.loss_cp);
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    const bg = `rgba(${r},${g},${b},0.12)`;
-
-    html += `<div class="move-line${selected}" data-line="${origIdx}" style="background:${bg}"><span class="move-score">${scoreStr}</span>${movesText}${lossStr}</div>`;
+    html += `<div class="move-line${signCls}${selected}" data-line="${origIdx}">`
+      + `<span class="r2-rank">${i + 1}</span>`
+      + `<span class="r2-san">${primarySan}${continuationHtml}</span>`
+      + `<span class="r2-score">${scoreStr}${lossHtml}</span>`
+      + `</div>`;
   }
   // Skip DOM rebuild if content unchanged (prevents hover flicker at 2fps)
   if (container.dataset.lastHtml === html) return;

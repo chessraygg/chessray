@@ -12,7 +12,6 @@ import { preloadPieceImages } from './piece-svg.js';
 import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid, setFpsBudgetMs, setActiveFpsDisplay, renderDebugHistoryNav, formatDebugReport, type DebugHistoryNavState } from './debug-panel.js';
 import { loadHistory, pushSlowFrame, clearHistory, snapshotToResult, type DebugSnapshot } from './debug-history.js';
 import { pieceSvg } from './piece-svg.js';
-import { SplitLayout, type LayoutNode, type SectionDef } from './split-layout.js';
 
 /// <reference path="../shared/window.d.ts" />
 
@@ -474,23 +473,29 @@ function initOverlay(): void {
     observer.observe(boardFit);
   }
 
-  // ── Split-pane layout ──
-  const splitRoot = document.getElementById('cv-split-root') as HTMLElement | null;
-  const sectionLibrary = document.getElementById('cv-section-library') as HTMLElement | null;
-  if (splitRoot && sectionLibrary) {
-    const defs: SectionDef[] = [...sectionLibrary.querySelectorAll<HTMLElement>('[data-section-id]')].map(body => ({
-      id: body.dataset.sectionId!,
-      title: body.dataset.sectionTitle ?? body.dataset.sectionId!,
-      body,
-    }));
-    new SplitLayout(splitRoot, defs, {
-      initialLayout: prefs.sectionLayout as LayoutNode | null,
-      hiddenIds: prefs.hiddenSections,
-      onChange: ({ layout, hiddenIds }) => {
-        savePrefs({ sectionLayout: layout, hiddenSections: hiddenIds });
-      },
-    });
+  // ── View switcher (moves / settings / debug) ──
+  // The panel has three exclusive views; ⚙ and 🐛 in the header swap them.
+  // Clicking the active button (or ←) returns to moves.
+  const viewMoves    = document.getElementById('r2-view-moves');
+  const viewSettings = document.getElementById('r2-view-settings');
+  const viewDebug    = document.getElementById('r2-view-debug');
+  const btnSettings  = document.getElementById('r2-btn-settings');
+  const btnDebug     = document.getElementById('r2-btn-debug');
+  function showView(name: 'moves' | 'settings' | 'debug'): void {
+    if (viewMoves)    viewMoves.hidden    = name !== 'moves';
+    if (viewSettings) viewSettings.hidden = name !== 'settings';
+    if (viewDebug)    viewDebug.hidden    = name !== 'debug';
+    btnSettings?.classList.toggle('active', name === 'settings');
+    btnDebug?.classList.toggle('active', name === 'debug');
   }
+  btnSettings?.addEventListener('click', () => {
+    showView(viewSettings?.hidden === false ? 'moves' : 'settings');
+  });
+  btnDebug?.addEventListener('click', () => {
+    showView(viewDebug?.hidden === false ? 'moves' : 'debug');
+  });
+  document.getElementById('r2-back-settings')?.addEventListener('click', () => showView('moves'));
+  document.getElementById('r2-back-debug')?.addEventListener('click', () => showView('moves'));
 
   // ── Resize grips (drag corners to resize panel width/height) ──
   // `anchorRight`/`anchorBottom` mean the OPPOSITE edge is anchored, so dragging the grip
