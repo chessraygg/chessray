@@ -179,17 +179,11 @@ function stopLoop(): void {
 
 chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendResponse) => {
   if (msg.type === 'capture-started') {
-    chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
-      const tabId = tabs[0]?.id;
-      if (!tabId) {
-        sendResponse({ ok: false, error: 'no active tab' });
-        return;
-      }
-      startLoop(msg.streamId, tabId).then(
-        () => sendResponse({ ok: true }),
-        (err) => sendResponse({ ok: false, error: String(err) }),
-      );
-    });
+    // tabId is supplied by the service worker (offscreen has no chrome.tabs).
+    startLoop(msg.streamId, msg.tabId).then(
+      () => sendResponse({ ok: true }),
+      (err) => sendResponse({ ok: false, error: String(err) }),
+    );
     return true;
   }
   if (msg.type === 'stop-capture') {

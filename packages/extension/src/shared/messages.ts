@@ -21,7 +21,7 @@ export type ExtensionSetting =
 export type ExtensionMessage =
   | { type: 'start-capture'; tabId: number }
   | { type: 'stop-capture' }
-  | { type: 'capture-started'; streamId: string }
+  | { type: 'capture-started'; streamId: string; tabId: number }
   | { type: 'frame-result'; result: PipelineResult }
   | { type: 'apply-setting'; setting: ExtensionSetting }
   | { type: 'status'; message: string }

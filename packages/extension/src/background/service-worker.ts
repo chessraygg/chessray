@@ -37,7 +37,9 @@ async function startCapture(tabId: number): Promise<void> {
       resolve(id);
     });
   });
-  const msg: ExtensionMessage = { type: 'capture-started', streamId };
+  // Pass tabId through — offscreen documents have no chrome.tabs access
+  // and would otherwise blow up trying to query the active tab themselves.
+  const msg: ExtensionMessage = { type: 'capture-started', streamId, tabId };
   await chrome.runtime.sendMessage(msg);
 }
 
