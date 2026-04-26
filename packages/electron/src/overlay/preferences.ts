@@ -68,7 +68,7 @@ export const DEFAULT_PREFS: Prefs = {
   fpsMax: 5,
   changeDetect: true,
   pvDepth: 10,
-  lossThreshold: 0,
+  lossThreshold: 100,
   maxDepth: 28,
   multiPvMax: 5,
   evalBarVisible: true,
@@ -84,8 +84,8 @@ export const DEFAULT_PREFS: Prefs = {
   gravityUp: true,
   debugImgScale: 100,
   overlaySize: 5,
-  overlayOpacity: 0.85,
-  evalBarStaleOpacity: 0.75,
+  overlayOpacity: 0.50,
+  evalBarStaleOpacity: 0.90,
   manualOrientationFlip: null,
 };
 

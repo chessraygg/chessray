@@ -111,8 +111,8 @@
             </div>
             <div class="pv-depth-row">
               <label data-tip="Max centipawn loss for showing alternative moves">CP loss</label>
-              <input type="range" id="cv-loss-threshold" min="0" max="500" value="0" step="10">
-              <span id="cv-loss-threshold-val">0</span>
+              <input type="range" id="cv-loss-threshold" min="0" max="500" value="100" step="10">
+              <span id="cv-loss-threshold-val">100</span>
             </div>
           </div>
 
@@ -125,13 +125,13 @@
             </div>
             <div class="pv-depth-row">
               <label data-tip="Opacity of all on-board decorations: arrows, PV move numbers, and played-move markers. Color still carries quality.">Opacity</label>
-              <input type="range" id="cv-overlay-opacity" min="20" max="100" value="85" step="5">
-              <span id="cv-overlay-opacity-val">85</span><span class="pv-unit">%</span>
+              <input type="range" id="cv-overlay-opacity" min="20" max="100" value="50" step="5">
+              <span id="cv-overlay-opacity-val">50</span><span class="pv-unit">%</span>
             </div>
             <div class="pv-depth-row">
               <label data-tip="Eval bar opacity on the actual-board overlay while the eval is stale (position changed, engine is catching up). Higher = easier to follow; lower = more subtle.">Stale eval</label>
-              <input type="range" id="cv-eval-stale-opacity" min="30" max="100" value="75" step="5">
-              <span id="cv-eval-stale-opacity-val">75</span><span class="pv-unit">%</span>
+              <input type="range" id="cv-eval-stale-opacity" min="30" max="100" value="90" step="5">
+              <span id="cv-eval-stale-opacity-val">90</span><span class="pv-unit">%</span>
             </div>
           </div>
 
