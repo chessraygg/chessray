@@ -6,6 +6,9 @@
  * lives in chrome.storage. The heavy lifting (Stockfish, ONNX, frame loop)
  * happens in the offscreen document, which stays alive as long as it has
  * active work.
+ *
+ * The popup grabs the tabCapture stream id itself (user-gesture context)
+ * and hands the streamId here. We just open offscreen and forward.
  */
 
 import type { ExtensionMessage } from '../shared/messages.js';
@@ -26,19 +29,10 @@ async function ensureOffscreen(): Promise<void> {
   });
 }
 
-async function startCapture(tabId: number): Promise<void> {
+async function startCapture(tabId: number, streamId: string): Promise<void> {
   await ensureOffscreen();
-  const streamId = await new Promise<string>((resolve, reject) => {
-    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (id) => {
-      if (chrome.runtime.lastError || !id) {
-        reject(new Error(chrome.runtime.lastError?.message ?? 'no stream id'));
-        return;
-      }
-      resolve(id);
-    });
-  });
-  // Pass tabId through — offscreen documents have no chrome.tabs access
-  // and would otherwise blow up trying to query the active tab themselves.
+  // Forward to offscreen. tabId rides along because offscreen documents
+  // have no chrome.tabs access and need it to address the content script.
   const msg: ExtensionMessage = { type: 'capture-started', streamId, tabId };
   await chrome.runtime.sendMessage(msg);
 }
@@ -50,7 +44,7 @@ async function stopCapture(): Promise<void> {
 
 chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendResponse) => {
   if (msg.type === 'start-capture') {
-    startCapture(msg.tabId).then(
+    startCapture(msg.tabId, msg.streamId).then(
       () => sendResponse({ ok: true }),
       (err) => sendResponse({ ok: false, error: String(err) }),
     );
@@ -60,5 +54,54 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     stopCapture().then(() => sendResponse({ ok: true }));
     return true;
   }
+  if (msg.type === 'ensure-offscreen') {
+    // Test affordance: harness pings here so the offscreen doc exists
+    // before it sends 'test-process-frame' directly to offscreen.
+    ensureOffscreen().then(
+      () => sendResponse({ ok: true }),
+      (err) => sendResponse({ ok: false, error: String(err) }),
+    );
+    return true;
+  }
+  if (msg.type === 'forward-frame-result') {
+    // Offscreen → here → content script. Offscreen has no chrome.tabs;
+    // we do. Wrap the result in the canonical 'frame-result' shape the
+    // content overlay listens for.
+    chrome.tabs.sendMessage(msg.tabId, { type: 'frame-result', result: msg.result } satisfies ExtensionMessage)
+      .catch(() => { /* content script may not be ready */ });
+    return false;
+  }
   return false;
+});
+
+// Keyboard shortcut path. Firing a chrome.commands shortcut counts as
+// user-invocation per Chrome's docs (same class of grant as a toolbar
+// click), so we get activeTab → tabCapture access from inside the SW
+// without bouncing through the popup. Also makes the extension usable
+// without ever opening the popup, which is friendlier for power users.
+let captureRunning = false;
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== 'toggle-capture') return;
+  if (captureRunning) {
+    captureRunning = false;
+    await stopCapture();
+    return;
+  }
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (!tab?.id) return;
+  try {
+    const streamId = await new Promise<string>((resolve, reject) => {
+      chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }, (id) => {
+        if (chrome.runtime.lastError || !id) {
+          reject(new Error(chrome.runtime.lastError?.message ?? 'no stream id'));
+          return;
+        }
+        resolve(id);
+      });
+    });
+    captureRunning = true;
+    await startCapture(tab.id, streamId);
+  } catch (err) {
+    console.error('[chessray] toggle-capture failed:', err);
+  }
 });

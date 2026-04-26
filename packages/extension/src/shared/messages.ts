@@ -19,10 +19,23 @@ export type ExtensionSetting =
   | { key: 'target-fps'; value: number };
 
 export type ExtensionMessage =
-  | { type: 'start-capture'; tabId: number }
+  /** Popup → SW. The popup runs `chrome.tabCapture.getMediaStreamId` inside
+   *  its click handler so the user-gesture activeTab grant comes from the
+   *  real popup invocation; the SW just opens offscreen and forwards. */
+  | { type: 'start-capture'; tabId: number; streamId: string }
   | { type: 'stop-capture' }
   | { type: 'capture-started'; streamId: string; tabId: number }
+  /** Test-only: SW grabs a single frame via chrome.tabs.captureVisibleTab
+   *  (works without activeTab thanks to <all_urls> host_permissions) and
+   *  hands the dataURL to offscreen. Used by scripts/local/test-extension
+   *  to exercise the full pipeline end-to-end without the user-gesture
+   *  wall around tabCapture.getMediaStreamId. */
+  | { type: 'ensure-offscreen' }
+  | { type: 'test-process-frame'; tabId: number; dataUrl: string }
   | { type: 'frame-result'; result: PipelineResult }
   | { type: 'apply-setting'; setting: ExtensionSetting }
+  /** Offscreen → SW: please forward this frame-result to the content
+   *  script in `tabId` (offscreen has no chrome.tabs access; SW does). */
+  | { type: 'forward-frame-result'; tabId: number; result: PipelineResult }
   | { type: 'status'; message: string }
   | { type: 'ping' };

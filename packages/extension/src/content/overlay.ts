@@ -23,6 +23,8 @@ const displayInfoListeners: Array<(info: DisplayInfo) => void> = [];
 
 chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
   if (msg.type === 'frame-result') {
+    const r = msg.result as { board_detection?: { found?: boolean }; arrows?: unknown[]; recognition?: { fen?: string } };
+    console.log(`[chessray content] frame-result: found=${r.board_detection?.found} arrows=${r.arrows?.length ?? 0} fen=${r.recognition?.fen ?? '-'}`);
     for (const cb of frameResultListeners) cb(msg.result);
   }
 });

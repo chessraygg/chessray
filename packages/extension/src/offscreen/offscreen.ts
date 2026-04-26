@@ -86,12 +86,21 @@ function encodePreviewUrl(cropped: PixelBuffer): string {
   return previewCanvas.toDataURL('image/jpeg', 0.7);
 }
 
+/** Visible to the test harness via the test-process-frame summary. */
+const recentSendErrors: string[] = [];
+
 async function pushResult(result: PipelineResult): Promise<void> {
   if (activeTabId === null) return;
-  const msg: ExtensionMessage = { type: 'frame-result', result };
-  await chrome.tabs.sendMessage(activeTabId, msg).catch(() => {
-    // Content script may not be ready on the first few frames.
-  });
+  // chrome.tabs is unavailable inside offscreen documents — Chrome scopes
+  // the API surface tightly. Hop through the service worker, which has
+  // chrome.tabs and forwards to the content-script tab.
+  const msg: ExtensionMessage = { type: 'forward-frame-result', tabId: activeTabId, result };
+  try {
+    await chrome.runtime.sendMessage(msg);
+  } catch (err) {
+    const s = String(err);
+    if (recentSendErrors.length < 5) recentSendErrors.push(s);
+  }
 }
 
 const processor = new FrameProcessor({
@@ -106,6 +115,10 @@ const processor = new FrameProcessor({
 });
 
 async function startLoop(streamId: string, tabId: number): Promise<void> {
+  // Tear down any previous capture state — otherwise getUserMedia for the
+  // new streamId can leak a second video track and the next stop won't
+  // reach the original one.
+  stopLoop();
   activeTabId = tabId;
   await Promise.all([initEngine(), initRecognizer()]);
 
@@ -190,6 +203,55 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     stopLoop();
     sendResponse({ ok: true });
     return false;
+  }
+  if (msg.type === 'test-process-frame') {
+    activeTabId = msg.tabId;
+    (async () => {
+      await Promise.all([initEngine(), initRecognizer()]);
+      const img = new Image();
+      img.src = msg.dataUrl;
+      await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = (e) => rej(e); });
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const ctx = c.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, c.width, c.height) as ImageDataLike;
+      processor.resetFrameCount();
+      processor.resetCaches();
+      // Capture every result emitted during this single processFrame so the
+      // harness can inspect detection/recognition/eval without depending on
+      // the content-script roundtrip (whose console isn't reliably visible
+      // via puppeteer's targetcreated for offscreen docs).
+      const captured: PipelineResult[] = [];
+      const orig = processor['deps'].sendResult.bind(processor['deps']);
+      (processor as unknown as { deps: { sendResult: typeof orig } }).deps.sendResult = (r) => {
+        captured.push(r);
+        orig(r);
+      };
+      try {
+        await processor.processFrame(imageData, { capture_ms: 0, captured_at: Date.now() });
+        // Wait briefly for async eval depths to settle.
+        await new Promise(r => setTimeout(r, 4000));
+      } finally {
+        (processor as unknown as { deps: { sendResult: typeof orig } }).deps.sendResult = orig;
+      }
+      const last = captured[captured.length - 1];
+      const summary = {
+        results: captured.length,
+        imageDims: `${c.width}x${c.height}`,
+        boardFound: last?.board_detection?.found ?? false,
+        bbox: last?.board_detection?.bbox ?? null,
+        confidence: last?.board_detection?.confidence ?? 0,
+        fen: last?.recognition?.fen ?? null,
+        topMove: last?.evaluation?.top_moves?.[0]?.move ?? null,
+        evalDepth: last?.eval_depth ?? null,
+        arrows: last?.arrows?.length ?? 0,
+        sendErrors: [...recentSendErrors],
+      };
+      recentSendErrors.length = 0;
+      return summary;
+    })().then((s) => sendResponse({ ok: true, summary: s }), (err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
   }
   if (msg.type === 'apply-setting') {
     const s = msg.setting;
