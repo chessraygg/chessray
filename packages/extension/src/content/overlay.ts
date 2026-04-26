@@ -214,6 +214,26 @@ const bridge: ChessRayAPI = {
 // canvas stays visible (arrows + eval bar drawn on the captured page).
 mountOverlay(bridge, { hidePanel: true });
 
+// On window resize, the document area changes immediately but the
+// capture stream's video resolution lags behind by a frame or two.
+// Re-render the on-page overlay with the freshest vw/vh so it doesn't
+// drift to "super downwards" / "super left" while the stream catches up.
+let lastFrameResult: unknown = null;
+frameResultListeners.unshift((r) => { lastFrameResult = r; });
+
+let resizeRaf = 0;
+window.addEventListener('resize', () => {
+  if (resizeRaf) return;
+  resizeRaf = requestAnimationFrame(() => {
+    resizeRaf = 0;
+    if (lastFrameResult === null) return;
+    // Replay through every consumer that's NOT the cache-stamper above.
+    for (let i = 1; i < frameResultListeners.length; i++) {
+      frameResultListeners[i](lastFrameResult);
+    }
+  });
+});
+
 // Notify the service worker that the content script is ready so it can
 // trigger capture on user request.
 chrome.runtime.sendMessage({ type: 'ping' }).catch(() => {});

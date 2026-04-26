@@ -975,8 +975,14 @@ export function renderVideoOverlay(state: OverlayState): void {
   // We need to map frame pixels → overlay CSS pixels, accounting for:
   // 1. devicePixelRatio (frame is in physical pixels, overlay is in CSS pixels)
   // 2. Menu bar offset (frame y=0 is top of screen, overlay y=0 is top of work area)
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  //
+  // For the extension on a content-script page we want the *rendered*
+  // page area (clientWidth/Height of <html>), not innerWidth/Height
+  // — they differ when the page has scrollbars or when Chrome has a
+  // tab-share indicator pushing layout.
+  const docEl = document.documentElement;
+  const vw = docEl?.clientWidth || window.innerWidth;
+  const vh = docEl?.clientHeight || window.innerHeight;
 
   if (state.videoCanvas.width !== vw || state.videoCanvas.height !== vh) {
     state.videoCanvas.width = vw;
