@@ -59,6 +59,8 @@ body {
   padding-top: 2px;
   word-break: break-word;
   line-height: 1.35;
+  white-space: pre-wrap;
+  font-family: ui-monospace, 'SF Mono', monospace;
 }
 #cap-status:empty { display: none; }
 #cap-status.error { color: #f87171; }

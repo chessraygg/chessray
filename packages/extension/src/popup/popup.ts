@@ -32,32 +32,65 @@ const status = document.getElementById('cap-status')!;
 //   user gesture later. Falls back from currentWindow → lastFocusedWindow
 //   so the popup also works when opened as a tab (test harness path).
 let cachedTabId: number | null = null;
+let cachedTabUrl: string | null = null;
+let cachedTabSource: 'sw-target' | 'currentWindow' | 'lastFocusedWindow' | 'any' | 'override' | 'none' = 'none';
 async function preloadTabId(): Promise<void> {
   const params = new URLSearchParams(location.search);
   const override = params.get('tabId');
-  if (override) { cachedTabId = Number(override); return; }
-  // Ask the SW which tab Chrome activeTab-granted. That's the tab the
-  // user clicked the toolbar action on — the only tab tabCapture is
-  // allowed to capture. Falls back to chrome.tabs.query in test contexts
-  // where the SW path isn't wired (popup-as-tab in puppeteer harness).
+  if (override) {
+    cachedTabId = Number(override);
+    cachedTabSource = 'override';
+    await fetchTabUrl();
+    return;
+  }
+  // Ask the SW which tab Chrome activeTab-granted.
   try {
     const resp = await chrome.runtime.sendMessage({ type: 'get-target-tab' } satisfies ExtensionMessage);
-    if (resp?.tabId != null) { cachedTabId = resp.tabId; return; }
+    if (resp?.tabId != null) {
+      cachedTabId = resp.tabId;
+      cachedTabSource = 'sw-target';
+      await fetchTabUrl();
+      return;
+    }
   } catch { /* SW unreachable; fall through */ }
   const isContent = (t: chrome.tabs.Tab | undefined): boolean =>
     !!t?.url && (t.url.startsWith('http://') || t.url.startsWith('https://'));
-  const queries: Array<chrome.tabs.QueryInfo> = [
-    { active: true, currentWindow: true },
-    { active: true, lastFocusedWindow: true },
-    { currentWindow: true },
-    {},
+  const queries: Array<{ q: chrome.tabs.QueryInfo; src: typeof cachedTabSource }> = [
+    { q: { active: true, currentWindow: true }, src: 'currentWindow' },
+    { q: { active: true, lastFocusedWindow: true }, src: 'lastFocusedWindow' },
+    { q: { currentWindow: true }, src: 'currentWindow' },
+    { q: {}, src: 'any' },
   ];
-  for (const q of queries) {
+  for (const { q, src } of queries) {
     const tabs = await chrome.tabs.query(q);
     const t = tabs.find(isContent);
-    if (t) { cachedTabId = t.id ?? null; return; }
+    if (t) {
+      cachedTabId = t.id ?? null;
+      cachedTabSource = src;
+      cachedTabUrl = t.url ?? null;
+      return;
+    }
   }
   cachedTabId = null;
+  cachedTabSource = 'none';
+}
+
+async function fetchTabUrl(): Promise<void> {
+  if (cachedTabId == null) return;
+  try {
+    const tab = await chrome.tabs.get(cachedTabId);
+    cachedTabUrl = tab.url ?? null;
+  } catch (err) {
+    cachedTabUrl = `(get failed: ${(err as Error).message})`;
+  }
+}
+
+function shortUrl(): string {
+  if (!cachedTabUrl) return '(no url)';
+  try {
+    const u = new URL(cachedTabUrl);
+    return u.host + u.pathname.slice(0, 20);
+  } catch { return cachedTabUrl.slice(0, 40); }
 }
 
 // Bootstrap status: ask the SW for actual capture state, then preload
@@ -91,7 +124,7 @@ async function bootstrap(): Promise<void> {
   if (cachedTabId === null) {
     setStatus('No http(s) tab to capture', true);
   } else {
-    setStatus(`Idle (tab ${cachedTabId})`);
+    setStatus(`Idle · ${cachedTabSource} · tab ${cachedTabId} · ${shortUrl()}`);
   }
 }
 void bootstrap();
@@ -140,13 +173,16 @@ startBtn.addEventListener('click', () => {
   chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
     if (chrome.runtime.lastError || !streamId) {
       const msg = chrome.runtime.lastError?.message ?? 'no stream id';
-      if (msg.includes('active stream')) {
-        setStatus('Already capturing this tab — press Stop first, then Start again.', true);
-      } else if (msg.includes('not been invoked')) {
-        setStatus('Click the Chessray toolbar icon (not the popup) to grant tab-capture permission, then click Start.', true);
-      } else {
-        setStatus(`getMediaStreamId failed (tab ${tabId}): ${msg}`, true);
-      }
+      // Always surface the RAW Chrome error verbatim plus all context.
+      // The user keeps reporting "doesn't work" without telling me what
+      // the error string is — wrapping it with friendly hints was hiding
+      // the actual symptom. Show everything.
+      setStatus(
+        `Chrome rejected getMediaStreamId.\n` +
+        `targetTabId=${tabId} (${cachedTabSource}, ${shortUrl()})\n` +
+        `error: "${msg}"`,
+        true,
+      );
       return;
     }
     void (async () => {
