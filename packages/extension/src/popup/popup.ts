@@ -130,7 +130,7 @@ async function bootstrap(): Promise<void> {
   }
   // Show last error if it happened recently (within ~30s), otherwise
   // fall back to Idle. Stale errors don't survive a tab reload.
-  const last = stored?.__chessrayPopupStatus as { msg: string; isError: boolean; ts: number } | undefined;
+  const last = (stored as Record<string, unknown> | undefined)?.__chessrayPopupStatus as { msg: string; isError: boolean; ts: number } | undefined;
   if (last?.isError && Date.now() - last.ts < 30_000) {
     setStatus(`(prev) ${last.msg}`, true);
     return;

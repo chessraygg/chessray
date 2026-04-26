@@ -87,8 +87,8 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
         sendResponse({ tabId: lastInvokedTabId });
         return;
       }
-      const stored = await chrome.storage.session.get('__chessrayInvokedTab').catch(() => ({}));
-      const stashed = stored?.__chessrayInvokedTab as number | undefined;
+      const stored = await chrome.storage.session.get('__chessrayInvokedTab').catch(() => ({} as Record<string, unknown>));
+      const stashed = (stored as Record<string, unknown>).__chessrayInvokedTab as number | undefined;
       if (stashed != null) {
         lastInvokedTabId = stashed;
         sendResponse({ tabId: stashed });
@@ -108,12 +108,11 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     return true;
   }
   if (msg.type === 'forward-frame-result') {
-    // Offscreen has no chrome.tabs / no broadcast access. We do both:
-    //   - chrome.tabs.sendMessage → in-page panel (content script)
-    //   - chrome.runtime.sendMessage → popup / side panel / any open
-    //     extension surface that's subscribed
+    // Offscreen has no broadcast access; we do. Side panel + popup are
+    // the only consumers (no content script in this extension — the
+    // captured page must stay untouched so it doesn't feed our own
+    // arrows back into the recognition pipeline).
     const out: ExtensionMessage = { type: 'frame-result', result: msg.result };
-    chrome.tabs.sendMessage(msg.tabId, out).catch(() => { /* page panel may be missing */ });
     chrome.runtime.sendMessage(out).catch(() => { /* no extension surface open */ });
     return false;
   }
