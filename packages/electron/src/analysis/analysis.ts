@@ -87,11 +87,6 @@ window.chessRay.onStopCapture(() => {
   previewCtx = null;
 });
 
-window.chessRay.onSetMaxDepth((depth: number) => {
-  debugLog(`Max depth changed to ${depth}`);
-  processor.setMaxDepth(depth);
-});
-
 window.chessRay.onSetMultiPvMax((n: number) => {
   debugLog(`MultiPV max changed to ${n}`);
   setMultiPvMax(n);

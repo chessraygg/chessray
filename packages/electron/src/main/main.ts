@@ -482,12 +482,6 @@ ipcMain.on('update-lichess', (_e, fen: string, color: string) => {
   lichessWindow.loadURL(`https://lichess.org/analysis/${fenPath}?color=${side}`);
 });
 
-ipcMain.on('set-max-depth', (_e, depth: number) => {
-  if (analysisWindow && !analysisWindow.isDestroyed()) {
-    analysisWindow.webContents.send('set-max-depth', depth);
-  }
-});
-
 ipcMain.on('set-multi-pv-max', (_e, n: number) => {
   if (analysisWindow && !analysisWindow.isDestroyed()) {
     analysisWindow.webContents.send('set-multi-pv-max', n);

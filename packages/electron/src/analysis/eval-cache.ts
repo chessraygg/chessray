@@ -3,7 +3,10 @@ import type { ArrowDescriptor } from '../shared/types.js';
 
 export const EVAL_START_DEPTH = 16;
 export const EVAL_DEPTH_STEP = 4;
-export const EVAL_MAX_DEPTH = 28;
+/** Effectively unbounded — the iterative-deepening loop keeps going until the
+ *  position changes (AbortController fires from frame-processor) or the engine
+ *  saturates. Stockfish 18-lite plateaus well before depth 99 in practice. */
+export const EVAL_MAX_DEPTH = 99;
 /** Line count for the very first (shallowest) eval pass. Capped by the user's
  *  selected max below. Kept small so the initial preview arrives quickly. */
 export const EVAL_MULTI_PV_START = 3;

@@ -59,7 +59,6 @@ export interface FrameProcessorDeps {
   /** Produces a data URL for the cropped board preview. Return '' to skip (tests). */
   encodePreviewUrl?: (cropped: PixelBuffer) => string;
   changeDetectEnabled?: boolean;
-  maxDepth?: number;
   multiPvMax?: number;
 }
 
@@ -109,14 +108,16 @@ export class FrameProcessor {
   private evalAbortController: AbortController | null = null;
 
   // ── Tunables (overridable at runtime) ──
-  private maxDepth: number;
+  /** Search ceiling for iterative deepening. The loop almost always terminates
+   *  earlier via the AbortController (FEN change) or because Stockfish saturates;
+   *  this is just an upper safety bound. Deliberately not user-configurable. */
+  private readonly maxDepth: number = DEFAULT_MAX_DEPTH;
   private multiPvMax: number;
   private changeDetectEnabled: boolean;
   /** User-supplied orientation override. null = use auto-detection. */
   private manualFlip: boolean | null = null;
 
   constructor(private deps: FrameProcessorDeps) {
-    this.maxDepth = deps.maxDepth ?? DEFAULT_MAX_DEPTH;
     this.multiPvMax = deps.multiPvMax ?? EVAL_MULTI_PV_MAX;
     this.changeDetectEnabled = deps.changeDetectEnabled ?? true;
   }
@@ -151,7 +152,6 @@ export class FrameProcessor {
     this.frameCount = 0;
   }
 
-  setMaxDepth(d: number): void { this.maxDepth = d; }
   setMultiPvMax(n: number): void { this.multiPvMax = n; }
   setChangeDetect(on: boolean): void { this.changeDetectEnabled = on; }
   setManualFlip(v: boolean | null): void {

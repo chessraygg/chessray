@@ -1228,22 +1228,6 @@ function initOverlay(): void {
     });
   }
 
-  // ── Max engine depth slider ──
-  const maxDepthSlider = document.getElementById('cv-max-depth') as HTMLInputElement | null;
-  const maxDepthVal = document.getElementById('cv-max-depth-val');
-  const savedMaxDepth = prefs.maxDepth;
-  if (maxDepthSlider && maxDepthVal) {
-    maxDepthSlider.value = String(savedMaxDepth);
-    maxDepthVal.textContent = String(savedMaxDepth);
-    window.chessRay.setMaxDepth(savedMaxDepth);
-    maxDepthSlider.addEventListener('input', () => {
-      const depth = parseInt(maxDepthSlider.value, 10);
-      maxDepthVal.textContent = String(depth);
-      savePrefs({ maxDepth: depth });
-      window.chessRay.setMaxDepth(depth);
-    });
-  }
-
   // ── MultiPV max slider ──
   const multiPvSlider = document.getElementById('cv-multi-pv-max') as HTMLInputElement | null;
   const multiPvVal = document.getElementById('cv-multi-pv-max-val');

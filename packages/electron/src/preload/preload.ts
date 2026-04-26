@@ -49,10 +49,6 @@ const api = {
     ipcRenderer.send('reopen-picker'),
 
   // Engine settings
-  setMaxDepth: (depth: number) =>
-    ipcRenderer.send('set-max-depth', depth),
-  onSetMaxDepth: (cb: (depth: number) => void) =>
-    ipcRenderer.on('set-max-depth', (_e, depth: number) => cb(depth)),
   setMultiPvMax: (n: number) =>
     ipcRenderer.send('set-multi-pv-max', n),
   onSetMultiPvMax: (cb: (n: number) => void) =>
