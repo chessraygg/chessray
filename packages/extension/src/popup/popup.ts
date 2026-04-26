@@ -1,66 +1,146 @@
-import type { ExtensionMessage } from '../shared/messages.js';
+/**
+ * Popup: hosts the full @chessray/overlay-ui panel. Same canvas-renderer,
+ * eval bar, top-moves list, settings and diagnostics the Electron app
+ * uses; the only popup-specific addition is the Start/Stop strip at the
+ * top, since the extension can't auto-start (tabCapture needs a real
+ * user-gesture grant from a popup click).
+ *
+ * Frame results arrive via chrome.runtime broadcast from the SW. The
+ * content script's in-page panel still receives them too — both surfaces
+ * stay in sync.
+ */
 
-const statusEl = document.getElementById('status')!;
+import { mountOverlay, type ChessRayAPI, type DisplayInfo, type HostDisplay } from '@chessray/overlay-ui';
+import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
+
 const startBtn = document.getElementById('start') as HTMLButtonElement;
 const stopBtn = document.getElementById('stop') as HTMLButtonElement;
+const status = document.getElementById('cap-status')!;
 
-function setStatus(s: string): void {
-  statusEl.textContent = s;
+// ── Frame-result + display-info plumbing ───────────────────────────────
+const frameResultListeners: Array<(r: unknown) => void> = [];
+const displayInfoListeners: Array<(info: DisplayInfo) => void> = [];
+
+chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
+  if (msg.type === 'frame-result') {
+    for (const cb of frameResultListeners) cb(msg.result);
+  }
+});
+
+function applySetting(setting: ExtensionSetting): void {
+  chrome.runtime.sendMessage({ type: 'apply-setting', setting } satisfies ExtensionMessage).catch(() => {});
 }
 
-/** Resolve which tab to capture. Production: the active tab in the window
- *  from which the popup was opened. Test harness: ?tabId=N override so the
- *  test can drive the click without depending on tab focus order across a
- *  popup-as-tab + content-tab pair. */
-async function resolveTargetTabId(): Promise<number | null> {
-  const params = new URLSearchParams(location.search);
-  const override = params.get('tabId');
-  if (override) return Number(override);
+const noop = (): void => { /* host doesn't support this method */ };
+
+// Capture-lifecycle helpers wired to the existing service-worker flow.
+async function startCaptureFromPopup(): Promise<void> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  return tab?.id ?? null;
-}
-
-/** Pull the tab MediaStream ID inside this user-gesture click handler.
- *  Chrome only grants tabCapture access when the call originates from a
- *  user-invoked extension surface (toolbar click → popup click handler).
- *  Calling this from the SW after an IPC hop loses that activation, which
- *  was the source of the "Extension has not been invoked for the current
- *  page" failures. */
-function getStreamId(targetTabId: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    chrome.tabCapture.getMediaStreamId({ targetTabId }, (id) => {
-      if (chrome.runtime.lastError || !id) {
-        reject(new Error(chrome.runtime.lastError?.message ?? 'no stream id'));
-        return;
-      }
-      resolve(id);
-    });
-  });
-}
-
-startBtn.addEventListener('click', async () => {
-  const tabId = await resolveTargetTabId();
-  if (!tabId) {
-    setStatus('No active tab');
-    return;
-  }
-  setStatus('Starting…');
+  if (!tab?.id) { status.textContent = 'No active tab'; return; }
+  status.textContent = 'Starting…';
   try {
-    // Make Start idempotent: tear down any prior capture before grabbing
-    // a fresh stream id, otherwise getMediaStreamId throws "Cannot capture
-    // a tab with an active stream."
+    // Idempotent: tear down any previous stream first.
     await chrome.runtime.sendMessage({ type: 'stop-capture' } satisfies ExtensionMessage).catch(() => {});
-    const streamId = await getStreamId(tabId);
-    const msg: ExtensionMessage = { type: 'start-capture', tabId, streamId };
-    const resp: { ok: boolean; error?: string } = await chrome.runtime.sendMessage(msg);
-    setStatus(resp?.ok ? 'Running' : `Error: ${resp?.error ?? 'unknown'}`);
+    const streamId: string = await new Promise((resolve, reject) => {
+      chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id! }, (id) => {
+        if (chrome.runtime.lastError || !id) {
+          reject(new Error(chrome.runtime.lastError?.message ?? 'no stream id'));
+          return;
+        }
+        resolve(id);
+      });
+    });
+    const resp: { ok: boolean; error?: string } = await chrome.runtime.sendMessage({
+      type: 'start-capture', tabId: tab.id, streamId,
+    } satisfies ExtensionMessage);
+    if (resp?.ok) {
+      status.textContent = 'Running';
+      startBtn.classList.add('running');
+    } else {
+      status.textContent = `Error: ${resp?.error ?? 'unknown'}`;
+    }
   } catch (err) {
-    setStatus(`Error: ${(err as Error).message}`);
+    status.textContent = `Error: ${(err as Error).message}`;
   }
-});
+}
 
-stopBtn.addEventListener('click', async () => {
-  const msg: ExtensionMessage = { type: 'stop-capture' };
-  await chrome.runtime.sendMessage(msg);
-  setStatus('Stopped');
-});
+async function stopCaptureFromPopup(): Promise<void> {
+  await chrome.runtime.sendMessage({ type: 'stop-capture' } satisfies ExtensionMessage).catch(() => {});
+  status.textContent = 'Stopped';
+  startBtn.classList.remove('running');
+}
+
+startBtn.addEventListener('click', () => { void startCaptureFromPopup(); });
+stopBtn.addEventListener('click', () => { void stopCaptureFromPopup(); });
+
+// ── Bridge ─────────────────────────────────────────────────────────────
+// Same shape as the content-script bridge — only differences are how
+// frame-result arrives (broadcast vs tabs.sendMessage) and that the
+// reset-panel-position handler scrolls within the popup body.
+
+const bridge: ChessRayAPI = {
+  onStartCapture: noop,
+  onStopCapture: noop,
+  sendRendererReady: noop,
+  getSourceId: () => Promise.resolve(null),
+  sendFrameResult: noop,
+  sendDebugLog: (msg: string) => { console.log('[chessray]', msg); },
+
+  onFrameResult: (cb) => { frameResultListeners.push(cb); },
+  onStopTracking: noop,
+
+  setMousePassthrough: noop,
+  setAlwaysOnTop: noop,
+  onDisplayInfo: (cb) => {
+    displayInfoListeners.push(cb);
+    cb({
+      scaleFactor: window.devicePixelRatio || 1,
+      overlayBounds: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
+      displayBounds: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
+    });
+  },
+  onSourceVisibility: (cb) => { cb(true); },
+
+  getSources: () => Promise.resolve([]),
+  selectSource: noop,
+  reopenPicker: noop,
+
+  setMultiPvMax: (n) => applySetting({ key: 'multi-pv-max', value: n }),
+  onSetMultiPvMax: noop,
+  setChangeDetect: (enabled) => applySetting({ key: 'change-detect', value: enabled }),
+  onSetChangeDetect: noop,
+  setManualFlip: (v) => applySetting({ key: 'manual-flip', value: v }),
+  onSetManualFlip: noop,
+  setTargetFps: (fps) => applySetting({ key: 'target-fps', value: fps }),
+  onSetTargetFps: noop,
+
+  onResetPanelPosition: noop,
+  onTogglePanel: noop,
+  onResetAllSettings: noop,
+  requestResetPanelPosition: noop,
+  requestResetAllSettings: () => {
+    if (confirm('Reset all panel settings to defaults?')) {
+      try { localStorage.removeItem('chessray-prefs'); } catch { /* ignore */ }
+      location.reload();
+    }
+  },
+  getDisplays: (): Promise<HostDisplay[]> => Promise.resolve([]),
+  switchDisplay: noop,
+  onDisplaysChanged: noop,
+
+  startRecording: noop,
+  stopRecording: noop,
+  onRecordingStateChanged: noop,
+  saveFrameArtifact: noop,
+
+  minimizeApp: noop,
+  closeApp: () => { window.close(); },
+  openExternal: (url) => { chrome.tabs.create({ url }); },
+  toggleLichess: (fen) => {
+    const fenPath = encodeURIComponent(fen.split(' ')[0] ?? fen);
+    chrome.tabs.create({ url: `https://lichess.org/analysis/${fenPath}` });
+  },
+  updateLichess: noop,
+};
+
+mountOverlay(bridge);

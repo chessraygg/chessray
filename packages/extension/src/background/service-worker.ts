@@ -64,11 +64,13 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     return true;
   }
   if (msg.type === 'forward-frame-result') {
-    // Offscreen → here → content script. Offscreen has no chrome.tabs;
-    // we do. Wrap the result in the canonical 'frame-result' shape the
-    // content overlay listens for.
-    chrome.tabs.sendMessage(msg.tabId, { type: 'frame-result', result: msg.result } satisfies ExtensionMessage)
-      .catch(() => { /* content script may not be ready */ });
+    // Offscreen has no chrome.tabs / no broadcast access. We do both:
+    //   - chrome.tabs.sendMessage → in-page panel (content script)
+    //   - chrome.runtime.sendMessage → popup / side panel / any open
+    //     extension surface that's subscribed
+    const out: ExtensionMessage = { type: 'frame-result', result: msg.result };
+    chrome.tabs.sendMessage(msg.tabId, out).catch(() => { /* page panel may be missing */ });
+    chrome.runtime.sendMessage(out).catch(() => { /* no extension surface open */ });
     return false;
   }
   return false;
