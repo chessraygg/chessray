@@ -57,16 +57,41 @@ async function preloadTabId(): Promise<void> {
   cachedTabId = null;
 }
 
-// Disable Start until tabId is resolved so a fast click doesn't race
-// against the (very short) preload and silently fail with "No active
-// tab". Stop is always safe.
+// Bootstrap status: ask the SW for actual capture state, then preload
+// the tabId. This ordering matters — popups close on focus-loss (e.g.
+// when Chrome shows the tab-share indicator), so the user may reopen
+// the popup while a capture is already running. Without this query the
+// popup would show "Idle" and let the user click Start, hitting the
+// "active stream" error path.
 startBtn.disabled = true;
-status.textContent = '…';
-preloadTabId().then(() => {
+setStatus('…');
+async function bootstrap(): Promise<void> {
+  const [state, stored] = await Promise.all([
+    chrome.runtime.sendMessage({ type: 'get-capture-state' } satisfies ExtensionMessage)
+      .catch(() => ({ running: false })),
+    chrome.storage.session.get('__chessrayPopupStatus').catch(() => ({})),
+  ]);
+  await preloadTabId();
   startBtn.disabled = false;
-  if (cachedTabId === null) setStatus('No http(s) tab to capture', true);
-  else setStatus(`Idle (tab ${cachedTabId})`);
-});
+  if (state?.running) {
+    setStatus(`Running (tab ${state.tabId ?? '?'})`);
+    startBtn.classList.add('running');
+    return;
+  }
+  // Show last error if it happened recently (within ~30s), otherwise
+  // fall back to Idle. Stale errors don't survive a tab reload.
+  const last = stored?.__chessrayPopupStatus as { msg: string; isError: boolean; ts: number } | undefined;
+  if (last?.isError && Date.now() - last.ts < 30_000) {
+    setStatus(`(prev) ${last.msg}`, true);
+    return;
+  }
+  if (cachedTabId === null) {
+    setStatus('No http(s) tab to capture', true);
+  } else {
+    setStatus(`Idle (tab ${cachedTabId})`);
+  }
+}
+void bootstrap();
 
 // ── Frame-result + display-info plumbing ───────────────────────────────
 const frameResultListeners: Array<(r: unknown) => void> = [];
@@ -93,6 +118,12 @@ const noop = (): void => { /* host doesn't support this method */ };
 function setStatus(msg: string, isError = false): void {
   status.textContent = msg;
   status.classList.toggle('error', isError);
+  // Mirror to chrome.storage.session so reopening the popup (which
+  // happens automatically when Chrome's tab-share indicator steals
+  // focus) still shows the last status / error.
+  void chrome.storage.session.set({
+    __chessrayPopupStatus: { msg, isError, ts: Date.now() },
+  }).catch(() => {});
 }
 
 startBtn.addEventListener('click', () => {

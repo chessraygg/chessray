@@ -29,17 +29,33 @@ async function ensureOffscreen(): Promise<void> {
   });
 }
 
+/** Capture state persisted to chrome.storage.session so it survives
+ *  SW restarts within the same browser session. The popup queries this
+ *  on every open to show the real capture state — popups close on
+ *  focus-loss (e.g. when Chrome's tab-share indicator appears) so the
+ *  popup's local memory of "Starting…" or "Running" can be lost. */
+type CaptureState = { running: boolean; tabId?: number };
+async function getCaptureState(): Promise<CaptureState> {
+  const { __chessrayCapture } = await chrome.storage.session.get('__chessrayCapture');
+  return (__chessrayCapture as CaptureState | undefined) ?? { running: false };
+}
+async function setCaptureState(s: CaptureState): Promise<void> {
+  await chrome.storage.session.set({ __chessrayCapture: s });
+}
+
 async function startCapture(tabId: number, streamId: string): Promise<void> {
   await ensureOffscreen();
   // Forward to offscreen. tabId rides along because offscreen documents
   // have no chrome.tabs access and need it to address the content script.
   const msg: ExtensionMessage = { type: 'capture-started', streamId, tabId };
   await chrome.runtime.sendMessage(msg);
+  await setCaptureState({ running: true, tabId });
 }
 
 async function stopCapture(): Promise<void> {
   const msg: ExtensionMessage = { type: 'stop-capture' };
   await chrome.runtime.sendMessage(msg).catch(() => {});
+  await setCaptureState({ running: false });
 }
 
 chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendResponse) => {
@@ -52,6 +68,10 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
   }
   if (msg.type === 'stop-capture') {
     stopCapture().then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (msg.type === 'get-capture-state') {
+    getCaptureState().then(sendResponse);
     return true;
   }
   if (msg.type === 'ensure-offscreen') {

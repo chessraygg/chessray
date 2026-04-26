@@ -37,5 +37,10 @@ export type ExtensionMessage =
   /** Offscreen → SW: please forward this frame-result to the content
    *  script in `tabId` (offscreen has no chrome.tabs access; SW does). */
   | { type: 'forward-frame-result'; tabId: number; result: PipelineResult }
+  /** Popup ⇄ SW: query/persist whether a capture is currently running.
+   *  Popups close on focus-loss (e.g. when Chrome shows the tab-share
+   *  indicator), so the popup can't trust local state alone — it asks
+   *  the SW on every open. */
+  | { type: 'get-capture-state' }
   | { type: 'status'; message: string }
   | { type: 'ping' };
