@@ -18,6 +18,10 @@
 
 import { mountOverlay, type ChessRayAPI, type DisplayInfo, type HostDisplay } from '@chessray/overlay-ui';
 import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
+// Popup CSS imported AFTER mountOverlay (which pulls in panel.css from
+// overlay-ui) so this file's selectors win on equal-specificity rules
+// — body background, panel positioning, etc.
+import './popup.css';
 
 const startBtn = document.getElementById('start') as HTMLButtonElement;
 const stopBtn = document.getElementById('stop') as HTMLButtonElement;
@@ -52,7 +56,16 @@ async function preloadTabId(): Promise<void> {
   }
   cachedTabId = null;
 }
-void preloadTabId();
+
+// Disable Start until tabId is resolved so a fast click doesn't race
+// against the (very short) preload and silently fail with "No active
+// tab". Stop is always safe.
+startBtn.disabled = true;
+status.textContent = '…';
+preloadTabId().then(() => {
+  startBtn.disabled = false;
+  status.textContent = cachedTabId === null ? 'No http(s) tab to capture' : 'Idle';
+});
 
 // ── Frame-result + display-info plumbing ───────────────────────────────
 const frameResultListeners: Array<(r: unknown) => void> = [];
