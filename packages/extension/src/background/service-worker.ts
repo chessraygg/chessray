@@ -128,25 +128,34 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
  *  Start always targets the tab the user invoked the extension on, even
  *  if they've since switched tabs in the same window. */
 let lastInvokedTabId: number | undefined;
+
+// Make Chrome auto-open the side panel on action click. We also keep an
+// onClicked listener — different Chrome versions handle this combo
+// differently (some fire onClicked alongside the auto-open, some don't).
+// Whichever path fires, lastInvokedTabId gets stamped.
+chrome.runtime.onInstalled.addListener(() => {
+  void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+    .catch((err) => console.error('[chessray] setPanelBehavior:', err));
+});
+
 chrome.action.onClicked.addListener(async (tab) => {
   if (tab.id == null) return;
   lastInvokedTabId = tab.id;
   await chrome.storage.session.set({ __chessrayInvokedTab: tab.id }).catch(() => {});
   try {
-    // Explicitly configure the panel for this tab. We deliberately
-    // omit `side_panel.default_path` from manifest because that flag
-    // makes Chrome auto-open the panel on action click and suppress
-    // onClicked entirely — which is exactly what we DON'T want
-    // (no onClicked → no activeTab grant → tabCapture rejects).
-    await chrome.sidePanel.setOptions({
-      tabId: tab.id,
-      path: 'src/popup/popup.html',
-      enabled: true,
-    });
     await chrome.sidePanel.open({ tabId: tab.id });
   } catch (err) {
-    console.error('[chessray] sidePanel open failed:', err);
+    // Panel may already be open from openPanelOnActionClick — that's fine.
+    if (!String(err).includes('already')) console.error('[chessray] sidePanel.open:', err);
   }
+});
+
+// Also stamp lastInvokedTabId whenever the user activates a tab while
+// the side panel is open. tabs.onActivated doesn't grant activeTab, but
+// the data point lets the panel show "you're viewing tab X but invoked
+// tab Y — click toolbar to grant capture for X" without confusion.
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  await chrome.storage.session.set({ __chessrayActiveTab: tabId }).catch(() => {});
 });
 
 // Keyboard shortcut path. Firing a chrome.commands shortcut counts as

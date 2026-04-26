@@ -14,13 +14,16 @@ export default defineManifest({
   description: pkg.description,
   minimum_chrome_version: '116',
   action: {
-    // No default_popup AND no side_panel.default_path: this combo lets
-    // chrome.action.onClicked fire on every toolbar click, which is the
-    // ONLY reliable way to get an activeTab grant. The SW's onClicked
-    // handler then configures + opens the side panel for that tab via
-    // chrome.sidePanel.setOptions + chrome.sidePanel.open (both of
-    // which are allowed inside onClicked because it's a user gesture).
     default_title: 'Chessray',
+  },
+  // Restore default_path so the side panel reliably opens on action
+  // click. We also call sidePanel.setPanelBehavior({openPanelOnActionClick})
+  // in the SW. action.onClicked may or may not fire alongside this in
+  // current Chrome — the SW handler is defensive: it handles both
+  // (onClicked grants activeTab if it fires; the panel's Start button
+  // also re-invokes via context menu if activeTab is missing).
+  side_panel: {
+    default_path: 'src/popup/popup.html',
   },
   background: {
     service_worker: 'src/background/service-worker.ts',

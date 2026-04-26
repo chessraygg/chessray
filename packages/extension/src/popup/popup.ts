@@ -18,9 +18,11 @@
 
 import { mountOverlay, type ChessRayAPI, type DisplayInfo, type HostDisplay } from '@chessray/overlay-ui';
 import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
-// Popup CSS imported AFTER mountOverlay (which pulls in panel.css from
-// overlay-ui) so this file's selectors win on equal-specificity rules
-// — body background, panel positioning, etc.
+// Popup owns its document, so it can safely load panel.css's global
+// rules. (mount-overlay.ts no longer pulls panel.css automatically —
+// that was leaking body{overflow:hidden} into every page the content
+// script ran on.)
+import '@chessray/overlay-ui/src/panel.css';
 import './popup.css';
 
 const startBtn = document.getElementById('start') as HTMLButtonElement;

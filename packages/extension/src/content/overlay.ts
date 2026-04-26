@@ -14,6 +14,11 @@
 
 import { mountOverlay, type ChessRayAPI, type DisplayInfo, type HostDisplay } from '@chessray/overlay-ui';
 import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
+// Minimal CSS for the on-screen canvas only. We deliberately don't
+// import overlay-ui's panel.css here — it sets body{overflow:hidden}
+// and *{margin:0} globally, which broke scrolling on every page the
+// content script touched.
+import './content-overlay.css';
 
 type FrameResultListener = (result: unknown) => void;
 

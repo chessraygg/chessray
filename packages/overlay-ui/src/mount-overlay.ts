@@ -17,7 +17,12 @@ import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid, setFpsBu
 import { loadHistory, pushSlowFrame, clearHistory, snapshotToResult, type DebugSnapshot } from './debug-history.js';
 import { PANEL_HTML } from './panel-template.js';
 import type { ChessRayAPI } from './host-api.js';
-import './panel.css';
+// NOTE: panel.css is NOT imported here. It contains global rules
+// (body{overflow:hidden}, *{margin:0}) that hose every page the content
+// script runs on. Each host imports panel.css itself only when it owns
+// the document (popup, side panel, Electron overlay window). The content
+// script imports its own minimal stylesheet just for the on-screen
+// #video-overlay canvas.
 
 // Module-scoped pointer to the host API. Initialized by mountOverlay()
 // before any DOM listeners run; bang assertion is safe because every
