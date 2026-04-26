@@ -108,11 +108,11 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     return true;
   }
   if (msg.type === 'forward-frame-result') {
-    // Offscreen has no broadcast access; we do. Side panel + popup are
-    // the only consumers (no content script in this extension — the
-    // captured page must stay untouched so it doesn't feed our own
-    // arrows back into the recognition pipeline).
+    // Offscreen has no broadcast access; we do.
+    //   chrome.tabs.sendMessage → content-script overlay on the page
+    //   chrome.runtime.sendMessage → side panel
     const out: ExtensionMessage = { type: 'frame-result', result: msg.result };
+    chrome.tabs.sendMessage(msg.tabId, out).catch(() => { /* no content script */ });
     chrome.runtime.sendMessage(out).catch(() => { /* no extension surface open */ });
     return false;
   }

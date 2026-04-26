@@ -42,11 +42,14 @@ export default defineManifest({
     },
   },
   host_permissions: ['<all_urls>'],
-  // No content_scripts: the side panel is the one and only UI surface.
-  // Drawing arrows on the captured page would feed back into the
-  // tabCapture stream and confuse YOLO recognition; the in-panel
-  // virtual board renders the same arrows + eval bar without that
-  // feedback loop, and avoids polluting every page's DOM/CSS.
+  content_scripts: [
+    {
+      matches: ['<all_urls>'],
+      js: ['src/content/overlay.ts'],
+      run_at: 'document_idle',
+      all_frames: false,
+    },
+  ],
   web_accessible_resources: [
     {
       resources: [
