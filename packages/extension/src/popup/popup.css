@@ -17,8 +17,8 @@ body {
 }
 
 #cap-bar {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
   padding: 6px 8px;
   border-bottom: 1px solid #272727;
@@ -50,14 +50,15 @@ body {
 }
 
 #cap-status {
-  flex: 0 0 auto;
-  font-size: 9.5px;
-  color: #737373;
-  max-width: 110px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  grid-column: 1 / -1;
+  font-size: 10px;
+  color: #a3a3a3;
+  padding-top: 2px;
+  word-break: break-word;
+  line-height: 1.35;
 }
+#cap-status:empty { display: none; }
+#cap-status.error { color: #f87171; }
 
 /* The mounted overlay panel: in production it's a fixed-positioned
    floating window. Inside the popup body we want it inline, full width,

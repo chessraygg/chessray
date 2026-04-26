@@ -64,7 +64,8 @@ startBtn.disabled = true;
 status.textContent = '…';
 preloadTabId().then(() => {
   startBtn.disabled = false;
-  status.textContent = cachedTabId === null ? 'No http(s) tab to capture' : 'Idle';
+  if (cachedTabId === null) setStatus('No http(s) tab to capture', true);
+  else setStatus(`Idle (tab ${cachedTabId})`);
 });
 
 // ── Frame-result + display-info plumbing ───────────────────────────────
@@ -89,43 +90,44 @@ const noop = (): void => { /* host doesn't support this method */ };
 // preceding await consumes the user-gesture activation and the call
 // fails with the activeTab error. Tab id is already cached.
 
+function setStatus(msg: string, isError = false): void {
+  status.textContent = msg;
+  status.classList.toggle('error', isError);
+}
+
 startBtn.addEventListener('click', () => {
   if (cachedTabId === null) {
-    status.textContent = 'No active tab';
-    // Try to recover for next click.
+    setStatus('No http(s) tab found to capture', true);
     void preloadTabId();
     return;
   }
   const tabId = cachedTabId;
-  status.textContent = 'Starting…';
+  setStatus('Starting…');
   chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
     if (chrome.runtime.lastError || !streamId) {
       const msg = chrome.runtime.lastError?.message ?? 'no stream id';
-      // The "active stream" error means a previous capture is still alive
-      // on this tab. We can't tear it down + retry inside the same click
-      // (the retry would have no user activation), so we surface a clear
-      // recovery hint and ask the user to press Stop first.
       if (msg.includes('active stream')) {
-        status.textContent = 'Already capturing — click Stop, then Start again';
+        setStatus('Already capturing this tab — press Stop first, then Start again.', true);
+      } else if (msg.includes('not been invoked')) {
+        setStatus('Click the Chessray toolbar icon (not the popup) to grant tab-capture permission, then click Start.', true);
       } else {
-        status.textContent = `Error: ${msg}`;
+        setStatus(`getMediaStreamId failed (tab ${tabId}): ${msg}`, true);
       }
       return;
     }
-    // Past the user-gesture-gated call now; safe to await.
     void (async () => {
       try {
         const resp: { ok: boolean; error?: string } = await chrome.runtime.sendMessage({
           type: 'start-capture', tabId, streamId,
         } satisfies ExtensionMessage);
         if (resp?.ok) {
-          status.textContent = 'Running';
+          setStatus('Running');
           startBtn.classList.add('running');
         } else {
-          status.textContent = `Error: ${resp?.error ?? 'unknown'}`;
+          setStatus(`SW error: ${resp?.error ?? 'unknown'}`, true);
         }
       } catch (err) {
-        status.textContent = `Error: ${(err as Error).message}`;
+        setStatus(`Send failed: ${(err as Error).message}`, true);
       }
     })();
   });
@@ -133,7 +135,7 @@ startBtn.addEventListener('click', () => {
 
 stopBtn.addEventListener('click', async () => {
   await chrome.runtime.sendMessage({ type: 'stop-capture' } satisfies ExtensionMessage).catch(() => {});
-  status.textContent = 'Stopped';
+  setStatus('Stopped');
   startBtn.classList.remove('running');
 });
 

@@ -136,7 +136,10 @@ const bridge: ChessRayAPI = {
   updateLichess: noop, // tab is detached; no live-sync
 };
 
-mountOverlay(bridge);
+// Mount the overlay-ui but hide the floating panel — the popup is the
+// canonical UI surface in the extension. The on-screen #video-overlay
+// canvas stays visible (arrows + eval bar drawn on the captured page).
+mountOverlay(bridge, { hidePanel: true });
 
 // Notify the service worker that the content script is ready so it can
 // trigger capture on user request.

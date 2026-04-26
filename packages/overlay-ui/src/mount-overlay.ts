@@ -1798,7 +1798,7 @@ function processPendingResult(): void {
  * (legacy contract used throughout this file), injects the panel HTML +
  * CSS, and runs initOverlay + IPC listener registration.
  */
-export function mountOverlay(api: ChessRayAPI): void {
+export function mountOverlay(api: ChessRayAPI, options?: { hidePanel?: boolean }): void {
   // 1. Capture the host bridge for module-scoped use. We deliberately don't
   //    reassign window.chessRay — Electron's contextBridge.exposeInMainWorld
   //    makes it read-only and the assignment throws. Hosts that haven't
@@ -1809,6 +1809,16 @@ export function mountOverlay(api: ChessRayAPI): void {
   // 2. Inject the panel structure into the document. Hosts only need a body.
   if (!document.getElementById('user-panel')) {
     document.body.insertAdjacentHTML('beforeend', PANEL_HTML);
+  }
+
+  // Hide the panel if the host is using a separate UI surface (e.g. the
+  // extension popup). The on-screen #video-overlay canvas stays visible —
+  // arrows + eval bar still draw on the actual board. Panel DOM remains in
+  // place so initOverlay's setup wires cleanly without null-checks; it's
+  // just invisible and untouched.
+  if (options?.hidePanel) {
+    const userPanel = document.getElementById('user-panel');
+    if (userPanel) userPanel.style.display = 'none';
   }
 
   // 3. Wire DOM event listeners + restore prefs.
