@@ -1,47 +1,29 @@
 /**
  * Offscreen document: the long-lived worker for the extension.
  *
- * Runs the detection pipeline + Stockfish + YOLO. Receives a tab-capture
- * stream id from the service worker, pulls video frames from it, and pushes
- * pipeline results back to the content script via
- * `chrome.tabs.sendMessage` (proxied through the service worker since
- * offscreen docs can't address tabs directly).
- *
- * Intentionally minimal vs. the electron FrameProcessor — this is a
- * scaffold that proves the architecture. Change detection, intermediate-frame
- * handling, iterative deepening, and the eval cache can be ported from
- * `packages/electron/src/analysis/frame-processor.ts` incrementally.
+ * Owns a single FrameProcessor instance from @chessray/runtime — the same
+ * pipeline class the Electron app uses. Host-specific bits (Stockfish/YOLO
+ * init, tab-capture stream lifecycle, chrome.tabs message routing) stay
+ * here; the per-frame state machine, eval cache, change detection,
+ * iterative deepening, and intermediate-frame handling all come from the
+ * shared runtime.
  */
 
 import './vendor.ts';
 // Default `onnxruntime-web` resolves to ort.bundle.min.mjs (WASM only).
-// The /webgpu subpath gives us ort.webgpu.bundle.min.mjs, which keeps the
-// WASM EP for non-GPU ops while exposing the WebGPU EP that core's YOLO
-// recognizer requests first. Without this, every Chrome session silently
-// falls back to WASM and inference is ~10× slower.
+// /webgpu picks ort.webgpu.bundle.min.mjs which keeps WASM for non-GPU ops
+// while exposing the WebGPU EP that core's YoloPieceRecognizer requests.
 import * as ort from 'onnxruntime-web/webgpu';
-import {
-  StockfishEngine,
-  YoloPieceRecognizer,
-  detectBoard,
-  cropPixels,
-  recognizeBoard,
-  buildFullFen,
-  guessTurn,
-  type EvalResult,
-  type PixelBuffer,
-} from '@chessray/core';
-import { Chess } from 'chess.js';
-import type { ExtensionMessage, ExtensionFrameResult } from '../shared/messages.js';
+import { StockfishEngine, YoloPieceRecognizer, type PixelBuffer, type PipelineResult } from '@chessray/core';
+import { FrameProcessor, type ImageDataLike, type FrameMeta } from '@chessray/runtime';
+import type { ExtensionMessage } from '../shared/messages.js';
 
 const TARGET_FPS = 2;
-const MAX_DEPTH = 18;
-const MULTI_PV = 3;
 
-// ── ONNX Runtime global wire-up ──
-// Core code (YoloPieceRecognizer, label-detect) reads `globalThis.ort`.
-// The electron host historically injected `ort` via a script tag; in MV3
-// we import the npm package and expose the same global so core is unchanged.
+// ── ORT global wire-up ──
+// Core's YoloPieceRecognizer reads `globalThis.ort` because the Electron host
+// historically loaded ORT via a script tag. Mirror that contract here so the
+// shared core code is unchanged.
 (globalThis as typeof globalThis & { ort: typeof ort }).ort = ort;
 ort.env.wasm.wasmPaths = chrome.runtime.getURL('vendor/onnxruntime-web/');
 ort.env.logLevel = 'warning';
@@ -53,13 +35,29 @@ let mediaStream: MediaStream | null = null;
 let videoEl: HTMLVideoElement | null = null;
 let activeTabId: number | null = null;
 let processing = false;
+let previewCanvas: HTMLCanvasElement | null = null;
+let previewCtx: CanvasRenderingContext2D | null = null;
+
+function debugLog(msg: string): void {
+  console.log(`[chessray] ${msg}`);
+}
 
 async function initEngine(): Promise<StockfishEngine> {
   if (engine) return engine;
-  const sf = new StockfishEngine({ depth: MAX_DEPTH, multiPV: MULTI_PV });
+  const sf = new StockfishEngine({});
   await sf.init(chrome.runtime.getURL('vendor/stockfish/stockfish-18-lite-single.js'));
   engine = sf;
+  debugLog('Stockfish 18 initialized');
   return sf;
+}
+
+async function reinitEngine(): Promise<void> {
+  debugLog('Reinitializing Stockfish after crash...');
+  if (engine) {
+    try { engine.destroy(); } catch { /* ignore */ }
+  }
+  engine = null;
+  await initEngine();
 }
 
 async function initRecognizer(): Promise<YoloPieceRecognizer> {
@@ -70,90 +68,42 @@ async function initRecognizer(): Promise<YoloPieceRecognizer> {
   return rec;
 }
 
-/** Load the shared board-detection ONNX session (same YOLO model as pieces —
- *  the core pipeline uses the recognizer's session for board detection too). */
-function getBoardDetectSession(): unknown {
-  return recognizer?.session ?? null;
+function encodePreviewUrl(cropped: PixelBuffer): string {
+  if (!previewCanvas) {
+    previewCanvas = document.createElement('canvas');
+    previewCtx = previewCanvas.getContext('2d')!;
+  }
+  if (previewCanvas.width !== cropped.width || previewCanvas.height !== cropped.height) {
+    previewCanvas.width = cropped.width;
+    previewCanvas.height = cropped.height;
+  }
+  const imgData = new ImageData(
+    cropped.data as unknown as Uint8ClampedArray<ArrayBuffer>,
+    cropped.width,
+    cropped.height,
+  );
+  previewCtx!.putImageData(imgData, 0, 0);
+  return previewCanvas.toDataURL('image/jpeg', 0.7);
 }
 
-async function pushResult(result: ExtensionFrameResult): Promise<void> {
+async function pushResult(result: PipelineResult): Promise<void> {
   if (activeTabId === null) return;
   const msg: ExtensionMessage = { type: 'frame-result', result };
   await chrome.tabs.sendMessage(activeTabId, msg).catch(() => {
-    // Content script may not be ready yet on the first few frames.
+    // Content script may not be ready on the first few frames.
   });
 }
 
-async function processFrame(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): Promise<void> {
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const pixels: PixelBuffer = {
-    data: imageData.data,
-    width: imageData.width,
-    height: imageData.height,
-  };
-
-  const detection = await detectBoard(getBoardDetectSession(), ort, pixels.data, pixels.width, pixels.height);
-  if (!detection.bbox) {
-    await pushResult({ bbox: null, fen: null, evaluation: null, arrows: [], flipped: false, status: 'No board' });
-    return;
-  }
-
-  const cropped = cropPixels(pixels, detection.bbox);
-  const board = await recognizeBoard(cropped, recognizer!, null, null);
-  if (!board.recognition || board.recognition.confidence < 0.3) {
-    await pushResult({
-      bbox: detection.bbox,
-      fen: null,
-      evaluation: null,
-      arrows: [],
-      flipped: board.flipped,
-      status: 'Low confidence',
-    });
-    return;
-  }
-
-  const turn = board.turn ?? guessTurn(null, board.recognition.fen);
-  const fullFen = buildFullFen(board.recognition.fen, turn);
-
-  let gameOverStatus: string | undefined;
-  try {
-    const chess = new Chess(fullFen);
-    if (chess.isCheckmate()) gameOverStatus = 'checkmate';
-    else if (chess.isStalemate()) gameOverStatus = 'stalemate';
-  } catch {
-    // Invalid FEN — let the engine call fail naturally below.
-  }
-
-  if (gameOverStatus) {
-    await pushResult({
-      bbox: detection.bbox,
-      fen: fullFen,
-      evaluation: null,
-      arrows: [],
-      flipped: board.flipped,
-      status: gameOverStatus,
-    });
-    return;
-  }
-
-  const sf = await initEngine();
-  const evalResult: EvalResult = await sf.evaluate(fullFen, { depth: MAX_DEPTH, multiPV: MULTI_PV });
-  const arrows = evalResult.top_moves.slice(0, 3).map((m, i) => ({
-    from: m.move.slice(0, 2),
-    to: m.move.slice(2, 4),
-    color: i === 0 ? '#00c853' : i === 1 ? '#ffd600' : '#ff9100',
-    width: 8,
-    opacity: i === 0 ? 0.9 : 0.6,
-  }));
-
-  await pushResult({
-    bbox: detection.bbox,
-    fen: fullFen,
-    evaluation: evalResult,
-    arrows,
-    flipped: board.flipped,
-  });
-}
+const processor = new FrameProcessor({
+  get onnxSession() { return recognizer?.session ?? null; },
+  ortModule: ort,
+  get recognizer() { return recognizer; },
+  getEngine: () => engine,
+  reinitEngine,
+  sendResult: pushResult,
+  log: debugLog,
+  encodePreviewUrl,
+});
 
 async function startLoop(streamId: string, tabId: number): Promise<void> {
   activeTabId = tabId;
@@ -162,7 +112,6 @@ async function startLoop(streamId: string, tabId: number): Promise<void> {
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: false,
     video: {
-      // Chrome tab-capture constraints — not in lib.dom, hence the ts-expect-error.
       // @ts-expect-error Chrome-specific mandatory constraints for tab capture
       mandatory: {
         chromeMediaSource: 'tab',
@@ -184,16 +133,23 @@ async function startLoop(streamId: string, tabId: number): Promise<void> {
   canvas.height = video.videoHeight || 720;
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 
+  processor.resetFrameCount();
+
   captureInterval = setInterval(async () => {
     if (processing || !videoEl) return;
     if (videoEl.videoWidth > 0 && (canvas.width !== videoEl.videoWidth || canvas.height !== videoEl.videoHeight)) {
       canvas.width = videoEl.videoWidth;
       canvas.height = videoEl.videoHeight;
+      processor.resetCaches();
     }
     processing = true;
+    const tCap = Date.now();
     try {
       ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-      await processFrame(canvas, ctx);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height) as ImageDataLike;
+      const captured_at = Date.now();
+      const meta: FrameMeta = { capture_ms: captured_at - tCap, captured_at };
+      await processor.processFrame(imageData, meta);
     } catch (err) {
       console.error('[chessray] frame processing error', err);
     } finally {
@@ -218,14 +174,11 @@ function stopLoop(): void {
     mediaStream = null;
   }
   activeTabId = null;
+  processor.resetPipelineState();
 }
 
 chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendResponse) => {
   if (msg.type === 'capture-started') {
-    // The service worker has already determined the active tab id via
-    // chrome.tabs.query; it's encoded in the streamId-originating tab. We
-    // ask chrome for the currently active tab here since offscreen docs
-    // can't otherwise discover it.
     chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
       const tabId = tabs[0]?.id;
       if (!tabId) {

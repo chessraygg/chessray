@@ -1,5 +1,5 @@
 import { StockfishEngine, YoloPieceRecognizer } from '@chessray/core';
-import { EVAL_START_DEPTH, EVAL_MULTI_PV_START } from './eval-cache.js';
+import { EVAL_START_DEPTH, EVAL_MULTI_PV_START } from '@chessray/runtime';
 
 let engine: StockfishEngine | null = null;
 let recognizer: YoloPieceRecognizer | null = null;

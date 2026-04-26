@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@chessray/core": "*"
+    "@chessray/core": "*",
+    "@chessray/runtime": "*"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.8.0",

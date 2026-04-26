@@ -2,14 +2,17 @@
  * Content script: injects a transparent overlay into the active tab and
  * renders arrows + eval bar on top of the chess board.
  *
- * Deliberately minimal. The coordinate math assumes the captured stream
- * matches the tab viewport 1:1 (modulo devicePixelRatio). Real sites scroll,
- * zoom, and show boards inside iframes — mapping bbox pixels back to page
- * CSS pixels will need a proper calibration pass. Tracked as a TODO in the
- * extension README, not in-code, so the scaffold stays small.
+ * Reads the same PipelineResult shape the Electron overlay uses. This is
+ * still the bare-bones renderer; the full @chessray/overlay-ui package
+ * (canvas-renderer + draggable panel) is wired in in a later phase.
+ *
+ * Coordinate math assumes the captured stream matches the tab viewport 1:1
+ * (modulo devicePixelRatio). Real sites scroll, zoom, and show boards
+ * inside iframes — proper bbox→viewport calibration is a known TODO.
  */
 
-import type { ExtensionMessage, ExtensionFrameResult } from '../shared/messages.js';
+import type { PipelineResult } from '@chessray/core';
+import type { ExtensionMessage } from '../shared/messages.js';
 
 const OVERLAY_ID = 'chessray-ext-overlay';
 
@@ -109,7 +112,7 @@ function drawEvalBar(
   ctx.restore();
 }
 
-function render(result: ExtensionFrameResult): void {
+function render(result: PipelineResult): void {
   const canvas = ensureOverlay();
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -118,17 +121,19 @@ function render(result: ExtensionFrameResult): void {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
 
-  if (!result.bbox) return;
+  const bbox = result.board_detection?.bbox;
+  if (!bbox) return;
   // Captured stream pixels → viewport CSS pixels. Works when the capture
   // matches the viewport (single-monitor, no zoom). Refine later.
-  const scale = window.innerWidth / Math.max(1, result.bbox.width + result.bbox.x * 2);
-  const bx = result.bbox.x * scale;
-  const by = result.bbox.y * scale;
-  const bw = result.bbox.width * scale;
+  const scale = window.innerWidth / Math.max(1, bbox.width + bbox.x * 2);
+  const bx = bbox.x * scale;
+  const by = bbox.y * scale;
+  const bw = bbox.width * scale;
 
+  const flipped = result.flipped ?? false;
   for (const a of result.arrows) {
-    const from = squareToPixel(a.from, bx, by, bw, result.flipped);
-    const to = squareToPixel(a.to, bx, by, bw, result.flipped);
+    const from = squareToPixel(a.from, bx, by, bw, flipped);
+    const to = squareToPixel(a.to, bx, by, bw, flipped);
     drawArrow(ctx, from.cx, from.cy, to.cx, to.cy, a.color, a.width, a.opacity);
   }
 

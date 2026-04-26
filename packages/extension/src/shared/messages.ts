@@ -7,22 +7,12 @@
  * must be transferred by reference (streamId) or sent over a dedicated port.
  */
 
-import type { EvalResult, BoardBBox } from '@chessray/core';
-
-/** Simplified pipeline output for the content-script overlay. */
-export interface ExtensionFrameResult {
-  bbox: BoardBBox | null;
-  fen: string | null;
-  evaluation: EvalResult | null;
-  arrows: Array<{ from: string; to: string; color: string; width: number; opacity: number }>;
-  flipped: boolean;
-  status?: string;
-}
+import type { PipelineResult } from '@chessray/core';
 
 export type ExtensionMessage =
   | { type: 'start-capture'; tabId: number }
   | { type: 'stop-capture' }
   | { type: 'capture-started'; streamId: string }
-  | { type: 'frame-result'; result: ExtensionFrameResult }
+  | { type: 'frame-result'; result: PipelineResult }
   | { type: 'status'; message: string }
   | { type: 'ping' };

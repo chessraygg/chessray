@@ -6,10 +6,9 @@
 
 import type { PixelBuffer } from '@chessray/core';
 import type { PipelineResult } from '@chessray/core';
-import { setMultiPvMax } from './eval-cache.js';
+import { FrameProcessor, setMultiPvMax, type ImageDataLike } from '@chessray/runtime';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
 import { initAndStartCapture, stopCapture, setTargetFps, type FrameMeta } from './frame-capture.js';
-import { FrameProcessor, type ImageDataLike } from './frame-processor.js';
 import { setRecording, recordFrame, recordResultSidecar, currentFrameFilename, isRecording } from './frame-recorder.js';
 
 /// <reference path="../shared/window.d.ts" />
