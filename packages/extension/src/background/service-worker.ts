@@ -155,6 +155,31 @@ async function recordInvocation(tabId: number, source: string): Promise<void> {
   await chrome.storage.session.set({ __chessrayInvokedTab: tabId }).catch(() => {});
 }
 
+/** Try to start capture immediately. Must be called from a user-gesture
+ *  invocation (action.onClicked, context-menu.onClicked, commands) that
+ *  granted activeTab on tabId; otherwise tabCapture.getMediaStreamId
+ *  will reject. Returns false on failure so the caller can surface the
+ *  error to the user via the trace ring. */
+async function autoStart(tabId: number): Promise<boolean> {
+  try {
+    const streamId = await new Promise<string>((resolve, reject) => {
+      chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (id) => {
+        if (chrome.runtime.lastError || !id) {
+          reject(new Error(chrome.runtime.lastError?.message ?? 'no stream id'));
+          return;
+        }
+        resolve(id);
+      });
+    });
+    await startCapture(tabId, streamId);
+    note(`autoStart ok tab=${tabId}`);
+    return true;
+  } catch (err) {
+    note(`autoStart FAILED tab=${tabId}: ${String(err)}`);
+    return false;
+  }
+}
+
 chrome.action.onClicked.addListener(async (tab) => {
   note(`action.onClicked tab=${tab.id}`);
   if (tab.id == null) return;
@@ -165,6 +190,11 @@ chrome.action.onClicked.addListener(async (tab) => {
   } catch (err) {
     note(`sidePanel.open FAILED: ${String(err)}`);
   }
+  // Capture immediately — no separate Start click needed. activeTab is
+  // granted by this very invocation; tabCapture works synchronously
+  // before any awaits could consume the user gesture (await
+  // sidePanel.open above is fine, gestures cross microtasks).
+  await autoStart(tab.id);
 });
 
 // Context-menu fallback. If chrome.action.onClicked refuses to fire
@@ -194,6 +224,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   } catch (err) {
     note(`sidePanel.open FAILED (context): ${String(err)}`);
   }
+  await autoStart(tab.id);
 });
 
 // Also stamp lastInvokedTabId whenever the user activates a tab while
