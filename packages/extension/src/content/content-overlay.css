@@ -4,13 +4,18 @@
    The full panel.css lives only in surfaces that own their document
    (popup, side panel, Electron overlay window). */
 
-/* The on-page overlay canvas is hidden — alignment between tabCapture's
-   frame geometry and the page CSS viewport is structurally imperfect
-   (capture often differs from the rendered area by a few dozen pixels
-   with no reliable way to know where the delta lives). The side panel's
-   virtual board gives a clean, correctly-aligned view of the position +
-   arrows + eval, drawn on its own canvas with its own coordinates. */
-canvas#video-overlay,
+canvas#video-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  pointer-events: none !important;
+  z-index: 2147483647;
+}
+
+/* Side-panel-style panel HTML still gets injected by mount-overlay.ts
+   (the renderer's setup wiring depends on its DOM IDs); force-hide it
+   so the user only sees the on-page overlay arrows here, not a second
+   floating panel. The interactive panel lives in the side panel. */
 #user-panel {
   display: none !important;
 }
