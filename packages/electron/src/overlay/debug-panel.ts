@@ -425,9 +425,14 @@ let currentFpsBudgetMs = 0;
 export function setFpsBudgetMs(ms: number): void { currentFpsBudgetMs = ms; }
 
 /** Active FPS the controller is currently targeting. Shown as a pill on the
- *  total bar. Updated whenever the controller steps up/down. */
+ *  total bar AND in the panel header (cv-active-fps). Updated whenever the
+ *  controller steps up/down. */
 let currentActiveFps = 0;
-export function setActiveFpsDisplay(fps: number): void { currentActiveFps = fps; }
+export function setActiveFpsDisplay(fps: number): void {
+  currentActiveFps = fps;
+  const headerEl = document.getElementById('cv-active-fps');
+  if (headerEl) headerEl.textContent = fps > 0 ? `${fps} fps` : '';
+}
 
 export interface DebugHistoryNavState {
   /** Total slow-frame snapshots stored. */

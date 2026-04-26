@@ -1209,6 +1209,18 @@ canvas#video-overlay {
 }
 .r2-meta-depth { color: var(--text-dim); }
 .r2-meta-depth:empty::before { content: "—"; color: var(--text-faint); }
+.r2-meta-lines,
+.r2-meta-fps { color: var(--text-faint); }
+.r2-meta-lines:empty,
+.r2-meta-fps:empty { display: none; }
+/* Middle-dot separators between non-empty header readouts. */
+.r2-meta > span + span:not(:empty)::before {
+  content: "·";
+  color: var(--text-faint);
+  margin: 0 6px 0 0;
+  opacity: 0.6;
+}
+.r2-meta > .r2-meta-orient::before { content: none; }
 .r2-meta-orient {
   display: inline-flex;
   align-items: center;

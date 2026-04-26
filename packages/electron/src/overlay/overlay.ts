@@ -1231,16 +1231,25 @@ function initOverlay(): void {
   // ── MultiPV max slider ──
   const multiPvSlider = document.getElementById('cv-multi-pv-max') as HTMLInputElement | null;
   const multiPvVal = document.getElementById('cv-multi-pv-max-val');
+  const multiPvHeader = document.getElementById('cv-active-lines');
+  const writeLinesHeader = (n: number): void => {
+    if (multiPvHeader) multiPvHeader.textContent = `${n} lines`;
+  };
   if (multiPvSlider && multiPvVal) {
     multiPvSlider.value = String(prefs.multiPvMax);
     multiPvVal.textContent = String(prefs.multiPvMax);
+    writeLinesHeader(prefs.multiPvMax);
     window.chessRay.setMultiPvMax(prefs.multiPvMax);
     multiPvSlider.addEventListener('input', () => {
       const n = parseInt(multiPvSlider.value, 10);
       multiPvVal.textContent = String(n);
+      writeLinesHeader(n);
       savePrefs({ multiPvMax: n });
       window.chessRay.setMultiPvMax(n);
     });
+  } else {
+    // Slider was removed — still keep the header readout in sync with the pref.
+    writeLinesHeader(prefs.multiPvMax);
   }
 
   // ── Change detection toggle ──
