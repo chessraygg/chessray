@@ -311,6 +311,49 @@ const bridge: ChessRayAPI = {
 
 mountOverlay(bridge);
 
+// ── Engine info in Diagnostics ────────────────────────────────────────
+// Inject a small "Engine" line at the top of the diagnostics view
+// surfacing the YOLO ONNX execution provider (webgpu vs wasm) and
+// recent applyConstraints results — both come from the SW trace,
+// which is populated by debugLog() in offscreen. The trace lives in
+// the SW only; pull it on bootstrap and on a 2s interval so the side
+// panel always shows fresh values without DevTools.
+function ensureEngineInfoEl(): HTMLElement | null {
+  let el = document.getElementById('cv-engine-info') as HTMLElement | null;
+  if (el) return el;
+  const debugSection = document.getElementById('debug-section');
+  if (!debugSection) return null;
+  el = document.createElement('div');
+  el.id = 'cv-engine-info';
+  el.style.cssText = 'font: 11px ui-monospace, monospace; color: #a3e635; padding: 6px 10px; border-bottom: 1px solid #272727; background: rgba(0,0,0,0.25); white-space: pre-wrap;';
+  el.textContent = 'Engine info: pending…';
+  debugSection.insertBefore(el, debugSection.firstChild);
+  return el;
+}
+
+async function refreshEngineInfo(): Promise<void> {
+  const el = ensureEngineInfoEl();
+  if (!el) return;
+  try {
+    const resp = await chrome.runtime.sendMessage({ type: 'get-trace' } satisfies ExtensionMessage);
+    const lines: string[] = resp?.trace ?? [];
+    // Most recent matching line wins — these are the ones that actually
+    // describe the current capture state.
+    const epLine = [...lines].reverse().find(l => l.includes('YOLO loaded'));
+    const acLine = [...lines].reverse().find(l => l.includes('applyConstraints ok'));
+    const streamLine = [...lines].reverse().find(l => l.includes('stream settings'));
+    const parts: string[] = [];
+    if (epLine) parts.push(epLine.replace(/^[\d:]+\s+offscreen:\s+/, ''));
+    if (streamLine) parts.push(streamLine.replace(/^[\d:]+\s+offscreen:\s+/, ''));
+    if (acLine) parts.push(acLine.replace(/^[\d:]+\s+offscreen:\s+/, ''));
+    el.textContent = parts.length ? parts.join('\n') : 'Engine info: no events yet (start capture)';
+  } catch {
+    el.textContent = 'Engine info: SW unreachable';
+  }
+}
+void refreshEngineInfo();
+setInterval(refreshEngineInfo, 2000);
+
 // Relay pref changes to the captured tab's content script so the on-page
 // overlay (border/box, arrow opacity/size, eval-bar opacity, etc.) keeps
 // up with what the user just toggled in the side panel. Side panel and
