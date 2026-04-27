@@ -88,7 +88,33 @@ async function stopCapture(): Promise<void> {
   await setCaptureState({ running: false });
 }
 
-chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendResponse) => {
+/** Re-grab a streamId for `tabId` and tell offscreen to restart capture
+ *  with the new viewport pinned. Called after the content script reports
+ *  a viewport change (side panel open/close, window resize). activeTab
+ *  grant from the original user-gesture invocation persists for this
+ *  tab until navigation/close, so getMediaStreamId works without a
+ *  fresh user gesture. */
+async function recaptureWithViewport(tabId: number, viewport: { width: number; height: number }): Promise<void> {
+  try {
+    const streamId = await new Promise<string>((resolve, reject) => {
+      chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (id) => {
+        if (chrome.runtime.lastError || !id) {
+          reject(new Error(chrome.runtime.lastError?.message ?? 'no stream id'));
+          return;
+        }
+        resolve(id);
+      });
+    });
+    await ensureOffscreen();
+    const out: ExtensionMessage = { type: 'capture-started', streamId, tabId, viewport };
+    await chrome.runtime.sendMessage(out);
+    note(`recapture ok tab=${tabId} ${viewport.width}x${viewport.height}`);
+  } catch (err) {
+    note(`recapture FAILED tab=${tabId}: ${String(err)}`);
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg: ExtensionMessage, sender, sendResponse) => {
   if (msg.type === 'start-capture') {
     startCapture(msg.tabId, msg.streamId).then(
       () => sendResponse({ ok: true }),
@@ -136,6 +162,15 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
       (err) => sendResponse({ ok: false, error: String(err) }),
     );
     return true;
+  }
+  if (msg.type === 'viewport-resized') {
+    const senderTabId = sender.tab?.id;
+    if (senderTabId == null) return false;
+    getCaptureState().then((state) => {
+      if (!state.running || state.tabId !== senderTabId) return;
+      void recaptureWithViewport(senderTabId, msg.viewport);
+    });
+    return false;
   }
   if (msg.type === 'forward-frame-result') {
     // Offscreen has no broadcast access; we do.

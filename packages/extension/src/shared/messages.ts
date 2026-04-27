@@ -60,4 +60,11 @@ export type ExtensionMessage =
    *  tab Chrome will let us capture, even if focus has since moved. */
   | { type: 'get-target-tab' }
   | { type: 'status'; message: string }
-  | { type: 'ping' };
+  | { type: 'ping' }
+  /** Content script → SW: the captured tab's content area resized
+   *  (window resize, side panel open/close, OS chrome change). SW
+   *  re-grabs a streamId and restarts the capture so the pinned
+   *  min=max constraints match the new viewport. Without this the
+   *  on-page overlay drifts because the MediaStream stays at the
+   *  original capture-start dimensions. Viewport is in physical px. */
+  | { type: 'viewport-resized'; viewport: { width: number; height: number } };

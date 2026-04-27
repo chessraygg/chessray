@@ -240,6 +240,36 @@ window.addEventListener('resize', scheduleReplay);
 window.visualViewport?.addEventListener('resize', scheduleReplay);
 window.visualViewport?.addEventListener('scroll', scheduleReplay);
 
+// ── Viewport-change reporter ──
+// When the side panel opens/closes (or the user resizes the window) the
+// captured tab's content area changes, but the MediaStream sticks at
+// the dimensions the constraints were pinned to at capture-start. Tell
+// the SW so it can re-grab a streamId and restart capture with new
+// constraints — the on-page overlay realigns once the new frames arrive.
+// Debounce: side-panel open is animated and viewport flaps for ~200ms.
+let viewportReportTimer = 0;
+let lastReportedViewport = { w: 0, h: 0 };
+const reportViewportSize = (): void => {
+  if (viewportReportTimer) clearTimeout(viewportReportTimer);
+  viewportReportTimer = window.setTimeout(() => {
+    viewportReportTimer = 0;
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = window.visualViewport?.width
+      ?? document.documentElement?.clientWidth
+      ?? window.innerWidth;
+    const cssH = window.visualViewport?.height
+      ?? document.documentElement?.clientHeight
+      ?? window.innerHeight;
+    const w = Math.round(cssW * dpr);
+    const h = Math.round(cssH * dpr);
+    if (w === lastReportedViewport.w && h === lastReportedViewport.h) return;
+    lastReportedViewport = { w, h };
+    chrome.runtime.sendMessage({ type: 'viewport-resized', viewport: { width: w, height: h } }).catch(() => {});
+  }, 350);
+};
+window.addEventListener('resize', reportViewportSize);
+window.visualViewport?.addEventListener('resize', reportViewportSize);
+
 // Notify the service worker that the content script is ready so it can
 // trigger capture on user request.
 chrome.runtime.sendMessage({ type: 'ping' }).catch(() => {});
