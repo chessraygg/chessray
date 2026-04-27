@@ -188,6 +188,16 @@ function note(s: string): void {
 }
 note('SW startup');
 
+// Explicitly tell Chrome NOT to auto-open the side panel on toolbar
+// click. Per docs the default is already false, but in practice some
+// Chrome versions interpret side_panel.default_path as implicit
+// auto-open and silently suppress action.onClicked (chromium 40916430-
+// class). Setting it explicitly to false makes our action.onClicked
+// listener fire reliably so we can grab the streamId in the gesture.
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false })
+  .then(() => note('setPanelBehavior(openPanelOnActionClick=false) ok'))
+  .catch((err) => note(`setPanelBehavior FAILED: ${String(err)}`));
+
 // Documented pattern: side_panel.default_path in manifest + no
 // setPanelBehavior call means action.onClicked fires on toolbar click
 // (granting activeTab); the listener below opens the panel manually.
