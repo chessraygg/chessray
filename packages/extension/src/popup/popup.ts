@@ -184,18 +184,7 @@ function setStatus(msg: string, isError = false): void {
   }).catch(() => {});
 }
 
-// Visible click counter — proves the click handler is reaching at all.
-// If the user reports "no response" but the counter doesn't tick, the
-// button isn't receiving events; if it ticks but status doesn't change
-// after, the failure is downstream.
-let clickCount = 0;
-function bumpClicks(): void {
-  clickCount++;
-  startBtn.textContent = `Start [${clickCount}]`;
-}
-
 startBtn.addEventListener('click', () => {
-  bumpClicks();
   if (cachedTabId === null) {
     setStatus('No http(s) tab found to capture', true);
     void preloadTabId();
