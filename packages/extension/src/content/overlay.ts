@@ -304,6 +304,25 @@ try {
 } catch (err) {
   console.warn('[chessray content] ResizeObserver init failed', err);
 }
+
+// ── DPR change detection (Chrome moved to a screen with different
+// scale factor) ──
+// innerWidth/Height in CSS px don't change when the window moves
+// between displays of different DPR — only window.devicePixelRatio
+// does. ResizeObserver/resize won't fire. Standard matchMedia trick:
+// the resolution-MQ stops matching when DPR changes, so the 'change'
+// event tells us to re-measure (the physical-px viewport we report
+// IS dpr-dependent: innerWidth * DPR).
+function watchDprChanges(): void {
+  const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+  const onChange = (): void => {
+    mq.removeEventListener('change', onChange);
+    reportViewportSize('dpr-change');
+    watchDprChanges(); // re-bind to the NEW dpr's MQ
+  };
+  mq.addEventListener('change', onChange);
+}
+watchDprChanges();
 // Seed lastReportedViewport with the current size on mount so the first
 // post-mount layout change is detected as a real diff (without this, the
 // initial recapture-from-mount can spuriously fire if the page hadn't
