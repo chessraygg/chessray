@@ -24,21 +24,11 @@ body {
 
 #cap-bar {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
   padding: 6px 8px;
   border-bottom: 1px solid #272727;
   background: rgba(0, 0, 0, 0.35);
-}
-
-#cap-instructions {
-  font-size: 11px;
-  color: #cbd5e1;
-  line-height: 1.4;
-}
-#cap-instructions b {
-  color: #22c55e;
-  font-weight: 600;
 }
 
 #cap-bar button {

@@ -233,23 +233,17 @@ chrome.action.onClicked.addListener(async (tab) => {
   } catch (err) {
     note(`sidePanel.open FAILED: ${String(err)}`);
   }
-  // Toolbar click ONLY opens the side panel — capture is initiated
-  // exclusively via the right-click 'Chessray: Capture this tab' menu.
-  // Single mandatory entry point avoids the historical reliability
-  // issues of action+sidePanel combos (some Chrome versions suppress
-  // action.onClicked when a side panel is configured, see chromium
-  // issue 40916430) and keeps the user's mental model crisp.
+  // Capture immediately — no separate Start click needed. activeTab is
+  // granted by this very invocation; tabCapture works synchronously
+  // before any awaits could consume the user gesture (await
+  // sidePanel.open above is fine, gestures cross microtasks).
+  await autoStart(tab.id);
 });
 
-// Right-click menu — the MANDATORY capture entry point. Per Chrome's
-// activeTab docs and the tabCapture API, contextMenus.onClicked is a
-// fully-qualified user-gesture invocation: it grants activeTab on the
-// target tab and the synchronous getMediaStreamId call inside the
-// listener has the user activation it needs. We chose this single
-// path over the toolbar action because action+sidePanel combos have
-// historical reliability issues (see chromium 40916430) and the
-// explicit menu item makes the "this tab is being captured" intent
-// unambiguous.
+// Context-menu fallback. If chrome.action.onClicked refuses to fire
+// (some Chrome versions appear to suppress it when the side panel is
+// configured), the user can right-click the page and pick "Chessray:
+// Capture this tab" — context-menu invocation also grants activeTab.
 chrome.runtime.onInstalled.addListener(() => {
   try {
     chrome.contextMenus.create({
@@ -284,9 +278,34 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   await chrome.storage.session.set({ __chessrayActiveTab: tabId }).catch(() => {});
 });
 
-// Keyboard-command capture path removed — the right-click menu is the
-// single mandatory entry point. The Cmd+Shift+M shortcut would still
-// be a valid user gesture in principle, but exposing two ways to
-// start capture re-introduces the inconsistency the mandatory-context-
-// menu policy is meant to eliminate. Stop is still reachable from the
-// side panel's Stop button.
+// Keyboard shortcut path. Firing a chrome.commands shortcut counts as
+// user-invocation per Chrome's docs (same class of grant as a toolbar
+// click), so we get activeTab → tabCapture access from inside the SW
+// without bouncing through the popup. Also makes the extension usable
+// without ever opening the popup, which is friendlier for power users.
+let captureRunning = false;
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== 'toggle-capture') return;
+  if (captureRunning) {
+    captureRunning = false;
+    await stopCapture();
+    return;
+  }
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (!tab?.id) return;
+  try {
+    const streamId = await new Promise<string>((resolve, reject) => {
+      chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }, (id) => {
+        if (chrome.runtime.lastError || !id) {
+          reject(new Error(chrome.runtime.lastError?.message ?? 'no stream id'));
+          return;
+        }
+        resolve(id);
+      });
+    });
+    captureRunning = true;
+    await startCapture(tab.id, streamId);
+  } catch (err) {
+    console.error('[chessray] toggle-capture failed:', err);
+  }
+});

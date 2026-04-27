@@ -32,6 +32,15 @@ export default defineManifest({
     'sidePanel',
     'contextMenus',
   ],
+  commands: {
+    'toggle-capture': {
+      suggested_key: {
+        default: 'Ctrl+Shift+M',
+        mac: 'Command+Shift+M',
+      },
+      description: 'Start/stop Chessray capture on the current tab',
+    },
+  },
   host_permissions: ['<all_urls>'],
   content_scripts: [
     {

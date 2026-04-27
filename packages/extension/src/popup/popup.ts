@@ -31,6 +31,7 @@ import './popup.css';
 declare const __CHESSRAY_BUILD__: string;
 const BUILD = typeof __CHESSRAY_BUILD__ !== 'undefined' ? __CHESSRAY_BUILD__ : '?';
 
+const startBtn = document.getElementById('start') as HTMLButtonElement;
 const stopBtn = document.getElementById('stop') as HTMLButtonElement;
 const status = document.getElementById('cap-status')!;
 
@@ -106,6 +107,7 @@ function shortUrl(): string {
 // the popup while a capture is already running. Without this query the
 // popup would show "Idle" and let the user click Start, hitting the
 // "active stream" error path.
+startBtn.disabled = true;
 setStatus('…');
 async function bootstrap(): Promise<void> {
   const [state, stored, traceResp] = await Promise.all([
@@ -116,13 +118,18 @@ async function bootstrap(): Promise<void> {
       .catch(() => ({ trace: [] })),
   ]);
   await preloadTabId();
-  // Show the last few SW events at the bottom for diagnostics.
+  startBtn.disabled = false;
+  // Show the last few SW events at the bottom so we can verify whether
+  // chrome.action.onClicked fired when the user clicked the toolbar.
   const traceLines: string[] = traceResp?.trace?.slice(-6) ?? [];
   const traceTail = traceLines.length ? '\n— SW trace —\n' + traceLines.join('\n') : '\n(no SW events yet)';
   if (state?.running) {
     setStatus(`Running (tab ${state.tabId ?? '?'})`);
+    startBtn.classList.add('running');
     return;
   }
+  // Show last error if it happened recently (within ~30s), otherwise
+  // fall back to Idle. Stale errors don't survive a tab reload.
   const last = (stored as Record<string, unknown> | undefined)?.__chessrayPopupStatus as { msg: string; isError: boolean; ts: number } | undefined;
   if (last?.isError && Date.now() - last.ts < 30_000) {
     setStatus(`(prev) ${last.msg}`, true);
@@ -177,13 +184,62 @@ function setStatus(msg: string, isError = false): void {
   }).catch(() => {});
 }
 
-// Capture is started exclusively from the right-click context menu —
-// the side panel intentionally has no Start button. Stop is fine to
-// call from here because it doesn't need a fresh user gesture; it
-// just tells the SW to tear down the existing stream.
+// Visible click counter — proves the click handler is reaching at all.
+// If the user reports "no response" but the counter doesn't tick, the
+// button isn't receiving events; if it ticks but status doesn't change
+// after, the failure is downstream.
+let clickCount = 0;
+function bumpClicks(): void {
+  clickCount++;
+  startBtn.textContent = `Start [${clickCount}]`;
+}
+
+startBtn.addEventListener('click', () => {
+  bumpClicks();
+  if (cachedTabId === null) {
+    setStatus('No http(s) tab found to capture', true);
+    void preloadTabId();
+    return;
+  }
+  const tabId = cachedTabId;
+  setStatus('Starting…');
+  chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
+    if (chrome.runtime.lastError || !streamId) {
+      const msg = chrome.runtime.lastError?.message ?? 'no stream id';
+      // Always surface the RAW Chrome error verbatim plus all context.
+      // The user keeps reporting "doesn't work" without telling me what
+      // the error string is — wrapping it with friendly hints was hiding
+      // the actual symptom. Show everything.
+      setStatus(
+        `Chrome rejected getMediaStreamId.\n` +
+        `targetTabId=${tabId} (${cachedTabSource}, ${shortUrl()})\n` +
+        `error: "${msg}"`,
+        true,
+      );
+      return;
+    }
+    void (async () => {
+      try {
+        const resp: { ok: boolean; error?: string } = await chrome.runtime.sendMessage({
+          type: 'start-capture', tabId, streamId,
+        } satisfies ExtensionMessage);
+        if (resp?.ok) {
+          setStatus('Running');
+          startBtn.classList.add('running');
+        } else {
+          setStatus(`SW error: ${resp?.error ?? 'unknown'}`, true);
+        }
+      } catch (err) {
+        setStatus(`Send failed: ${(err as Error).message}`, true);
+      }
+    })();
+  });
+});
+
 stopBtn.addEventListener('click', async () => {
   await chrome.runtime.sendMessage({ type: 'stop-capture' } satisfies ExtensionMessage).catch(() => {});
   setStatus('Stopped');
+  startBtn.classList.remove('running');
 });
 
 // ── Bridge ─────────────────────────────────────────────────────────────
