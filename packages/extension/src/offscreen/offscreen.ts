@@ -148,11 +148,21 @@ async function startLoop(streamId: string, tabId: number, viewport?: { width: nu
     },
   });
   mediaStream = stream;
+  // Log what Chrome actually allocated so we can see if the pinned
+  // constraints took effect. If actual ≠ pinned, Chrome silently
+  // ignored the constraints and the bbox→CSS mapping will misalign
+  // in proportion to the discrepancy.
+  const track = stream.getVideoTracks()[0];
+  const settings = track?.getSettings();
+  debugLog(`stream settings: ${settings?.width}x${settings?.height} (asked ${viewport?.width ?? '?'}x${viewport?.height ?? '?'})`);
 
   const video = document.createElement('video');
   video.srcObject = stream;
   video.muted = true;
   video.playsInline = true;
+  video.addEventListener('loadedmetadata', () => {
+    debugLog(`video loadedmetadata: ${video.videoWidth}x${video.videoHeight}`);
+  });
   await video.play();
   videoEl = video;
 

@@ -255,26 +255,47 @@ window.visualViewport?.addEventListener('scroll', scheduleReplay);
 // change regardless of cause. visualViewport.resize is kept as a
 // belt-and-braces signal for pinch-zoom / OSK on mobile-emulating tabs.
 let viewportReportTimer = 0;
+let viewportSettleTimer = 0;
 let lastReportedViewport = { w: 0, h: 0 };
+// Use innerWidth/Height (matches what tabCapture's render-widget surface
+// captures, including the scrollbar gutter) rather than visualViewport
+// (which excludes scrollbars). Mismatched units between capture-pin and
+// render-mapping was a likely source of the post-resize misalignment.
+function measurePhysicalViewport(): { w: number; h: number } {
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = window.innerWidth || document.documentElement?.clientWidth || 0;
+  const cssH = window.innerHeight || document.documentElement?.clientHeight || 0;
+  return { w: Math.round(cssW * dpr), h: Math.round(cssH * dpr) };
+}
 const reportViewportSize = (cause: string): void => {
   if (viewportReportTimer) clearTimeout(viewportReportTimer);
+  // 500ms debounce — long enough for Chrome's side-panel slide-in (~200ms
+  // animation) plus the page's reflow + scrollbar settle to complete.
+  // Shorter values caused us to recapture mid-animation and pin to a
+  // viewport size that didn't match the post-settle page.
   viewportReportTimer = window.setTimeout(() => {
     viewportReportTimer = 0;
-    const dpr = window.devicePixelRatio || 1;
-    const cssW = window.visualViewport?.width
-      ?? document.documentElement?.clientWidth
-      ?? window.innerWidth;
-    const cssH = window.visualViewport?.height
-      ?? document.documentElement?.clientHeight
-      ?? window.innerHeight;
-    const w = Math.round(cssW * dpr);
-    const h = Math.round(cssH * dpr);
+    const { w, h } = measurePhysicalViewport();
     if (w === lastReportedViewport.w && h === lastReportedViewport.h) return;
     console.log(`[chessray content] viewport changed (${cause}): ${lastReportedViewport.w}x${lastReportedViewport.h} → ${w}x${h}`);
     lastReportedViewport = { w, h };
     chrome.runtime.sendMessage({ type: 'viewport-resized', viewport: { width: w, height: h } })
       .catch((err) => console.warn('[chessray content] viewport-resized send failed', err));
-  }, 350);
+    // Verification: 1.2s later the recapture should be done, the page
+    // should be fully settled, and any scrollbar transitions complete.
+    // If the viewport differs from what we reported, recapture once more.
+    // Without this the recapture pins to a transient mid-flight size.
+    if (viewportSettleTimer) clearTimeout(viewportSettleTimer);
+    viewportSettleTimer = window.setTimeout(() => {
+      viewportSettleTimer = 0;
+      const settled = measurePhysicalViewport();
+      if (settled.w === lastReportedViewport.w && settled.h === lastReportedViewport.h) return;
+      console.log(`[chessray content] viewport drift after recapture: ${lastReportedViewport.w}x${lastReportedViewport.h} → ${settled.w}x${settled.h}`);
+      lastReportedViewport = settled;
+      chrome.runtime.sendMessage({ type: 'viewport-resized', viewport: { width: settled.w, height: settled.h } })
+        .catch((err) => console.warn('[chessray content] viewport-resized verify send failed', err));
+    }, 1200);
+  }, 500);
 };
 window.addEventListener('resize', () => reportViewportSize('window-resize'));
 window.visualViewport?.addEventListener('resize', () => reportViewportSize('vvport-resize'));

@@ -976,14 +976,16 @@ export function renderVideoOverlay(state: OverlayState): void {
   // 1. devicePixelRatio (frame is in physical pixels, overlay is in CSS pixels)
   // 2. Menu bar offset (frame y=0 is top of screen, overlay y=0 is top of work area)
   //
-  // For the extension on a content-script page we want the *rendered*
-  // page area. Prefer visualViewport (handles pinch-zoom, OSK, scrollbar
-  // gutter) over clientWidth/Height; fall back through the chain because
-  // the analysis-window host may not have a visualViewport.
-  const vv = window.visualViewport;
+  // For the extension on a content-script page we want the same viewport
+  // units the capture is pinned to. Capture (offscreen.ts + SW) pins
+  // min=max to innerWidth/Height × DPR (the render-widget surface,
+  // includes scrollbar gutter). Using clientWidth/visualViewport here
+  // would underestimate by the scrollbar width and slightly compress
+  // the bbox horizontally. innerWidth keeps the units consistent end-
+  // to-end so frame ÷ DPR ≈ vw exactly.
   const docEl = document.documentElement;
-  const vw = vv?.width || docEl?.clientWidth || window.innerWidth;
-  const vh = vv?.height || docEl?.clientHeight || window.innerHeight;
+  const vw = window.innerWidth || docEl?.clientWidth || 0;
+  const vh = window.innerHeight || docEl?.clientHeight || 0;
 
   if (state.videoCanvas.width !== vw || state.videoCanvas.height !== vh) {
     state.videoCanvas.width = vw;

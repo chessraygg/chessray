@@ -54,13 +54,15 @@ async function readTabViewport(tabId: number): Promise<{ width: number; height: 
     const [hit] = await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
+        // Match the content-script's measurePhysicalViewport: innerWidth/
+        // Height (includes scrollbar gutter) is what tabCapture's
+        // render-widget surface sees. Using visualViewport.width here
+        // (which excludes scrollbars) caused recaptured streams to be
+        // pinned slightly smaller than the page Chrome was actually
+        // capturing.
         const dpr = window.devicePixelRatio || 1;
-        const w = window.visualViewport?.width
-          ?? document.documentElement?.clientWidth
-          ?? window.innerWidth;
-        const h = window.visualViewport?.height
-          ?? document.documentElement?.clientHeight
-          ?? window.innerHeight;
+        const w = window.innerWidth || document.documentElement?.clientWidth || 0;
+        const h = window.innerHeight || document.documentElement?.clientHeight || 0;
         return { width: Math.round(w * dpr), height: Math.round(h * dpr) };
       },
     });
