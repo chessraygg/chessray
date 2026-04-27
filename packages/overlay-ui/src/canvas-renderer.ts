@@ -778,7 +778,14 @@ export function drawArrow(
   // piece instead of sitting on top of the shaft. Stays fully opaque
   // regardless of arrow alpha so it's legible under any fade/dim state.
   if (arrow.label && t >= 1) {
-    const fontSize = Math.max(9, lineWidth * 2);
+    // Scale the step-pill from SQUARE size, not from arrow lineWidth.
+    // The previous formula (lineWidth * 2) made labels enormous on the
+    // virtual board (200px → ~25px squares) — a 10-logical-unit font
+    // inside a 25-unit square fills ~67% of the square. Anchor to
+    // squareW * 0.22 with a small floor so the pill sits cleanly in
+    // the destination square's corner on both the virtual board and
+    // the actual-board overlay.
+    const fontSize = Math.max(7, squareW * 0.22);
     const r = fontSize * 0.85;
     const strokeW = Math.max(1.5, fontSize * 0.14);
     // Offset from destination center toward the top-right corner, clamped so
