@@ -40,6 +40,10 @@ let previewCtx: CanvasRenderingContext2D | null = null;
 
 function debugLog(msg: string): void {
   console.log(`[chessray] ${msg}`);
+  // Forward to SW so it appears in the side panel's trace tail without
+  // needing the offscreen DevTools console open.
+  chrome.runtime.sendMessage({ type: 'log-from-offscreen', message: msg } satisfies ExtensionMessage)
+    .catch(() => { /* SW asleep or no listener */ });
 }
 
 async function initEngine(): Promise<StockfishEngine> {
@@ -281,6 +285,41 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
       recentSendErrors.length = 0;
       return summary;
     })().then((s) => sendResponse({ ok: true, summary: s }), (err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+  if (msg.type === 'viewport-resized') {
+    // Resize the existing MediaStreamTrack via applyConstraints — we
+    // CANNOT call chrome.tabCapture.getMediaStreamId here (no user
+    // gesture). 'ideal' instead of 'exact' so Chrome doesn't reject if
+    // it can't deliver the precise dimensions; the safety-net
+    // center-crop in canvas-renderer handles any residual mismatch.
+    if (!mediaStream) { sendResponse({ ok: false, error: 'no stream' }); return false; }
+    const track = mediaStream.getVideoTracks()[0];
+    if (!track) { sendResponse({ ok: false, error: 'no video track' }); return false; }
+    const before = track.getSettings();
+    debugLog(`viewport-resized: track was ${before.width}x${before.height}, asked ${msg.viewport.width}x${msg.viewport.height}`);
+    track.applyConstraints({
+      width: { ideal: msg.viewport.width },
+      height: { ideal: msg.viewport.height },
+    }).then(() => {
+      const after = track.getSettings();
+      debugLog(`applyConstraints ok: track now ${after.width}x${after.height}`);
+      // Force-resize the canvas now too — videoEl.videoWidth may take
+      // a frame to update, so the next captureInterval tick already
+      // sees the new size and processFrame uses it.
+      if (videoEl && after.width && after.height) {
+        const c = document.getElementById('capture-canvas') as HTMLCanvasElement;
+        if (c.width !== after.width || c.height !== after.height) {
+          c.width = after.width;
+          c.height = after.height;
+          processor.resetCaches();
+        }
+      }
+      sendResponse({ ok: true });
+    }).catch((err) => {
+      debugLog(`applyConstraints FAILED: ${String(err)}`);
+      sendResponse({ ok: false, error: String(err) });
+    });
     return true;
   }
   if (msg.type === 'apply-setting') {

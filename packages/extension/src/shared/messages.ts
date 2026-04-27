@@ -61,10 +61,15 @@ export type ExtensionMessage =
   | { type: 'get-target-tab' }
   | { type: 'status'; message: string }
   | { type: 'ping' }
-  /** Content script → SW: the captured tab's content area resized
-   *  (window resize, side panel open/close, OS chrome change). SW
-   *  re-grabs a streamId and restarts the capture so the pinned
-   *  min=max constraints match the new viewport. Without this the
-   *  on-page overlay drifts because the MediaStream stays at the
-   *  original capture-start dimensions. Viewport is in physical px. */
-  | { type: 'viewport-resized'; viewport: { width: number; height: number } };
+  /** Content script → offscreen (broadcast). The captured tab's
+   *  content area resized (window resize, side panel open/close, OS
+   *  chrome change). Offscreen calls track.applyConstraints to resize
+   *  the existing MediaStreamTrack — we can NOT call
+   *  chrome.tabCapture.getMediaStreamId from the SW here because that
+   *  requires a fresh user gesture (per Chrome DevRel: "It isn't
+   *  possible to do this without a user gesture unfortunately"). */
+  | { type: 'viewport-resized'; viewport: { width: number; height: number } }
+  /** Offscreen → SW. Offscreen has no access to the SW's trace ring
+   *  buffer (the surface the side panel reads from), so it forwards
+   *  diagnostics here for visibility without requiring DevTools. */
+  | { type: 'log-from-offscreen'; message: string };
