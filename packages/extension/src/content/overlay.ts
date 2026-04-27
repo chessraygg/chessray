@@ -323,10 +323,12 @@ function watchDprChanges(): void {
   mq.addEventListener('change', onChange);
 }
 watchDprChanges();
-// Backup: poll DPR every 1s. Some Chrome versions don't reliably fire
-// the resolution-MQ 'change' event when the window crosses between
-// displays of different scale factor (especially on macOS with mixed
-// retina/non-retina setups).
+// Backup: poll DPR every 250ms. Some Chrome versions don't reliably
+// fire the resolution-MQ 'change' event when the window crosses
+// between displays of different scale factor (especially on macOS
+// with mixed retina/non-retina setups). Reading devicePixelRatio is
+// a number lookup — cheap to poll at this rate, and 250ms keeps the
+// post-move adjustment latency below the noticeable threshold.
 let lastPolledDpr = window.devicePixelRatio || 1;
 setInterval(() => {
   const now = window.devicePixelRatio || 1;
@@ -335,7 +337,7 @@ setInterval(() => {
     lastPolledDpr = now;
     reportViewportSize('dpr-poll');
   }
-}, 1000);
+}, 250);
 // Seed lastReportedViewport with the current size on mount so the first
 // post-mount layout change is detected as a real diff (without this, the
 // initial recapture-from-mount can spuriously fire if the page hadn't
