@@ -246,10 +246,17 @@ window.visualViewport?.addEventListener('scroll', scheduleReplay);
 // the dimensions the constraints were pinned to at capture-start. Tell
 // the SW so it can re-grab a streamId and restart capture with new
 // constraints — the on-page overlay realigns once the new frames arrive.
-// Debounce: side-panel open is animated and viewport flaps for ~200ms.
+//
+// Why ResizeObserver and not just 'resize': Chrome's side panel slides
+// in from the right and narrows the page's layout viewport, but in
+// practice the 'resize' window event isn't fired reliably for that
+// transition (the user reported the recapture never triggered on side
+// panel open). ResizeObserver on documentElement catches every layout
+// change regardless of cause. visualViewport.resize is kept as a
+// belt-and-braces signal for pinch-zoom / OSK on mobile-emulating tabs.
 let viewportReportTimer = 0;
 let lastReportedViewport = { w: 0, h: 0 };
-const reportViewportSize = (): void => {
+const reportViewportSize = (cause: string): void => {
   if (viewportReportTimer) clearTimeout(viewportReportTimer);
   viewportReportTimer = window.setTimeout(() => {
     viewportReportTimer = 0;
@@ -263,12 +270,24 @@ const reportViewportSize = (): void => {
     const w = Math.round(cssW * dpr);
     const h = Math.round(cssH * dpr);
     if (w === lastReportedViewport.w && h === lastReportedViewport.h) return;
+    console.log(`[chessray content] viewport changed (${cause}): ${lastReportedViewport.w}x${lastReportedViewport.h} → ${w}x${h}`);
     lastReportedViewport = { w, h };
-    chrome.runtime.sendMessage({ type: 'viewport-resized', viewport: { width: w, height: h } }).catch(() => {});
+    chrome.runtime.sendMessage({ type: 'viewport-resized', viewport: { width: w, height: h } })
+      .catch((err) => console.warn('[chessray content] viewport-resized send failed', err));
   }, 350);
 };
-window.addEventListener('resize', reportViewportSize);
-window.visualViewport?.addEventListener('resize', reportViewportSize);
+window.addEventListener('resize', () => reportViewportSize('window-resize'));
+window.visualViewport?.addEventListener('resize', () => reportViewportSize('vvport-resize'));
+try {
+  new ResizeObserver(() => reportViewportSize('ro')).observe(document.documentElement);
+} catch (err) {
+  console.warn('[chessray content] ResizeObserver init failed', err);
+}
+// Seed lastReportedViewport with the current size on mount so the first
+// post-mount layout change is detected as a real diff (without this, the
+// initial recapture-from-mount can spuriously fire if the page hadn't
+// finished settling at content-script-load time).
+queueMicrotask(() => reportViewportSize('initial'));
 
 // Notify the service worker that the content script is ready so it can
 // trigger capture on user request.

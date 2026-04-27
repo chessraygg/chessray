@@ -99,6 +99,18 @@ canvas#video-overlay {
   padding: 8px 10px 6px;
 }
 
+/* panel.css pins .r2-board-block .board-fit to 168x168 so the board fits
+   the floating Electron panel. In the side panel we have the full panel
+   width to spend — let the board fill it (square via aspect-ratio). The
+   ResizeObserver in mount-overlay.ts reads .board-fit's contentRect and
+   updates --board-scale so the fixed-200px board-container grows with
+   the new size; nothing else needs to change. */
+.r2-board-block .board-fit {
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+}
+
 /* Drop the bottom-of-panel resize grips inside a popup. */
 .resize-grip {
   display: none !important;

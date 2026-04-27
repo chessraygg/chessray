@@ -165,9 +165,11 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, sender, sendRespons
   }
   if (msg.type === 'viewport-resized') {
     const senderTabId = sender.tab?.id;
+    note(`viewport-resized rcvd tab=${senderTabId} ${msg.viewport.width}x${msg.viewport.height}`);
     if (senderTabId == null) return false;
     getCaptureState().then((state) => {
-      if (!state.running || state.tabId !== senderTabId) return;
+      if (!state.running) { note(`viewport-resized ignored: not running`); return; }
+      if (state.tabId !== senderTabId) { note(`viewport-resized ignored: tab mismatch (state=${state.tabId} sender=${senderTabId})`); return; }
       void recaptureWithViewport(senderTabId, msg.viewport);
     });
     return false;
