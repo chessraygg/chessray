@@ -1293,7 +1293,11 @@ canvas#video-overlay {
    so the rest of the codebase doesn't need to change. */
 .r2-moves .move-line {
   display: grid;
-  grid-template-columns: 18px 1fr auto;
+  /* rank | san | score | loss — loss column reserved on every row
+     (even when empty) so rows align: without a fixed loss column,
+     the top line (no loss) had its score at a different x-position
+     than the rest. */
+  grid-template-columns: 18px 1fr auto 50px;
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
@@ -1343,7 +1347,8 @@ canvas#video-overlay {
 .r2-moves .move-line .r2-loss {
   font: 9px var(--mono);
   color: var(--text-faint);
-  margin-left: 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Empty / waiting state for the move list */

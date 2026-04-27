@@ -155,7 +155,13 @@ function renderBestMoves(
     const move = moves[i];
     const origIdx = result.evaluation.top_moves.indexOf(move);
     const scoreStr = move.score_cp >= 0 ? `+${(move.score_cp/100).toFixed(1)}` : (move.score_cp/100).toFixed(1);
-    const lossHtml = move.loss_cp > 0 ? `<span class="r2-loss">\u2212${move.loss_cp}cp</span>` : '';
+    // Loss span is ALWAYS emitted (empty for the top line) so the
+    // grid column width is reserved on every row — otherwise rows
+    // with a loss display shift the score column leftward and the
+    // top line's score ends up at a different x-position than the
+    // others.
+    const lossText = move.loss_cp > 0 ? `\u2212${move.loss_cp}cp` : '';
+    const lossHtml = `<span class="r2-loss">${lossText}</span>`;
     const selected = lineVisible && origIdx === selectedLineIndex ? ' selected' : '';
     const signCls = move.score_cp >= 0 ? ' r2-pos' : ' r2-neg';
 
@@ -175,7 +181,8 @@ function renderBestMoves(
     html += `<div class="move-line${signCls}${selected}" data-line="${origIdx}">`
       + `<span class="r2-rank">${i + 1}</span>`
       + `<span class="r2-san">${primarySan}${continuationHtml}</span>`
-      + `<span class="r2-score">${scoreStr}${lossHtml}</span>`
+      + `<span class="r2-score">${scoreStr}</span>`
+      + `${lossHtml}`
       + `</div>`;
   }
   // Skip DOM rebuild if content unchanged (prevents hover flicker at 2fps)

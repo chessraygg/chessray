@@ -85,6 +85,10 @@ export type ExtensionMessage =
    *  jump around. Resume re-arms the captureInterval. */
   | { type: 'pause-capture' }
   | { type: 'resume-capture' }
+  /** SW → content script (broadcast). Capture stopped — content
+   *  script clears the on-page overlay so leftover arrows / bbox
+   *  don't sit on the page indefinitely. */
+  | { type: 'capture-stopped' }
   /** Offscreen → side panel (broadcast). Push engine info on update
    *  so the diagnostics view refreshes live without polling. */
   | { type: 'engine-info-update'; info: { yolo?: string; stream?: string; constraints?: string } };

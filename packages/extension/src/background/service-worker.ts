@@ -88,6 +88,16 @@ async function stopCapture(): Promise<void> {
   const msg: ExtensionMessage = { type: 'stop-capture' };
   await chrome.runtime.sendMessage(msg).catch(() => {});
   await setCaptureState({ running: false });
+  // Tell every surface (content script + side panel) that capture
+  // ended so the on-page overlay clears. Without this the last-drawn
+  // bbox + arrows sit on the page until the user reloads it.
+  const stopped: ExtensionMessage = { type: 'capture-stopped' };
+  chrome.runtime.sendMessage(stopped).catch(() => {});
+  // Content scripts need a tabs.sendMessage hop (they don't receive
+  // runtime broadcasts). Get the last-invoked tab and notify it.
+  if (lastInvokedTabId != null) {
+    chrome.tabs.sendMessage(lastInvokedTabId, stopped).catch(() => {});
+  }
 }
 
 chrome.runtime.onMessage.addListener((msg: ExtensionMessage, sender, sendResponse) => {

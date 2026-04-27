@@ -35,6 +35,14 @@ const startBtn = document.getElementById('start') as HTMLButtonElement;
 const stopBtn = document.getElementById('stop') as HTMLButtonElement;
 const status = document.getElementById('cap-status')!;
 
+/** Reflect capture state in the Start/Stop buttons: only one of them
+ *  is interactive at a time (the other is muted/disabled) so the
+ *  current state is unambiguous and accidental clicks are impossible. */
+function setRunningUI(running: boolean): void {
+  startBtn.disabled = running;
+  stopBtn.disabled = !running;
+}
+
 // ── Pre-resolve target tabId at popup load ──────────────────────────
 //   Done off the click path so awaiting tabs.query doesn't consume the
 //   user gesture later. Falls back from currentWindow → lastFocusedWindow
@@ -107,8 +115,11 @@ function shortUrl(): string {
 // the popup while a capture is already running. Without this query the
 // popup would show "Idle" and let the user click Start, hitting the
 // "active stream" error path.
+// Both buttons start in the "loading" state (both disabled) — bootstrap
+// flips one of them on once the actual capture state is known.
 startBtn.disabled = true;
-setStatus('…');
+stopBtn.disabled = true;
+setStatus('');
 async function bootstrap(): Promise<void> {
   const [state, stored, traceResp] = await Promise.all([
     chrome.runtime.sendMessage({ type: 'get-capture-state' } satisfies ExtensionMessage)
@@ -118,7 +129,6 @@ async function bootstrap(): Promise<void> {
       .catch(() => ({ trace: [] })),
   ]);
   await preloadTabId();
-  startBtn.disabled = false;
   // Show the last few SW events at the bottom so we can verify whether
   // chrome.action.onClicked fired when the user clicked the toolbar.
   const traceLines: string[] = traceResp?.trace?.slice(-6) ?? [];
@@ -127,9 +137,10 @@ async function bootstrap(): Promise<void> {
     // CSS hides #cap-status when empty, so the whole status block
     // collapses out of the panel header during normal capture.
     setStatus('');
-    startBtn.classList.add('running');
+    setRunningUI(true);
     return;
   }
+  setRunningUI(false);
   // Show last error if it happened recently (within ~30s), otherwise
   // fall back to Idle. Stale errors don't survive a tab reload.
   const last = (stored as Record<string, unknown> | undefined)?.__chessrayPopupStatus as { msg: string; isError: boolean; ts: number } | undefined;
@@ -215,8 +226,8 @@ startBtn.addEventListener('click', () => {
           type: 'start-capture', tabId, streamId,
         } satisfies ExtensionMessage);
         if (resp?.ok) {
-          setStatus('Running');
-          startBtn.classList.add('running');
+          setStatus('');
+          setRunningUI(true);
         } else {
           setStatus(`SW error: ${resp?.error ?? 'unknown'}`, true);
         }
@@ -229,8 +240,11 @@ startBtn.addEventListener('click', () => {
 
 stopBtn.addEventListener('click', async () => {
   await chrome.runtime.sendMessage({ type: 'stop-capture' } satisfies ExtensionMessage).catch(() => {});
-  setStatus('Stopped');
-  startBtn.classList.remove('running');
+  // Don't set a "Stopped" status — the disabled Stop button + enabled
+  // Start button already convey the state visually, and an extra text
+  // line below the buttons looks ugly.
+  setStatus('');
+  setRunningUI(false);
 });
 
 // ── Bridge ─────────────────────────────────────────────────────────────

@@ -32,6 +32,18 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
     console.log(`[chessray content] frame-result: found=${r.board_detection?.found} arrows=${r.arrows?.length ?? 0} fen=${r.recognition?.fen ?? '-'}`);
     for (const cb of frameResultListeners) cb(msg.result);
   }
+  if (msg.type === 'capture-stopped') {
+    // Capture ended — wipe the on-page overlay so leftover bbox /
+    // arrows / HUD don't sit on the page indefinitely. Just clear
+    // the canvas; full state reset isn't necessary because next
+    // capture-start replays the renderer flow from scratch.
+    const overlay = document.getElementById('video-overlay') as HTMLCanvasElement | null;
+    overlay?.getContext('2d')?.clearRect(0, 0, overlay.width, overlay.height);
+    // Also drop the cached last frame result so the resize-replay
+    // handler can't re-render the stale overlay on a viewport change.
+    lastFrameResult = null;
+    for (const cb of stopTrackingListeners) cb();
+  }
   if (msg.type === 'prefs-update') {
     // Side panel saved a new pref blob — mirror it into our localStorage
     // and re-fire the panel's own click handlers so initOverlay's state
