@@ -12,7 +12,7 @@
  * without `?.()` guards.
  */
 
-import { mountOverlay, type ChessRayAPI, type DisplayInfo, type HostDisplay } from '@chessray/overlay-ui';
+import { mountOverlay, type ChessRayAPI, type DisplayInfo, type HostDisplay, videoHitCache, hitTestArrows, hitTestAnimBoard } from '@chessray/overlay-ui';
 import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
 // Minimal CSS for the on-screen canvas only. We deliberately don't
 // import overlay-ui's panel.css here — it sets body{overflow:hidden}
@@ -347,3 +347,34 @@ queueMicrotask(() => reportViewportSize('initial'));
 // Notify the service worker that the content script is ready so it can
 // trigger capture on user request.
 chrome.runtime.sendMessage({ type: 'ping' }).catch(() => {});
+
+// ── On-page overlay click handling ──
+// The video-overlay canvas is pointer-events: none by default so the
+// page underneath receives clicks. We selectively flip it to 'auto'
+// when the cursor is over an arrow or an active PV-animation board, so
+// arrow-click → PV animation works without breaking site interactions
+// (clicking pieces to move on chess.com / lichess). Document-level
+// mousemove drives this — the canvas itself can't fire mousemove while
+// pointer-events is none.
+const videoCanvasEl = document.getElementById('video-overlay') as HTMLCanvasElement | null;
+if (videoCanvasEl) {
+  document.addEventListener('mousemove', (e) => {
+    const overArrow = hitTestArrows(videoHitCache, e.clientX, e.clientY) !== null;
+    const overAnimBoard = hitTestAnimBoard(videoHitCache, e.clientX, e.clientY);
+    videoCanvasEl.style.pointerEvents = (overArrow || overAnimBoard) ? 'auto' : 'none';
+  }, { passive: true });
+}
+
+// ── Pause capture during PV animation ──
+// mount-overlay sets window.__chessrayPvPlaying when an arrow is
+// clicked and clears it when playback ends. Watch the flag and ask
+// offscreen to pause/resume the capture loop accordingly so live
+// frame results don't update the boardRect mid-animation (which
+// would make the analysis-board overlay jump if the page reflows).
+let lastPvPlaying = false;
+setInterval(() => {
+  const playing = !!(window as { __chessrayPvPlaying?: boolean }).__chessrayPvPlaying;
+  if (playing === lastPvPlaying) return;
+  lastPvPlaying = playing;
+  chrome.runtime.sendMessage({ type: playing ? 'pause-capture' : 'resume-capture' }).catch(() => {});
+}, 100);

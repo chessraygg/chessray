@@ -78,6 +78,13 @@ export type ExtensionMessage =
    *  storage — chrome.storage.session cross-context propagation has
    *  been unreliable in practice. */
   | { type: 'get-engine-info' }
+  /** Content script → offscreen. Pause the YOLO/eval pipeline while
+   *  the user is interactively viewing a PV animation on the on-page
+   *  overlay; without pause, live frame results would update the
+   *  underlying boardRect mid-animation and the analysis board would
+   *  jump around. Resume re-arms the captureInterval. */
+  | { type: 'pause-capture' }
+  | { type: 'resume-capture' }
   /** Offscreen → side panel (broadcast). Push engine info on update
    *  so the diagnostics view refreshes live without polling. */
   | { type: 'engine-info-update'; info: { yolo?: string; stream?: string; constraints?: string } };

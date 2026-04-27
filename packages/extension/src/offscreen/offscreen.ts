@@ -358,6 +358,48 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     });
     return true;
   }
+  if (msg.type === 'pause-capture') {
+    if (captureInterval) {
+      clearInterval(captureInterval);
+      captureInterval = null;
+      debugLog('capture paused (PV animation)');
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
+  if (msg.type === 'resume-capture') {
+    // Only restart if we have an active stream and the loop isn't already
+    // running. The original interval is owned by startLoop — re-create it
+    // here using the same drawImage/processFrame pattern.
+    if (mediaStream && videoEl && !captureInterval) {
+      const canvas = document.getElementById('capture-canvas') as HTMLCanvasElement;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+      captureInterval = setInterval(async () => {
+        if (processing || !videoEl) return;
+        if (videoEl.videoWidth > 0 && (canvas.width !== videoEl.videoWidth || canvas.height !== videoEl.videoHeight)) {
+          canvas.width = videoEl.videoWidth;
+          canvas.height = videoEl.videoHeight;
+          processor.resetCaches();
+        }
+        processing = true;
+        const tCap = Date.now();
+        try {
+          ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height) as ImageDataLike;
+          const captured_at = Date.now();
+          const meta: FrameMeta = { capture_ms: captured_at - tCap, captured_at };
+          await processor.processFrame(imageData, meta);
+        } catch (err) {
+          console.error('[chessray] frame processing error', err);
+        } finally {
+          processing = false;
+        }
+      }, 1000 / TARGET_FPS);
+      debugLog('capture resumed');
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
   if (msg.type === 'apply-setting') {
     const s = msg.setting;
     if (s.key === 'multi-pv-max') processor.setMultiPvMax(s.value);
