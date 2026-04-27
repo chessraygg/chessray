@@ -323,6 +323,19 @@ function watchDprChanges(): void {
   mq.addEventListener('change', onChange);
 }
 watchDprChanges();
+// Backup: poll DPR every 1s. Some Chrome versions don't reliably fire
+// the resolution-MQ 'change' event when the window crosses between
+// displays of different scale factor (especially on macOS with mixed
+// retina/non-retina setups).
+let lastPolledDpr = window.devicePixelRatio || 1;
+setInterval(() => {
+  const now = window.devicePixelRatio || 1;
+  if (Math.abs(now - lastPolledDpr) > 0.01) {
+    console.log(`[chessray content] DPR poll detected: ${lastPolledDpr} → ${now}`);
+    lastPolledDpr = now;
+    reportViewportSize('dpr-poll');
+  }
+}, 1000);
 // Seed lastReportedViewport with the current size on mount so the first
 // post-mount layout change is detected as a real diff (without this, the
 // initial recapture-from-mount can spuriously fire if the page hadn't

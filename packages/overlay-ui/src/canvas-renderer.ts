@@ -1055,6 +1055,29 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.strokeStyle = 'rgba(255, 0, 255, 0.7)';
     ctx.lineWidth = 2;
     ctx.strokeRect(bx, by, bw, bh);
+
+    // Diagnostic HUD — top-left corner, only when borderVisible is on so
+    // it's opt-in and easy to screenshot. Shows the numbers needed to
+    // diagnose any bbox→CSS misalignment without DevTools: viewport,
+    // DPR, the frame_dimensions the renderer received, and the raw vs
+    // mapped bbox. If raw bbox * (vw/fw) ≠ mapped bbox there's a math
+    // bug; if frame_dimensions don't match vw*DPR the captured stream
+    // didn't get the constraints we asked for.
+    const fw = result.frame_dimensions?.width ?? 0;
+    const fh = result.frame_dimensions?.height ?? 0;
+    const dpr = (window.devicePixelRatio || 1).toFixed(2);
+    ctx.save();
+    ctx.font = '12px ui-monospace, monospace';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+    ctx.fillRect(4, 4, 380, 78);
+    ctx.fillStyle = '#22c55e';
+    ctx.fillText(`vp ${vw}x${vh}  dpr ${dpr}  expect ${Math.round(vw * (window.devicePixelRatio || 1))}x${Math.round(vh * (window.devicePixelRatio || 1))}`, 8, 20);
+    ctx.fillStyle = (Math.abs(fw - vw * (window.devicePixelRatio || 1)) > 8 || Math.abs(fh - vh * (window.devicePixelRatio || 1)) > 8) ? '#f87171' : '#a3e635';
+    ctx.fillText(`frame ${fw}x${fh}`, 8, 36);
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillText(`bbox raw ${Math.round(bbox.x)},${Math.round(bbox.y)} ${Math.round(bbox.width)}x${Math.round(bbox.height)}`, 8, 52);
+    ctx.fillText(`bbox css ${Math.round(bx)},${Math.round(by)} ${Math.round(bw)}x${Math.round(bh)}`, 8, 68);
+    ctx.restore();
   }
 
   // During PV animation, draw analysis board (background + pieces + animated arrow)
