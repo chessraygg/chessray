@@ -124,7 +124,9 @@ async function bootstrap(): Promise<void> {
   const traceLines: string[] = traceResp?.trace?.slice(-6) ?? [];
   const traceTail = traceLines.length ? '\n— SW trace —\n' + traceLines.join('\n') : '\n(no SW events yet)';
   if (state?.running) {
-    setStatus(`Running (tab ${state.tabId ?? '?'})`);
+    // CSS hides #cap-status when empty, so the whole status block
+    // collapses out of the panel header during normal capture.
+    setStatus('');
     startBtn.classList.add('running');
     return;
   }
@@ -314,9 +316,13 @@ function ensureEngineInfoEl(): HTMLElement | null {
   if (!debugSection) return null;
   el = document.createElement('div');
   el.id = 'cv-engine-info';
-  el.style.cssText = 'font: 11px ui-monospace, monospace; color: #a3e635; padding: 6px 10px; border-bottom: 1px solid #272727; background: rgba(0,0,0,0.25); white-space: pre-wrap;';
-  el.textContent = 'Engine info: pending…';
-  debugSection.insertBefore(el, debugSection.firstChild);
+  // Append at the BOTTOM of the diagnostics view — it's reference info,
+  // not the primary thing the user is looking at. Muted color + smaller
+  // font + top border (instead of the previous full-width background
+  // block) keeps it unobtrusive.
+  el.style.cssText = 'font: 10px ui-monospace, monospace; color: #6b7280; padding: 6px 10px; border-top: 1px solid #272727; white-space: pre-wrap; opacity: 0.75;';
+  el.textContent = 'Engine info: loading…';
+  debugSection.appendChild(el);
   return el;
 }
 
