@@ -334,25 +334,29 @@ function ensureEngineInfoEl(): HTMLElement | null {
 async function refreshEngineInfo(): Promise<void> {
   const el = ensureEngineInfoEl();
   if (!el) return;
+  // Read sticky offscreen-written storage. Trace ring is bounded so the
+  // YOLO load line gets evicted after enough events; storage doesn't.
   try {
-    const resp = await chrome.runtime.sendMessage({ type: 'get-trace' } satisfies ExtensionMessage);
-    const lines: string[] = resp?.trace ?? [];
-    // Most recent matching line wins — these are the ones that actually
-    // describe the current capture state.
-    const epLine = [...lines].reverse().find(l => l.includes('YOLO loaded'));
-    const acLine = [...lines].reverse().find(l => l.includes('applyConstraints ok'));
-    const streamLine = [...lines].reverse().find(l => l.includes('stream settings'));
+    const { __chessrayEngineInfo } = await chrome.storage.session.get('__chessrayEngineInfo');
+    const info = __chessrayEngineInfo as { yolo?: string; stream?: string; constraints?: string; ts?: number } | undefined;
+    if (!info) {
+      el.textContent = 'Engine info: loading…';
+      return;
+    }
     const parts: string[] = [];
-    if (epLine) parts.push(epLine.replace(/^[\d:]+\s+offscreen:\s+/, ''));
-    if (streamLine) parts.push(streamLine.replace(/^[\d:]+\s+offscreen:\s+/, ''));
-    if (acLine) parts.push(acLine.replace(/^[\d:]+\s+offscreen:\s+/, ''));
-    el.textContent = parts.length ? parts.join('\n') : 'Engine info: no events yet (start capture)';
+    if (info.yolo) parts.push(info.yolo);
+    if (info.stream) parts.push(info.stream);
+    if (info.constraints) parts.push(info.constraints);
+    el.textContent = parts.length ? parts.join('\n') : 'Engine info: pending…';
   } catch {
-    el.textContent = 'Engine info: SW unreachable';
+    el.textContent = 'Engine info: storage unreachable';
   }
 }
 void refreshEngineInfo();
-setInterval(refreshEngineInfo, 2000);
+// Live updates: storage.onChanged fires synchronously when offscreen writes.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'session' && '__chessrayEngineInfo' in changes) void refreshEngineInfo();
+});
 
 // Relay pref changes to the captured tab's content script so the on-page
 // overlay (border/box, arrow opacity/size, eval-bar opacity, etc.) keeps

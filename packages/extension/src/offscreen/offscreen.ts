@@ -46,6 +46,27 @@ function debugLog(msg: string): void {
     .catch(() => { /* SW asleep or no listener */ });
 }
 
+// ── Sticky engine-info store ──
+// SW's trace ring buffer is bounded (30 entries) so important
+// one-time diagnostics like "YOLO loaded, EP=…" get evicted once
+// enough events fire. Mirror them into chrome.storage.session under
+// stable keys so the side panel can always read the current values
+// regardless of how many other events have happened.
+type EngineInfoPatch = Partial<{
+  yolo: string;
+  stream: string;
+  constraints: string;
+}>;
+async function updateEngineInfo(patch: EngineInfoPatch): Promise<void> {
+  try {
+    const cur = await chrome.storage.session.get('__chessrayEngineInfo');
+    const old = (cur.__chessrayEngineInfo ?? {}) as EngineInfoPatch & { ts?: number };
+    await chrome.storage.session.set({
+      __chessrayEngineInfo: { ...old, ...patch, ts: Date.now() },
+    });
+  } catch { /* storage unavailable, side panel will show 'no events yet' */ }
+}
+
 async function initEngine(): Promise<StockfishEngine> {
   if (engine) return engine;
   const sf = new StockfishEngine({});
@@ -73,7 +94,9 @@ async function initRecognizer(): Promise<YoloPieceRecognizer> {
   // accel didn't kick in and inference will be ~10-20× slower than it
   // could be. With WebGPU a YOLOv11n inference at 640×640 is ~30-50ms;
   // on WASM it's ~500-900ms (consistent with the user-reported timing).
-  debugLog(`YOLO loaded, EP=${rec.executionProvider}, navigator.gpu=${!!(navigator as any).gpu}`);
+  const yoloLine = `YOLO loaded, EP=${rec.executionProvider}, navigator.gpu=${!!(navigator as any).gpu}`;
+  debugLog(yoloLine);
+  void updateEngineInfo({ yolo: yoloLine });
   return rec;
 }
 
@@ -163,7 +186,9 @@ async function startLoop(streamId: string, tabId: number, viewport?: { width: nu
   // in proportion to the discrepancy.
   const track = stream.getVideoTracks()[0];
   const settings = track?.getSettings();
-  debugLog(`stream settings: ${settings?.width}x${settings?.height} (asked ${viewport?.width ?? '?'}x${viewport?.height ?? '?'})`);
+  const streamLine = `stream settings: ${settings?.width}x${settings?.height} (asked ${viewport?.width ?? '?'}x${viewport?.height ?? '?'})`;
+  debugLog(streamLine);
+  void updateEngineInfo({ stream: streamLine });
 
   const video = document.createElement('video');
   video.srcObject = stream;
@@ -308,7 +333,9 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
       height: { ideal: msg.viewport.height },
     }).then(() => {
       const after = track.getSettings();
-      debugLog(`applyConstraints ok: track now ${after.width}x${after.height}`);
+      const acLine = `applyConstraints ok: track now ${after.width}x${after.height}`;
+      debugLog(acLine);
+      void updateEngineInfo({ constraints: acLine });
       // Force-resize the canvas now too — videoEl.videoWidth may take
       // a frame to update, so the next captureInterval tick already
       // sees the new size and processFrame uses it.
