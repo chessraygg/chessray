@@ -222,7 +222,7 @@ let lastFrameResult: unknown = null;
 frameResultListeners.unshift((r) => { lastFrameResult = r; });
 
 let resizeRaf = 0;
-window.addEventListener('resize', () => {
+const scheduleReplay = (): void => {
   if (resizeRaf) return;
   resizeRaf = requestAnimationFrame(() => {
     resizeRaf = 0;
@@ -232,7 +232,13 @@ window.addEventListener('resize', () => {
       frameResultListeners[i](lastFrameResult);
     }
   });
-});
+};
+window.addEventListener('resize', scheduleReplay);
+// visualViewport fires for pinch-zoom and OSK changes that don't fire
+// 'resize'. The renderer reads visualViewport.width/height first, so
+// re-render here keeps the overlay aligned through those gestures.
+window.visualViewport?.addEventListener('resize', scheduleReplay);
+window.visualViewport?.addEventListener('scroll', scheduleReplay);
 
 // Notify the service worker that the content script is ready so it can
 // trigger capture on user request.

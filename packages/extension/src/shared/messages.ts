@@ -24,7 +24,13 @@ export type ExtensionMessage =
    *  real popup invocation; the SW just opens offscreen and forwards. */
   | { type: 'start-capture'; tabId: number; streamId: string }
   | { type: 'stop-capture' }
-  | { type: 'capture-started'; streamId: string; tabId: number }
+  /** SW → offscreen. `viewport` is the target tab's content area in
+   *  *physical pixels* (CSS px × devicePixelRatio) at capture-start time.
+   *  Offscreen pins getUserMedia min=max to these values so Chrome
+   *  doesn't downscale-with-letterboxing — the captured frame then maps
+   *  cleanly to the viewport. Optional because some entry points (the
+   *  test harness) don't measure it. */
+  | { type: 'capture-started'; streamId: string; tabId: number; viewport?: { width: number; height: number } }
   /** Test-only: SW grabs a single frame via chrome.tabs.captureVisibleTab
    *  (works without activeTab thanks to <all_urls> host_permissions) and
    *  hands the dataURL to offscreen. Used by scripts/local/test-extension

@@ -43,11 +43,41 @@ async function setCaptureState(s: CaptureState): Promise<void> {
   await chrome.storage.session.set({ __chessrayCapture: s });
 }
 
+/** Read the target tab's content-area size in *physical* pixels.
+ *  We hand this to getUserMedia as min=max so Chrome captures the
+ *  page 1:1 (no letterboxing, no default-cap downscale). Without this,
+ *  the captured frame doesn't map cleanly to viewport×DPR and the
+ *  on-page overlay drifts a few CSS px off the actual board.
+ *  activeTab grant from the user-gesture invocation covers executeScript. */
+async function readTabViewport(tabId: number): Promise<{ width: number; height: number } | null> {
+  try {
+    const [hit] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const dpr = window.devicePixelRatio || 1;
+        const w = window.visualViewport?.width
+          ?? document.documentElement?.clientWidth
+          ?? window.innerWidth;
+        const h = window.visualViewport?.height
+          ?? document.documentElement?.clientHeight
+          ?? window.innerHeight;
+        return { width: Math.round(w * dpr), height: Math.round(h * dpr) };
+      },
+    });
+    return hit?.result ?? null;
+  } catch (err) {
+    note(`readTabViewport FAILED tab=${tabId}: ${String(err)}`);
+    return null;
+  }
+}
+
 async function startCapture(tabId: number, streamId: string): Promise<void> {
   await ensureOffscreen();
+  const viewport = await readTabViewport(tabId);
+  if (viewport) note(`viewport tab=${tabId} ${viewport.width}x${viewport.height}`);
   // Forward to offscreen. tabId rides along because offscreen documents
   // have no chrome.tabs access and need it to address the content script.
-  const msg: ExtensionMessage = { type: 'capture-started', streamId, tabId };
+  const msg: ExtensionMessage = { type: 'capture-started', streamId, tabId, viewport: viewport ?? undefined };
   await chrome.runtime.sendMessage(msg);
   await setCaptureState({ running: true, tabId });
 }

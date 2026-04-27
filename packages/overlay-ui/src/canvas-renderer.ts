@@ -977,12 +977,13 @@ export function renderVideoOverlay(state: OverlayState): void {
   // 2. Menu bar offset (frame y=0 is top of screen, overlay y=0 is top of work area)
   //
   // For the extension on a content-script page we want the *rendered*
-  // page area (clientWidth/Height of <html>), not innerWidth/Height
-  // — they differ when the page has scrollbars or when Chrome has a
-  // tab-share indicator pushing layout.
+  // page area. Prefer visualViewport (handles pinch-zoom, OSK, scrollbar
+  // gutter) over clientWidth/Height; fall back through the chain because
+  // the analysis-window host may not have a visualViewport.
+  const vv = window.visualViewport;
   const docEl = document.documentElement;
-  const vw = docEl?.clientWidth || window.innerWidth;
-  const vh = docEl?.clientHeight || window.innerHeight;
+  const vw = vv?.width || docEl?.clientWidth || window.innerWidth;
+  const vh = vv?.height || docEl?.clientHeight || window.innerHeight;
 
   if (state.videoCanvas.width !== vw || state.videoCanvas.height !== vh) {
     state.videoCanvas.width = vw;
@@ -1013,10 +1014,29 @@ export function renderVideoOverlay(state: OverlayState): void {
   } else if (result.frame_dimensions) {
     const fw = result.frame_dimensions.width;
     const fh = result.frame_dimensions.height;
-    const sx = vw / Math.max(1, fw);
-    const sy = vh / Math.max(1, fh);
-    bx = bbox.x * sx;
-    by = bbox.y * sy;
+    // Independent x/y scale assumes the captured frame *is* the viewport,
+    // just at a different resolution. That's true when capture pinned
+    // min=max to viewport×DPR (extension's normal path). When constraints
+    // didn't take — Chrome falls back to a default cap and letterboxes —
+    // the frame is centered inside the captured surface with black bars,
+    // and a per-axis scale would distort. Detect by aspect-ratio mismatch
+    // (>1% off): center-crop to the viewport AR, then scale uniformly.
+    const viewportAR = vw / Math.max(1, vh);
+    const frameAR = fw / Math.max(1, fh);
+    let activeX = 0, activeY = 0, activeW = fw, activeH = fh;
+    if (Math.abs(frameAR - viewportAR) / viewportAR > 0.01) {
+      if (frameAR > viewportAR) {
+        activeW = fh * viewportAR;
+        activeX = (fw - activeW) / 2;
+      } else {
+        activeH = fw / viewportAR;
+        activeY = (fh - activeH) / 2;
+      }
+    }
+    const sx = vw / Math.max(1, activeW);
+    const sy = vh / Math.max(1, activeH);
+    bx = (bbox.x - activeX) * sx;
+    by = (bbox.y - activeY) * sy;
     bw = bbox.width * sx;
     bh = bbox.height * sy;
   } else {

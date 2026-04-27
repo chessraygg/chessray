@@ -114,7 +114,7 @@ const processor = new FrameProcessor({
   encodePreviewUrl,
 });
 
-async function startLoop(streamId: string, tabId: number): Promise<void> {
+async function startLoop(streamId: string, tabId: number, viewport?: { width: number; height: number }): Promise<void> {
   // Tear down any previous capture state — otherwise getUserMedia for the
   // new streamId can leak a second video track and the next stop won't
   // reach the original one.
@@ -122,14 +122,29 @@ async function startLoop(streamId: string, tabId: number): Promise<void> {
   activeTabId = tabId;
   await Promise.all([initEngine(), initRecognizer()]);
 
+  // Pin min=max to the tab's content area in physical pixels. Without this
+  // Chrome applies a default size cap and produces a letterboxed frame
+  // whose aspect ratio doesn't match the viewport — the bbox→CSS mapping
+  // then carries a ~10-50 px error per axis. With min=max the captured
+  // frame is the viewport scaled by DPR exactly, so frame coords ÷ DPR =
+  // CSS coords. Trade-off: window resize after start invalidates this and
+  // alignment drifts until the user restarts capture (acceptable per spec).
+  const mandatory: Record<string, unknown> = {
+    chromeMediaSource: 'tab',
+    chromeMediaSourceId: streamId,
+  };
+  if (viewport && viewport.width > 0 && viewport.height > 0) {
+    mandatory.minWidth = viewport.width;
+    mandatory.maxWidth = viewport.width;
+    mandatory.minHeight = viewport.height;
+    mandatory.maxHeight = viewport.height;
+    debugLog(`getUserMedia pinned to ${viewport.width}x${viewport.height}`);
+  }
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: false,
     video: {
       // @ts-expect-error Chrome-specific mandatory constraints for tab capture
-      mandatory: {
-        chromeMediaSource: 'tab',
-        chromeMediaSourceId: streamId,
-      },
+      mandatory,
     },
   });
   mediaStream = stream;
@@ -193,7 +208,7 @@ function stopLoop(): void {
 chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendResponse) => {
   if (msg.type === 'capture-started') {
     // tabId is supplied by the service worker (offscreen has no chrome.tabs).
-    startLoop(msg.streamId, msg.tabId).then(
+    startLoop(msg.streamId, msg.tabId, msg.viewport).then(
       () => sendResponse({ ok: true }),
       (err) => sendResponse({ ok: false, error: String(err) }),
     );
