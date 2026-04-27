@@ -72,4 +72,12 @@ export type ExtensionMessage =
   /** Offscreen → SW. Offscreen has no access to the SW's trace ring
    *  buffer (the surface the side panel reads from), so it forwards
    *  diagnostics here for visibility without requiring DevTools. */
-  | { type: 'log-from-offscreen'; message: string };
+  | { type: 'log-from-offscreen'; message: string }
+  /** Side panel → offscreen. Pull the current engine info (YOLO EP,
+   *  stream settings, last applyConstraints). Direct query, not via
+   *  storage — chrome.storage.session cross-context propagation has
+   *  been unreliable in practice. */
+  | { type: 'get-engine-info' }
+  /** Offscreen → side panel (broadcast). Push engine info on update
+   *  so the diagnostics view refreshes live without polling. */
+  | { type: 'engine-info-update'; info: { yolo?: string; stream?: string; constraints?: string } };

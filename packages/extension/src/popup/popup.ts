@@ -331,32 +331,40 @@ function ensureEngineInfoEl(): HTMLElement | null {
   return el;
 }
 
-async function refreshEngineInfo(): Promise<void> {
+function renderEngineInfo(info: { yolo?: string; stream?: string; constraints?: string } | null): void {
   const el = ensureEngineInfoEl();
   if (!el) return;
-  // Read sticky offscreen-written storage. Trace ring is bounded so the
-  // YOLO load line gets evicted after enough events; storage doesn't.
+  if (!info) { el.textContent = 'Engine info: loading…'; return; }
+  const parts: string[] = [];
+  if (info.yolo) parts.push(info.yolo);
+  if (info.stream) parts.push(info.stream);
+  if (info.constraints) parts.push(info.constraints);
+  el.textContent = parts.length ? parts.join('\n') : 'Engine info: capture not started';
+}
+
+async function refreshEngineInfo(): Promise<void> {
+  // Direct query to offscreen. SW also receives the message but has no
+  // handler for it, so offscreen's response wins. If offscreen isn't
+  // up yet (capture never started this session), the message rejects
+  // and we surface that.
   try {
-    const { __chessrayEngineInfo } = await chrome.storage.session.get('__chessrayEngineInfo');
-    const info = __chessrayEngineInfo as { yolo?: string; stream?: string; constraints?: string; ts?: number } | undefined;
-    if (!info) {
-      el.textContent = 'Engine info: loading…';
-      return;
-    }
-    const parts: string[] = [];
-    if (info.yolo) parts.push(info.yolo);
-    if (info.stream) parts.push(info.stream);
-    if (info.constraints) parts.push(info.constraints);
-    el.textContent = parts.length ? parts.join('\n') : 'Engine info: pending…';
+    const resp = await chrome.runtime.sendMessage({ type: 'get-engine-info' } satisfies ExtensionMessage);
+    renderEngineInfo(resp?.info ?? null);
   } catch {
-    el.textContent = 'Engine info: storage unreachable';
+    const el = ensureEngineInfoEl();
+    if (el) el.textContent = 'Engine info: offscreen not running (start capture)';
   }
 }
 void refreshEngineInfo();
-// Live updates: storage.onChanged fires synchronously when offscreen writes.
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'session' && '__chessrayEngineInfo' in changes) void refreshEngineInfo();
+
+// Live updates: offscreen broadcasts engine-info-update on every change.
+chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
+  if (msg.type === 'engine-info-update') renderEngineInfo(msg.info);
 });
+
+// Belt-and-braces: also poll every 3s in case a broadcast was missed
+// (e.g. side panel opened mid-flight before the YOLO load fired).
+setInterval(refreshEngineInfo, 3000);
 
 // Relay pref changes to the captured tab's content script so the on-page
 // overlay (border/box, arrow opacity/size, eval-bar opacity, etc.) keeps
