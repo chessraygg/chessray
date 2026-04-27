@@ -223,21 +223,37 @@ async function autoStart(tabId: number): Promise<boolean> {
   }
 }
 
-chrome.action.onClicked.addListener(async (tab) => {
+chrome.action.onClicked.addListener((tab) => {
   note(`action.onClicked tab=${tab.id}`);
   if (tab.id == null) return;
-  await recordInvocation(tab.id, 'action');
-  try {
-    await chrome.sidePanel.open({ tabId: tab.id });
-    note(`sidePanel.open ok`);
-  } catch (err) {
-    note(`sidePanel.open FAILED: ${String(err)}`);
-  }
-  // Capture immediately — no separate Start click needed. activeTab is
-  // granted by this very invocation; tabCapture works synchronously
-  // before any awaits could consume the user gesture (await
-  // sidePanel.open above is fine, gestures cross microtasks).
-  await autoStart(tab.id);
+  const tabId = tab.id;
+  // Order matters: getMediaStreamId MUST run before any await that
+  // could consume the user activation. chrome.sidePanel.open does
+  // consume it on some Chrome versions (chromium 40916430-related),
+  // which is why the previous code sometimes needed a fallback right-
+  // click to actually start capture. Grab the streamId synchronously
+  // first, then do the housekeeping (recordInvocation,
+  // sidePanel.open, startCapture) afterwards — those awaits are now
+  // safe because we already have the streamId.
+  chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, async (streamId) => {
+    if (chrome.runtime.lastError || !streamId) {
+      note(`getMediaStreamId FAILED: ${chrome.runtime.lastError?.message ?? 'no id'}`);
+      return;
+    }
+    await recordInvocation(tabId, 'action');
+    try {
+      await chrome.sidePanel.open({ tabId });
+      note(`sidePanel.open ok`);
+    } catch (err) {
+      note(`sidePanel.open FAILED: ${String(err)}`);
+    }
+    try {
+      await startCapture(tabId, streamId);
+      note(`autoStart ok tab=${tabId}`);
+    } catch (err) {
+      note(`startCapture FAILED tab=${tabId}: ${String(err)}`);
+    }
+  });
 });
 
 // Context-menu fallback. If chrome.action.onClicked refuses to fire
