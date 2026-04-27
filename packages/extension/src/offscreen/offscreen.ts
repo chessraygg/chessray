@@ -69,6 +69,11 @@ async function initRecognizer(): Promise<YoloPieceRecognizer> {
   const rec = new YoloPieceRecognizer(chrome.runtime.getURL('vendor/yolo-chess/chess-pieces.onnx'));
   await rec.load();
   recognizer = rec;
+  // Surface the actual EP into the SW trace — 'wasm' here means GPU
+  // accel didn't kick in and inference will be ~10-20× slower than it
+  // could be. With WebGPU a YOLOv11n inference at 640×640 is ~30-50ms;
+  // on WASM it's ~500-900ms (consistent with the user-reported timing).
+  debugLog(`YOLO loaded, EP=${rec.executionProvider}, navigator.gpu=${!!(navigator as any).gpu}`);
   return rec;
 }
 

@@ -17,6 +17,11 @@ const CLASS_TO_FEN: Record<number, string> = {
 export class YoloPieceRecognizer implements PieceRecognizerInterface {
   session: any = null;
   ort: any = null;
+  /** Which ORT execution provider was actually selected at load time
+   *  ('webgpu' or 'wasm'). Hosts log this so we can tell from the
+   *  side-panel trace whether GPU acceleration is engaged — the
+   *  difference is ~10-20× per inference. */
+  executionProvider: string = 'unknown';
 
   constructor(private modelUrl: string) {}
 
@@ -53,6 +58,7 @@ export class YoloPieceRecognizer implements PieceRecognizerInterface {
     }
 
     const gpu = (globalThis as any).navigator?.gpu;
+    this.executionProvider = selectedEp;
     console.log(`[YOLO] ONNX session created, EP: ${selectedEp} | navigator.gpu: ${!!gpu}`);
 
     // Single warm-up inference: kernel compilation (the only fixed cost we
