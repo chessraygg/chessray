@@ -53,9 +53,18 @@ export async function detectBoard(
   const inputTensor = new ort.Tensor('float32', tensorData, [1, 3, inputSize, inputSize]);
   const results = await session.run({ [session.inputNames[0]]: inputTensor });
   const output = results[session.outputNames[0]];
-  const outputData = output.data as Float32Array;
   const numDetections = output.dims[2];
   const numChannels = output.dims[1];
+  // COPY outputData out of the tensor before disposing — on WASM
+  // tensor.data is a view into ORT-managed memory that becomes invalid
+  // after dispose(). Disposing input + every output releases GPU buffer
+  // handles (WebGPU) / WASM-heap allocations (WASM) that otherwise
+  // accumulate per inference.
+  const outputData = new Float32Array(output.data as Float32Array);
+  try { (inputTensor as { dispose?: () => void }).dispose?.(); } catch { /* ignore */ }
+  for (const k of Object.keys(results)) {
+    try { (results[k] as { dispose?: () => void }).dispose?.(); } catch { /* ignore */ }
+  }
 
   // Find all class-0 (board) detections
   const boardDetections: RawDetection[] = [];

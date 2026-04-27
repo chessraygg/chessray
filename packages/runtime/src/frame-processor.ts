@@ -720,6 +720,18 @@ export class FrameProcessor {
       this.evalAbortController = new AbortController();
       const { signal } = this.evalAbortController;
 
+      // Tell the engine the next position is from a fresh game so it
+      // flushes per-game transposition entries from prior unrelated
+      // positions. Over a long live-analysis session those accumulate
+      // and progressively slow successive searches; called per new
+      // FEN they keep search time stable. Fire-and-forget — newGame()
+      // is serialized through the engine's busyPromise so the
+      // following runDepth waits for it to complete.
+      const engineForNewGame = this.deps.getEngine();
+      if (engineForNewGame?.newGame) {
+        void engineForNewGame.newGame().catch(() => { /* logged elsewhere */ });
+      }
+
       const cached = cacheGet(fullFen);
       if (cached) {
         updatePlayedMoveLoss(cached.evaluation);

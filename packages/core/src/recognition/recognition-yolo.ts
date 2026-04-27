@@ -114,11 +114,22 @@ export class YoloPieceRecognizer implements PieceRecognizerInterface {
     const tInfer = Date.now() - tInferStart;
 
     // Parse YOLO output: shape [1, 17, 8400] — 17 = 4 (bbox) + 13 (class probs)
-    // Bbox coords are normalized (0-1), not pixel-based
+    // Bbox coords are normalized (0-1), not pixel-based.
+    // COPY outputData out of the tensor before disposing — on WASM
+    // tensor.data is a view into ORT-managed memory that becomes
+    // invalid after dispose(); on WebGPU it's already a CPU-side
+    // Float32Array but copying is cheap and keeps both EPs uniform.
+    // Disposing input + output tensors releases GPU buffer handles
+    // (WebGPU) / WASM-heap allocations (WASM) that otherwise
+    // accumulate per inference and ramp inference time over a session.
     const output = results[Object.keys(results)[0]];
-    const outputData = output.data as Float32Array;
     const numDetections = output.dims[2]; // 8400
     const numChannels = output.dims[1];   // 17
+    const outputData = new Float32Array(output.data as Float32Array);
+    try { (inputTensor as { dispose?: () => void }).dispose?.(); } catch { /* ignore */ }
+    for (const k of Object.keys(results)) {
+      try { (results[k] as { dispose?: () => void }).dispose?.(); } catch { /* ignore */ }
+    }
 
     const confThreshold = 0.5;
 
