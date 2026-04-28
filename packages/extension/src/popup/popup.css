@@ -22,82 +22,6 @@ body {
   overflow-y: auto !important;
 }
 
-#cap-bar {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.35);
-}
-
-#cap-bar button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 7px 10px;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid transparent;
-  color: var(--text-muted);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-#cap-bar button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--text);
-}
-#cap-bar button:active:not(:disabled) {
-  background: rgba(255, 255, 255, 0.10);
-}
-#cap-bar button:disabled {
-  opacity: 0.40;
-  cursor: not-allowed;
-}
-#cap-bar #start:not(:disabled) { color: var(--accent); }
-#cap-bar #start:not(:disabled):hover {
-  background: rgba(34, 197, 94, 0.10);
-  color: var(--accent-hover);
-}
-#cap-bar #stop:not(:disabled) { color: var(--danger); }
-#cap-bar #stop:not(:disabled):hover {
-  background: rgba(248, 113, 113, 0.10);
-  color: var(--danger-hover);
-}
-#cap-bar .cap-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.8;
-}
-#cap-bar #stop:not(:disabled) .cap-dot {
-  box-shadow: 0 0 6px rgba(248, 113, 113, 0.5);
-  animation: cap-pulse 1.6s ease-in-out infinite;
-}
-@keyframes cap-pulse {
-  0%, 100% { opacity: 0.7; }
-  50%      { opacity: 1; }
-}
-
-#cap-status {
-  grid-column: 1 / -1;
-  font-size: 10px;
-  color: var(--text-dim);
-  padding-top: 2px;
-  word-break: break-word;
-  line-height: 1.35;
-  white-space: pre-wrap;
-  font-family: var(--mono);
-}
-#cap-status:empty { display: none; }
-#cap-status.error { color: var(--danger); }
-
 /* The mounted overlay panel: in production it's a fixed-positioned
    floating window. Inside the popup body we want it inline, full width,
    sized to its content. */
@@ -116,9 +40,7 @@ body {
 /* The on-screen overlay canvas (#video-overlay) belongs to the captured
    PAGE, not the side panel. mountOverlay still injects it into the
    document because the renderer's wiring depends on the element being
-   present, but in the side panel it's irrelevant — and panel.css's
-   default position:fixed top:0 left:0 puts a 300x150 invisible canvas
-   smack on top of the Start/Stop bar, eating clicks. Force-hide it. */
+   present, but in the side panel it's irrelevant — force-hide it. */
 canvas#video-overlay {
   display: none !important;
 }

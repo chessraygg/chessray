@@ -1,19 +1,10 @@
 /**
  * Popup: hosts the full @chessray/overlay-ui panel. Same canvas-renderer,
  * eval bar, top-moves list, settings and diagnostics the Electron app
- * uses; the only popup-specific addition is the Start/Stop strip at the
- * top, since the extension can't auto-start (tabCapture needs a popup
- * user-gesture grant).
- *
- * IMPORTANT: chrome.tabCapture.getMediaStreamId requires the user
- * activation to still be fresh at call time. ANY `await` between the
- * click event and getMediaStreamId can consume the activation and the
- * call fails with "Extension has not been invoked for the current
- * page (see activeTab permission). Chrome pages cannot be captured."
- *
- * The fix below: resolve tabId at popup load and call getMediaStreamId
- * synchronously from the click handler; only await after the streamId
- * is in hand.
+ * uses. Capture start/stop is driven by the toolbar icon
+ * (chrome.action.onClicked → service-worker), not from this popup —
+ * the popup just preloads the target tab id so pref changes here can
+ * be relayed to the captured tab's content script.
  */
 
 import { mountOverlay, createDefaultBridge, type ChessRayAPI, type DisplayInfo } from '@chessray/overlay-ui';
@@ -25,143 +16,53 @@ import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
 import '@chessray/overlay-ui/src/panel.css';
 import './popup.css';
 
-// Build stamp baked in by Vite (define in vite.config.ts). Surfaces in
-// the side-panel status so we can tell at a glance which dist Chrome
-// is actually running.
-declare const __CHESSRAY_BUILD__: string;
-const BUILD = typeof __CHESSRAY_BUILD__ !== 'undefined' ? __CHESSRAY_BUILD__ : '?';
-
-const startBtn = document.getElementById('start') as HTMLButtonElement;
-const stopBtn = document.getElementById('stop') as HTMLButtonElement;
-const status = document.getElementById('cap-status')!;
-
-/** Reflect capture state in the Start/Stop buttons: only one of them
- *  is interactive at a time (the other is muted/disabled) so the
- *  current state is unambiguous and accidental clicks are impossible. */
-function setRunningUI(running: boolean): void {
-  startBtn.disabled = running;
-  stopBtn.disabled = !running;
-}
-
 // ── Pre-resolve target tabId at popup load ──────────────────────────
-//   Done off the click path so awaiting tabs.query doesn't consume the
-//   user gesture later. Falls back from currentWindow → lastFocusedWindow
-//   so the popup also works when opened as a tab (test harness path).
+// Used by the localStorage→content-script pref relay below so the
+// captured tab's overlay re-renders when the user toggles things in
+// the popup. Falls back from sw-target → currentWindow → lastFocused
+// → any so the relay works even when the popup is opened in odd ways
+// (test harness paths, side-panel re-open after capture stopped).
 let cachedTabId: number | null = null;
-let cachedTabUrl: string | null = null;
-let cachedTabSource: 'sw-target' | 'currentWindow' | 'lastFocusedWindow' | 'any' | 'override' | 'none' = 'none';
 async function preloadTabId(): Promise<void> {
   const params = new URLSearchParams(location.search);
   const override = params.get('tabId');
   if (override) {
     cachedTabId = Number(override);
-    cachedTabSource = 'override';
-    await fetchTabUrl();
     return;
   }
-  // Ask the SW which tab Chrome activeTab-granted.
   try {
     const resp = await chrome.runtime.sendMessage({ type: 'get-target-tab' } satisfies ExtensionMessage);
     if (resp?.tabId != null) {
       cachedTabId = resp.tabId;
-      cachedTabSource = 'sw-target';
-      await fetchTabUrl();
       return;
     }
   } catch { /* SW unreachable; fall through */ }
   const isContent = (t: chrome.tabs.Tab | undefined): boolean =>
     !!t?.url && (t.url.startsWith('http://') || t.url.startsWith('https://'));
-  const queries: Array<{ q: chrome.tabs.QueryInfo; src: typeof cachedTabSource }> = [
-    { q: { active: true, currentWindow: true }, src: 'currentWindow' },
-    { q: { active: true, lastFocusedWindow: true }, src: 'lastFocusedWindow' },
-    { q: { currentWindow: true }, src: 'currentWindow' },
-    { q: {}, src: 'any' },
+  const queries: chrome.tabs.QueryInfo[] = [
+    { active: true, currentWindow: true },
+    { active: true, lastFocusedWindow: true },
+    { currentWindow: true },
+    {},
   ];
-  for (const { q, src } of queries) {
+  for (const q of queries) {
     const tabs = await chrome.tabs.query(q);
     const t = tabs.find(isContent);
     if (t) {
       cachedTabId = t.id ?? null;
-      cachedTabSource = src;
-      cachedTabUrl = t.url ?? null;
       return;
     }
   }
   cachedTabId = null;
-  cachedTabSource = 'none';
 }
+void preloadTabId();
 
-async function fetchTabUrl(): Promise<void> {
-  if (cachedTabId == null) return;
-  try {
-    const tab = await chrome.tabs.get(cachedTabId);
-    cachedTabUrl = tab.url ?? null;
-  } catch (err) {
-    cachedTabUrl = `(get failed: ${(err as Error).message})`;
-  }
-}
-
-function shortUrl(): string {
-  if (!cachedTabUrl) return '(no url)';
-  try {
-    const u = new URL(cachedTabUrl);
-    return u.host + u.pathname.slice(0, 20);
-  } catch { return cachedTabUrl.slice(0, 40); }
-}
-
-// Bootstrap status: ask the SW for actual capture state, then preload
-// the tabId. This ordering matters — popups close on focus-loss (e.g.
-// when Chrome shows the tab-share indicator), so the user may reopen
-// the popup while a capture is already running. Without this query the
-// popup would show "Idle" and let the user click Start, hitting the
-// "active stream" error path.
-// Both buttons start in the "loading" state (both disabled) — bootstrap
-// flips one of them on once the actual capture state is known.
-startBtn.disabled = true;
-stopBtn.disabled = true;
-setStatus('');
-async function bootstrap(): Promise<void> {
-  const [state, stored, traceResp] = await Promise.all([
-    chrome.runtime.sendMessage({ type: 'get-capture-state' } satisfies ExtensionMessage)
-      .catch(() => ({ running: false })),
-    chrome.storage.session.get('__chessrayPopupStatus').catch(() => ({})),
-    chrome.runtime.sendMessage({ type: 'get-trace' } satisfies ExtensionMessage)
-      .catch(() => ({ trace: [] })),
-  ]);
-  await preloadTabId();
-  // Show the last few SW events at the bottom so we can verify whether
-  // chrome.action.onClicked fired when the user clicked the toolbar.
-  const traceLines: string[] = traceResp?.trace?.slice(-6) ?? [];
-  const traceTail = traceLines.length ? '\n— SW trace —\n' + traceLines.join('\n') : '\n(no SW events yet)';
-  if (state?.running) {
-    // CSS hides #cap-status when empty, so the whole status block
-    // collapses out of the panel header during normal capture.
-    setStatus('');
-    setRunningUI(true);
-    return;
-  }
-  setRunningUI(false);
-  // Show last error if it happened recently (within ~30s), otherwise
-  // fall back to Idle. Stale errors don't survive a tab reload.
-  const last = (stored as Record<string, unknown> | undefined)?.__chessrayPopupStatus as { msg: string; isError: boolean; ts: number } | undefined;
-  if (last?.isError && Date.now() - last.ts < 30_000) {
-    setStatus(`(prev) ${last.msg}`, true);
-    return;
-  }
-  if (cachedTabId === null) {
-    setStatus(`No http(s) tab · build ${BUILD}${traceTail}`, true);
-  } else {
-    setStatus(`Idle · build ${BUILD} · ${cachedTabSource} · tab ${cachedTabId} · ${shortUrl()}${traceTail}`);
-  }
-}
-void bootstrap();
-
-// When the SW updates the invoked tab id (i.e., the user finally clicks
-// the toolbar icon), refresh the side panel's status so the "click
-// toolbar icon" warning goes away on its own without a panel reload.
+// When the SW updates the invoked tab id (i.e., the user clicks the
+// toolbar icon and the side panel rehydrates onto a new tab), refresh
+// the cached tab id so subsequent pref changes go to the right tab.
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'session') return;
-  if ('__chessrayInvokedTab' in changes) void bootstrap();
+  if ('__chessrayInvokedTab' in changes) void preloadTabId();
 });
 
 // ── Frame-result + display-info plumbing ───────────────────────────────
@@ -177,73 +78,6 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
 function applySetting(setting: ExtensionSetting): void {
   chrome.runtime.sendMessage({ type: 'apply-setting', setting } satisfies ExtensionMessage).catch(() => {});
 }
-
-// ── Capture lifecycle ─────────────────────────────────────────────────
-//
-// Sync call into chrome.tabCapture.getMediaStreamId is critical: any
-// preceding await consumes the user-gesture activation and the call
-// fails with the activeTab error. Tab id is already cached.
-
-function setStatus(msg: string, isError = false): void {
-  status.textContent = msg;
-  status.classList.toggle('error', isError);
-  // Mirror to chrome.storage.session so reopening the popup (which
-  // happens automatically when Chrome's tab-share indicator steals
-  // focus) still shows the last status / error.
-  void chrome.storage.session.set({
-    __chessrayPopupStatus: { msg, isError, ts: Date.now() },
-  }).catch(() => {});
-}
-
-startBtn.addEventListener('click', () => {
-  if (cachedTabId === null) {
-    setStatus('No http(s) tab found to capture', true);
-    void preloadTabId();
-    return;
-  }
-  const tabId = cachedTabId;
-  setStatus('Starting…');
-  chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
-    if (chrome.runtime.lastError || !streamId) {
-      const msg = chrome.runtime.lastError?.message ?? 'no stream id';
-      // Always surface the RAW Chrome error verbatim plus all context.
-      // The user keeps reporting "doesn't work" without telling me what
-      // the error string is — wrapping it with friendly hints was hiding
-      // the actual symptom. Show everything.
-      setStatus(
-        `Chrome rejected getMediaStreamId.\n` +
-        `targetTabId=${tabId} (${cachedTabSource}, ${shortUrl()})\n` +
-        `error: "${msg}"`,
-        true,
-      );
-      return;
-    }
-    void (async () => {
-      try {
-        const resp: { ok: boolean; error?: string } = await chrome.runtime.sendMessage({
-          type: 'start-capture', tabId, streamId,
-        } satisfies ExtensionMessage);
-        if (resp?.ok) {
-          setStatus('');
-          setRunningUI(true);
-        } else {
-          setStatus(`SW error: ${resp?.error ?? 'unknown'}`, true);
-        }
-      } catch (err) {
-        setStatus(`Send failed: ${(err as Error).message}`, true);
-      }
-    })();
-  });
-});
-
-stopBtn.addEventListener('click', async () => {
-  await chrome.runtime.sendMessage({ type: 'stop-capture' } satisfies ExtensionMessage).catch(() => {});
-  // Don't set a "Stopped" status — the disabled Stop button + enabled
-  // Start button already convey the state visually, and an extra text
-  // line below the buttons looks ugly.
-  setStatus('');
-  setRunningUI(false);
-});
 
 // ── Bridge ─────────────────────────────────────────────────────────────
 
