@@ -13,9 +13,9 @@ body {
      allocates ~480px by default and the user can drag-resize. */
   width: 100%;
   min-width: 280px;
-  background: #171717;
-  color: #e5e5e5;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
   /* panel.css sets body{overflow:hidden} — fine for the Electron
      overlay window, fatal here. Restore vertical scrolling. */
   overflow-x: hidden !important;
@@ -27,7 +27,7 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   padding: 8px 10px;
-  border-bottom: 1px solid #272727;
+  border-bottom: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.35);
 }
 
@@ -43,14 +43,14 @@ body {
   letter-spacing: 0.02em;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid transparent;
-  color: #71717a;
+  color: var(--text-muted);
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 #cap-bar button:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.07);
-  color: #e5e5e5;
+  color: var(--text);
 }
 #cap-bar button:active:not(:disabled) {
   background: rgba(255, 255, 255, 0.10);
@@ -59,15 +59,15 @@ body {
   opacity: 0.40;
   cursor: not-allowed;
 }
-#cap-bar #start:not(:disabled) { color: #22c55e; }
+#cap-bar #start:not(:disabled) { color: var(--accent); }
 #cap-bar #start:not(:disabled):hover {
   background: rgba(34, 197, 94, 0.10);
-  color: #4ade80;
+  color: var(--accent-hover);
 }
-#cap-bar #stop:not(:disabled) { color: #f87171; }
+#cap-bar #stop:not(:disabled) { color: var(--danger); }
 #cap-bar #stop:not(:disabled):hover {
   background: rgba(248, 113, 113, 0.10);
-  color: #fca5a5;
+  color: var(--danger-hover);
 }
 #cap-bar .cap-dot {
   width: 6px;
@@ -88,15 +88,15 @@ body {
 #cap-status {
   grid-column: 1 / -1;
   font-size: 10px;
-  color: #a3a3a3;
+  color: var(--text-dim);
   padding-top: 2px;
   word-break: break-word;
   line-height: 1.35;
   white-space: pre-wrap;
-  font-family: ui-monospace, 'SF Mono', monospace;
+  font-family: var(--mono);
 }
 #cap-status:empty { display: none; }
-#cap-status.error { color: #f87171; }
+#cap-status.error { color: var(--danger); }
 
 /* The mounted overlay panel: in production it's a fixed-positioned
    floating window. Inside the popup body we want it inline, full width,
@@ -144,4 +144,16 @@ canvas#video-overlay {
 /* Drop the bottom-of-panel resize grips inside a popup. */
 .resize-grip {
   display: none !important;
+}
+
+/* Engine-info diagnostics row at the bottom of the panel's debug section.
+   Reference info — muted styling so it doesn't compete with primary
+   diagnostics. */
+#cv-engine-info {
+  font: 10px var(--mono);
+  color: var(--text-muted);
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+  white-space: pre-wrap;
+  opacity: 0.75;
 }

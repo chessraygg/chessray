@@ -15,6 +15,9 @@
   --radius-sm: 4px;
   --panel-w: 300px;
   --accent: #22c55e;
+  --accent-hover: #4ade80;
+  --danger: #f87171;
+  --danger-hover: #fca5a5;
 }
 
 body {

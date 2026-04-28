@@ -331,10 +331,7 @@ function ensureEngineInfoEl(): HTMLElement | null {
   el = document.createElement('div');
   el.id = 'cv-engine-info';
   // Append at the BOTTOM of the diagnostics view — it's reference info,
-  // not the primary thing the user is looking at. Muted color + smaller
-  // font + top border (instead of the previous full-width background
-  // block) keeps it unobtrusive.
-  el.style.cssText = 'font: 10px ui-monospace, monospace; color: #6b7280; padding: 6px 10px; border-top: 1px solid #272727; white-space: pre-wrap; opacity: 0.75;';
+  // not the primary thing the user is looking at. Styled in popup.css.
   el.textContent = 'Engine info: loading…';
   debugSection.appendChild(el);
   return el;
