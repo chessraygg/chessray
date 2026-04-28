@@ -1446,6 +1446,11 @@ function initOverlay(): void {
     statusOrientCell?.classList.toggle('manual', isManual);
     savePrefs({ manualOrientationFlip: state.manualOrientationFlip });
     chessRay.setManualFlip(state.manualOrientationFlip);
+    // Flipping the orientation mirrors the recognized FEN. Without this
+    // reset, the very next frame would compare its (mirrored) FEN against
+    // the pre-flip baseline, see similarity < 0.5, and immediately clear
+    // the override the user just set.
+    lastRecogFen = null;
   }
   orientationBadge?.addEventListener('click', toggleManualOrientation);
   statusOrientCell?.addEventListener('click', toggleManualOrientation);
