@@ -240,14 +240,8 @@ export function updateDebugPanel(
     renderBoardGrid(grid, result.recognition.fen, !!result.flipped, result.highlighted_squares || [], result.square_colors);
   }
 
-  // Status bar (Analysis view): turn / orientation / depth / lines / fps as a merged H2-style strip.
+  // Status bar (Analysis view): turn / orientation / depth as a merged H2-style strip.
   const turn = result.turn ?? result.evaluation?.fen?.split(' ')[1] ?? null;
-  // Header status dot tracks side-to-move so the panel keeps a turn cue even
-  // when the merged header doesn't render the full status bar (Settings view).
-  if (turn) {
-    const appDot = document.getElementById('cv-app-dot');
-    if (appDot) appDot.className = `r2-head-dot turn-dot ${turn === 'w' ? 'white' : 'black'}`;
-  }
   const statusTurn = document.getElementById('cv-status-turn');
   if (statusTurn && turn) {
     const dot = statusTurn.querySelector('.r2-status-dot') as HTMLElement | null;
@@ -444,13 +438,11 @@ let currentFpsBudgetMs = 0;
 export function setFpsBudgetMs(ms: number): void { currentFpsBudgetMs = ms; }
 
 /** Active FPS the controller is currently targeting. Shown as a pill on the
- *  total bar AND in the analysis-view status bar. Updated whenever the
- *  controller steps up/down. */
+ *  total bar in Diagnostics. The user-facing analysis view no longer
+ *  surfaces fps — it's an internal auto-tuning detail. */
 let currentActiveFps = 0;
 export function setActiveFpsDisplay(fps: number): void {
   currentActiveFps = fps;
-  const statusEl = document.querySelector('#cv-status-fps .r2-status-text') as HTMLElement | null;
-  if (statusEl) statusEl.textContent = fps > 0 ? `${fps} fps` : '— fps';
 }
 
 export interface DebugHistoryNavState {

@@ -1220,28 +1220,19 @@ function initOverlay(): void {
     });
   }
 
-  // ── MultiPV max slider ──
+  // ── Top lines (multi-PV) slider — Analysis-view inline control ──
   const multiPvSlider = document.getElementById('cv-multi-pv-max') as HTMLInputElement | null;
   const multiPvVal = document.getElementById('cv-multi-pv-max-val');
-  const multiPvStatus = document.querySelector('#cv-status-lines .r2-status-text') as HTMLElement | null;
-  const writeLinesHeader = (n: number): void => {
-    if (multiPvStatus) multiPvStatus.textContent = `${n} lines`;
-  };
   if (multiPvSlider && multiPvVal) {
     multiPvSlider.value = String(prefs.multiPvMax);
     multiPvVal.textContent = String(prefs.multiPvMax);
-    writeLinesHeader(prefs.multiPvMax);
     chessRay.setMultiPvMax(prefs.multiPvMax);
     multiPvSlider.addEventListener('input', () => {
       const n = parseInt(multiPvSlider.value, 10);
       multiPvVal.textContent = String(n);
-      writeLinesHeader(n);
       savePrefs({ multiPvMax: n });
       chessRay.setMultiPvMax(n);
     });
-  } else {
-    // Slider was removed — still keep the header readout in sync with the pref.
-    writeLinesHeader(prefs.multiPvMax);
   }
 
 // ── Overlay size / opacity sliders ──
@@ -1289,22 +1280,11 @@ function initOverlay(): void {
   }
 
   // ── Frame rate ceiling (auto-tuner floor is hardcoded to 1) ──
-  const fpsMaxSlider = document.getElementById('cv-fps-max') as HTMLInputElement | null;
-  const fpsMaxVal = document.getElementById('cv-fps-max-val');
+  // No user-facing slider — fps is internal auto-tuning state. The pref
+  // still controls the ceiling so existing saved values are honored.
   fpsRange.min = 1;
   fpsRange.max = Math.max(1, prefs.fpsMax ?? 5);
   setActiveFps(clamp(prefs.targetFps ?? fpsRange.min, fpsRange.min, fpsRange.max));
-  if (fpsMaxSlider && fpsMaxVal) {
-    fpsMaxSlider.value = String(fpsRange.max);
-    fpsMaxVal.textContent = String(fpsRange.max);
-    fpsMaxSlider.addEventListener('input', () => {
-      const v = parseInt(fpsMaxSlider.value, 10);
-      fpsRange.max = Math.max(1, v);
-      fpsMaxVal.textContent = String(fpsRange.max);
-      savePrefs({ fpsMax: fpsRange.max });
-      setActiveFps(clamp(activeFps, fpsRange.min, fpsRange.max));
-    });
-  }
 
   // Initial render of the history nav (shows nothing until the first slow frame).
   refreshHistoryNav(document.getElementById('cv-debug-history-nav'));

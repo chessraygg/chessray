@@ -7,9 +7,9 @@ export const PANEL_HTML = `\
 <canvas id="video-overlay"></canvas>
 
 <div class="panel user-panel" id="user-panel">
-  <!-- Single-row header: status dot · tabs · diagnostics · window controls. -->
+  <!-- Single-row header: tabs · diagnostics · window controls. Turn now lives
+       in the Analysis-view status bar; no need for a header dot. -->
   <div class="r2-head r2-head-merged" id="cv-main-toggles">
-    <span class="r2-head-dot turn-dot white" id="cv-app-dot" data-tip="ChessRay is running. Color reflects whose turn it is to move." data-tip-pos="below"></span>
     <div class="r2-tabs" id="r2-tabs">
       <button class="r2-tab active" id="r2-tab-moves" data-view="moves">Analysis</button>
       <button class="r2-tab" id="r2-tab-settings" data-view="settings">Settings</button>
@@ -47,12 +47,14 @@ export const PANEL_HTML = `\
         <span class="r2-status-cell" id="cv-status-depth" data-tip="Engine search depth completed for the current position." data-tip-pos="below">
           <span class="r2-status-text">Depth —</span>
         </span>
-        <span class="r2-status-cell" id="cv-status-lines" data-tip="Number of engine lines the next deeper pass will compute (the multi-PV count from Settings → Engine → Lines)." data-tip-pos="below">
-          <span class="r2-status-text">— lines</span>
-        </span>
-        <span class="r2-status-cell" id="cv-status-fps" data-tip="Frame capture rate the auto-tuner is currently targeting. Adjusts within [1, FPS max] based on observed pipeline cost." data-tip-pos="below">
-          <span class="r2-status-text">— fps</span>
-        </span>
+      </div>
+      <div class="r2-controls" id="cv-analysis-controls">
+        <label data-tip="Number of engine variations the panel shows. Each row is the engine's best continuation given that first move. Higher = more options at the cost of search time per line.">Top lines</label>
+        <input type="range" id="cv-multi-pv-max" min="1" max="8" value="5" step="1">
+        <span id="cv-multi-pv-max-val">5</span>
+        <label data-tip="Maximum centipawn loss vs the best move for an alternative line to be shown. 0 = only the best line. 100 = show moves up to 1.0 pawn worse. (100 cp = 1 pawn of evaluation.)">Loss cap (cp)</label>
+        <input type="range" id="cv-loss-threshold" min="0" max="500" value="100" step="10">
+        <span id="cv-loss-threshold-val">100</span>
       </div>
       <div class="r2-moves" id="cv-best-moves"></div>
     </div>
@@ -60,20 +62,6 @@ export const PANEL_HTML = `\
     <!-- Settings view -->
     <div class="r2-view" id="r2-view-settings" hidden>
       <div class="r2-surface-body">
-
-        <div class="r2-group">
-          <div class="r2-group-label">Engine</div>
-          <div class="pv-depth-row">
-            <label data-tip="Number of engine lines shown. The first (quick) eval uses up to 3; every deeper eval uses this value.">Lines analyzed</label>
-            <input type="range" id="cv-multi-pv-max" min="1" max="8" value="5" step="1">
-            <span id="cv-multi-pv-max-val">5</span>
-          </div>
-          <div class="pv-depth-row">
-            <label data-tip="Upper bound of the auto-tuned frame capture rate. The system can climb to this ceiling when fresh (non-cached) frames stay well under budget; floor is 1 fps.">Capture rate (max)</label>
-            <input type="range" id="cv-fps-max" min="1" max="5" value="5" step="1">
-            <span id="cv-fps-max-val">5</span><span class="pv-unit">fps</span>
-          </div>
-        </div>
 
         <div class="r2-group">
           <div class="r2-group-label">Animation</div>
@@ -91,11 +79,6 @@ export const PANEL_HTML = `\
             <label data-tip="Seconds the preview phase stays visible (selected move highlighted, others hidden) before the per-step PV piece animation begins.">Preview hold</label>
             <input type="range" id="cv-pv-preview-sec" min="0" max="5" value="1" step="1">
             <span id="cv-pv-preview-sec-val">1</span><span class="pv-unit">s</span>
-          </div>
-          <div class="pv-depth-row">
-            <label data-tip="Maximum centipawn loss for showing alternative moves. Lower = only near-best moves; higher = more options visualized.">Alt-move threshold (cp)</label>
-            <input type="range" id="cv-loss-threshold" min="0" max="500" value="100" step="10">
-            <span id="cv-loss-threshold-val">100</span>
           </div>
         </div>
 
