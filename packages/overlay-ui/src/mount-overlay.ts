@@ -1446,11 +1446,11 @@ function initOverlay(): void {
     statusOrientCell?.classList.toggle('manual', isManual);
     savePrefs({ manualOrientationFlip: state.manualOrientationFlip });
     chessRay.setManualFlip(state.manualOrientationFlip);
-    // Flipping the orientation mirrors the recognized FEN. Without this
-    // reset, the very next frame would compare its (mirrored) FEN against
-    // the pre-flip baseline, see similarity < 0.5, and immediately clear
-    // the override the user just set.
-    lastRecogFen = null;
+    // Recognition can be cached for many frames; the manual flip only takes
+    // effect on the next *fresh* recognition, which produces a mirrored FEN.
+    // The flag survives across cached frames so that when the mirrored FEN
+    // finally arrives we don't mistake it for a new game.
+    pendingManualToggleApply = true;
   }
   orientationBadge?.addEventListener('click', toggleManualOrientation);
   statusOrientCell?.addEventListener('click', toggleManualOrientation);
@@ -1563,6 +1563,10 @@ let lastRenderMs = 0;
 let userLockedLine = -1; // -1 = cycle all, >= 0 = locked to that line
 let lastEvalFen: string | null = null;
 let lastRecogFen: string | null = null;
+/** Set true when the user toggles the manual orientation override. The very
+ *  next FEN change is the mirror of the previous recognition (the override
+ *  applied), not a new game — skip the new-game auto-clear once. */
+let pendingManualToggleApply = false;
 let lastEvalDepth: number = 0;
 
 function selectLine(index: number): void {
@@ -1626,9 +1630,14 @@ function processPendingResult(): void {
   // Stop playback immediately when recognition FEN changes (before eval arrives)
   const recogFen = result.recognition?.fen ?? null;
   if (recogFen && recogFen !== lastRecogFen) {
-    // Manual orientation override auto-resets when the new position is too
-    // dissimilar to look like the same game (new game detected).
-    if (state.manualOrientationFlip !== null && lastRecogFen) {
+    if (pendingManualToggleApply) {
+      // First FEN change after the user toggled manual orientation. The new
+      // FEN is the mirror of the old (because the override applied), not a
+      // new game — re-baseline and skip the new-game auto-clear this once.
+      pendingManualToggleApply = false;
+    } else if (state.manualOrientationFlip !== null && lastRecogFen) {
+      // Manual orientation override auto-resets when the new position is too
+      // dissimilar to look like the same game (new game detected).
       const similarity = fenSimilarity(lastRecogFen, recogFen);
       if (similarity < 0.5) {
         state.manualOrientationFlip = null;
