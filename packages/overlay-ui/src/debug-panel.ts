@@ -22,15 +22,21 @@ export function clearDebugPanel(
 
   const evalFill = document.getElementById('cv-eval-fill') as HTMLDivElement | null;
   const evalLabel = document.getElementById('cv-eval-label');
-  const depthLabel = document.getElementById('cv-eval-depth');
   if (evalFill) { evalFill.style.width = '50%'; evalFill.style.background = '#d4d4d4'; evalFill.parentElement!.style.background = '#272727'; }
   if (evalLabel) evalLabel.textContent = '';
-  if (depthLabel) depthLabel.textContent = '';
 
-  const turnDot = document.getElementById('cv-turn-dot');
-  const turnText = document.getElementById('cv-turn-text');
-  if (turnDot) turnDot.className = 'turn-dot';
-  if (turnText) turnText.textContent = '';
+  // Reset the merged status bar (turn / orientation / depth / lines / fps).
+  const statusTurnDot = document.querySelector('#cv-status-turn .r2-status-dot') as HTMLElement | null;
+  const statusTurnText = document.querySelector('#cv-status-turn .r2-status-text') as HTMLElement | null;
+  if (statusTurnDot) statusTurnDot.className = 'r2-status-dot turn-dot';
+  if (statusTurnText) statusTurnText.textContent = '—';
+  const statusOrientText = document.querySelector('#cv-status-orient .r2-status-text') as HTMLElement | null;
+  const statusOrientSuffix = document.querySelector('#cv-status-orient .r2-status-suffix') as HTMLElement | null;
+  if (statusOrientText) statusOrientText.textContent = '—';
+  if (statusOrientSuffix) statusOrientSuffix.textContent = 'auto';
+  document.getElementById('cv-status-orient')?.classList.remove('manual');
+  const statusDepthText = document.querySelector('#cv-status-depth .r2-status-text') as HTMLElement | null;
+  if (statusDepthText) statusDepthText.textContent = 'Depth —';
 
   const hlDebug = document.getElementById('cv-highlight-debug');
   if (hlDebug) hlDebug.innerHTML = '';
@@ -234,22 +240,8 @@ export function updateDebugPanel(
     renderBoardGrid(grid, result.recognition.fen, !!result.flipped, result.highlighted_squares || [], result.square_colors);
   }
 
-  // Turn indicator — use highlight-based turn (always current), fall back to eval FEN
+  // Status bar (Analysis view): turn / orientation / depth / lines / fps as a merged H2-style strip.
   const turn = result.turn ?? result.evaluation?.fen?.split(' ')[1] ?? null;
-  const turnDot = document.getElementById('cv-turn-dot');
-  const turnText = document.getElementById('cv-turn-text');
-  if (turnDot && turnText && turn) {
-    turnDot.className = `turn-dot ${turn === 'w' ? 'white' : 'black'}`;
-    turnText.textContent = turn === 'w' ? "White's turn" : "Black's turn";
-  }
-
-  // Orientation arrow (header)
-  const pawnDir = document.getElementById('cv-pawn-dir');
-  if (pawnDir) {
-    pawnDir.textContent = result.flipped ? '\u2B07' : '\u2B06';
-  }
-
-  // Status bar (Analysis view): turn / orientation / depth as a merged H2-style strip.
   const statusTurn = document.getElementById('cv-status-turn');
   if (statusTurn && turn) {
     const dot = statusTurn.querySelector('.r2-status-dot') as HTMLElement | null;
@@ -288,7 +280,6 @@ export function updateDebugPanel(
   // Eval bar
   const evalFill = document.getElementById('cv-eval-fill') as HTMLDivElement | null;
   const evalLabel = document.getElementById('cv-eval-label');
-  const depthLabel = document.getElementById('cv-eval-depth');
 
   if (evalFill && evalLabel) {
     if (result.game_over === 'checkmate') {
@@ -298,13 +289,11 @@ export function updateDebugPanel(
       evalFill.style.background = '#d4d4d4';
       evalFill.parentElement!.style.background = '#272727';
       evalLabel.textContent = '#';
-      if (depthLabel) depthLabel.textContent = '';
     } else if (result.game_over === 'stalemate') {
       evalFill.style.width = '50%';
       evalFill.style.background = '#888';
       evalFill.parentElement!.style.background = '#888';
       evalLabel.textContent = '½–½';
-      if (depthLabel) depthLabel.textContent = '';
     } else if (result.evaluation?.top_moves?.length) {
       const sideScore = result.evaluation.top_moves[0].score_cp;
       const turn = result.evaluation.fen?.split(' ')[1] || 'w';
@@ -321,10 +310,6 @@ export function updateDebugPanel(
       } else {
         const scoreStr = bestScore >= 0 ? `+${(bestScore/100).toFixed(1)}` : (bestScore/100).toFixed(1);
         evalLabel.textContent = scoreStr;
-      }
-
-      if (depthLabel && result.eval_depth) {
-        depthLabel.textContent = `d${result.eval_depth}`;
       }
     }
   }
@@ -453,13 +438,13 @@ let currentFpsBudgetMs = 0;
 export function setFpsBudgetMs(ms: number): void { currentFpsBudgetMs = ms; }
 
 /** Active FPS the controller is currently targeting. Shown as a pill on the
- *  total bar AND in the panel header (cv-active-fps). Updated whenever the
+ *  total bar AND in the analysis-view status bar. Updated whenever the
  *  controller steps up/down. */
 let currentActiveFps = 0;
 export function setActiveFpsDisplay(fps: number): void {
   currentActiveFps = fps;
-  const headerEl = document.getElementById('cv-active-fps');
-  if (headerEl) headerEl.textContent = fps > 0 ? `${fps} fps` : '';
+  const statusEl = document.querySelector('#cv-status-fps .r2-status-text') as HTMLElement | null;
+  if (statusEl) statusEl.textContent = fps > 0 ? `${fps} fps` : '— fps';
 }
 
 export interface DebugHistoryNavState {

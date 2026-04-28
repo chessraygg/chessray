@@ -7,17 +7,9 @@ export const PANEL_HTML = `\
 <canvas id="video-overlay"></canvas>
 
 <div class="panel user-panel" id="user-panel">
-  <!-- Slim header: turn · depth · ⚙ ⚧ — × -->
+  <!-- Slim header: window controls only. Live status (turn, orientation,
+       depth, lines, fps) lives in the merged status bar below the board. -->
   <div class="r2-head" id="cv-main-toggles">
-    <span class="r2-turn-dot turn-dot" id="cv-turn-dot"></span>
-    <span class="r2-meta">
-      <span class="r2-meta-depth" id="cv-eval-depth" data-tip="Currently completed engine search depth. Climbs while the position is stable; resets when a new move is recognized." data-tip-pos="below"></span>
-      <span class="r2-meta-lines" id="cv-active-lines" data-tip="Number of engine lines the next deeper pass will compute (the multi-PV count from Settings → Engine → Lines)." data-tip-pos="below"></span>
-      <span class="r2-meta-fps" id="cv-active-fps" data-tip="Frame capture rate the auto-tuner is currently targeting. Adjusts within [1, FPS max] based on observed pipeline cost." data-tip-pos="below"></span>
-      <span class="orientation-badge r2-meta-orient" id="cv-orientation-badge" data-tip="Click to flip the board manually. Click again to return to auto-detection. Resets automatically on a new game." data-tip-pos="below">
-        <span class="orient-arrow" id="cv-pawn-dir"></span>
-      </span>
-    </span>
     <span class="r2-spacer"></span>
     <button class="r2-btn" id="cv-hide-btn" data-tip="Hide control panel (toggle: Cmd/Ctrl+Shift+H)" data-tip-pos="below">&#x2014;</button>
     <button class="r2-btn danger" id="cv-close-btn" data-tip="Close" data-tip-pos="below">&#xD7;</button>
@@ -56,6 +48,12 @@ export const PANEL_HTML = `\
         </span>
         <span class="r2-status-cell" id="cv-status-depth" data-tip="Engine search depth completed for the current position." data-tip-pos="below">
           <span class="r2-status-text">Depth —</span>
+        </span>
+        <span class="r2-status-cell" id="cv-status-lines" data-tip="Number of engine lines the next deeper pass will compute (the multi-PV count from Settings → Engine → Lines)." data-tip-pos="below">
+          <span class="r2-status-text">— lines</span>
+        </span>
+        <span class="r2-status-cell" id="cv-status-fps" data-tip="Frame capture rate the auto-tuner is currently targeting. Adjusts within [1, FPS max] based on observed pipeline cost." data-tip-pos="below">
+          <span class="r2-status-text">— fps</span>
         </span>
       </div>
       <div class="r2-moves" id="cv-best-moves"></div>
@@ -183,7 +181,6 @@ export const PANEL_HTML = `\
     <button id="cv-eval-btn"></button>
     <button id="cv-compact-btn"></button>
     <button id="cv-collapse-btn"></button>
-    <span id="cv-turn-text"></span>
     <span id="cv-compact-hint"></span>
     <div id="cv-compact-moves"></div>
   </div>

@@ -1223,9 +1223,9 @@ function initOverlay(): void {
   // ── MultiPV max slider ──
   const multiPvSlider = document.getElementById('cv-multi-pv-max') as HTMLInputElement | null;
   const multiPvVal = document.getElementById('cv-multi-pv-max-val');
-  const multiPvHeader = document.getElementById('cv-active-lines');
+  const multiPvStatus = document.querySelector('#cv-status-lines .r2-status-text') as HTMLElement | null;
   const writeLinesHeader = (n: number): void => {
-    if (multiPvHeader) multiPvHeader.textContent = `${n} lines`;
+    if (multiPvStatus) multiPvStatus.textContent = `${n} lines`;
   };
   if (multiPvSlider && multiPvVal) {
     multiPvSlider.value = String(prefs.multiPvMax);
