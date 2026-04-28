@@ -156,9 +156,12 @@ export class FrameProcessor {
   setChangeDetect(on: boolean): void { this.changeDetectEnabled = on; }
   setManualFlip(v: boolean | null): void {
     this.manualFlip = v;
-    // Clear the orientation cache so the next frame re-evaluates with the
-    // new override (or re-runs auto-detection when cleared to null).
+    // Clear both caches so the next frame re-runs recognition with the new
+    // override. Without invalidating lastRecognitionResult the visually-
+    // unchanged fast path would keep returning the pre-flip recognition
+    // and the user would see no change at all.
     this.cachedOrientation = null;
+    this.lastRecognitionResult = null;
   }
 
   /** First (shallowest) pass gets a small quick-look count; every deeper pass
