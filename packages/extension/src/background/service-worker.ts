@@ -73,6 +73,28 @@ async function readTabViewport(tabId: number): Promise<{ width: number; height: 
   }
 }
 
+/** In-memory mirror of the capture state. We need a SYNCHRONOUS read
+ *  in chrome.action.onClicked to decide whether to start or stop, but
+ *  getCaptureState() reads chrome.storage.session asynchronously and
+ *  any await before getMediaStreamId would consume the user gesture.
+ *  Initialized from storage on SW startup so it survives SW sleeps. */
+let currentlyCapturing = false;
+
+/** Toolbar badge: red dot while capturing, clear when idle. Lives in
+ *  browser chrome (not in the captured tab pixels) so it doesn't leak
+ *  into screen recordings while still being always-visible feedback. */
+function setRecBadge(on: boolean): void {
+  if (on) {
+    chrome.action.setBadgeText({ text: '\u25CF' }); // ●
+    chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+    chrome.action.setBadgeTextColor?.({ color: '#ffffff' });
+    chrome.action.setTitle({ title: 'Chessray — capturing (click to stop)' });
+  } else {
+    chrome.action.setBadgeText({ text: '' });
+    chrome.action.setTitle({ title: 'Chessray' });
+  }
+}
+
 async function startCapture(tabId: number, streamId: string): Promise<void> {
   await ensureOffscreen();
   const viewport = await readTabViewport(tabId);
@@ -82,12 +104,16 @@ async function startCapture(tabId: number, streamId: string): Promise<void> {
   const msg: ExtensionMessage = { type: 'capture-started', streamId, tabId, viewport: viewport ?? undefined };
   await chrome.runtime.sendMessage(msg);
   await setCaptureState({ running: true, tabId });
+  currentlyCapturing = true;
+  setRecBadge(true);
 }
 
 async function stopCapture(): Promise<void> {
   const msg: ExtensionMessage = { type: 'stop-capture' };
   await chrome.runtime.sendMessage(msg).catch(() => {});
   await setCaptureState({ running: false });
+  currentlyCapturing = false;
+  setRecBadge(false);
   // Tell every surface (content script + side panel) that capture
   // ended so the on-page overlay clears. Without this the last-drawn
   // bbox + arrows sit on the page until the user reloads it.
@@ -208,6 +234,16 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false })
   .then(() => note('setPanelBehavior(openPanelOnActionClick=false) ok'))
   .catch((err) => note(`setPanelBehavior FAILED: ${String(err)}`));
 
+// Hydrate currentlyCapturing + badge from persisted state — survives
+// the SW sleeping mid-capture. Without this, after the SW respawns the
+// in-memory flag would be false and a toolbar click would try to START
+// (and fail with "active stream") instead of toggling off.
+void getCaptureState().then((s) => {
+  currentlyCapturing = !!s.running;
+  setRecBadge(currentlyCapturing);
+  note(`hydrated capture state: running=${currentlyCapturing}`);
+});
+
 // Documented pattern: side_panel.default_path in manifest + no
 // setPanelBehavior call means action.onClicked fires on toolbar click
 // (granting activeTab); the listener below opens the panel manually.
@@ -244,17 +280,20 @@ async function autoStart(tabId: number): Promise<boolean> {
 }
 
 chrome.action.onClicked.addListener((tab) => {
-  note(`action.onClicked tab=${tab.id}`);
+  note(`action.onClicked tab=${tab.id} (capturing=${currentlyCapturing})`);
   if (tab.id == null) return;
   const tabId = tab.id;
-  // Order matters: getMediaStreamId MUST run before any await that
-  // could consume the user activation. chrome.sidePanel.open does
-  // consume it on some Chrome versions (chromium 40916430-related),
-  // which is why the previous code sometimes needed a fallback right-
-  // click to actually start capture. Grab the streamId synchronously
-  // first, then do the housekeeping (recordInvocation,
-  // sidePanel.open, startCapture) afterwards — those awaits are now
-  // safe because we already have the streamId.
+  // Toggle: if already capturing, the click stops it. Stopping doesn't
+  // need a fresh user gesture (it just clears the existing stream), so
+  // the await chain in stopCapture is fine.
+  if (currentlyCapturing) {
+    void stopCapture();
+    return;
+  }
+  // Start path. getMediaStreamId MUST run synchronously before any
+  // await — chrome.sidePanel.open consumes the user activation on some
+  // Chrome versions (chromium 40916430-class). Grab the streamId
+  // first, then do housekeeping in the callback.
   chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, async (streamId) => {
     if (chrome.runtime.lastError || !streamId) {
       note(`getMediaStreamId FAILED: ${chrome.runtime.lastError?.message ?? 'no id'}`);
