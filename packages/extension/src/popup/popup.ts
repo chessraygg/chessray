@@ -16,7 +16,7 @@
  * is in hand.
  */
 
-import { mountOverlay, type ChessRayAPI, type DisplayInfo, type HostDisplay } from '@chessray/overlay-ui';
+import { mountOverlay, createDefaultBridge, type ChessRayAPI, type DisplayInfo } from '@chessray/overlay-ui';
 import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
 // Popup owns its document, so it can safely load panel.css's global
 // rules. (mount-overlay.ts no longer pulls panel.css automatically —
@@ -178,8 +178,6 @@ function applySetting(setting: ExtensionSetting): void {
   chrome.runtime.sendMessage({ type: 'apply-setting', setting } satisfies ExtensionMessage).catch(() => {});
 }
 
-const noop = (): void => { /* host doesn't support this method */ };
-
 // ── Capture lifecycle ─────────────────────────────────────────────────
 //
 // Sync call into chrome.tabCapture.getMediaStreamId is critical: any
@@ -249,19 +247,11 @@ stopBtn.addEventListener('click', async () => {
 
 // ── Bridge ─────────────────────────────────────────────────────────────
 
-const bridge: ChessRayAPI = {
-  onStartCapture: noop,
-  onStopCapture: noop,
-  sendRendererReady: noop,
-  getSourceId: () => Promise.resolve(null),
-  sendFrameResult: noop,
+const bridge: ChessRayAPI = createDefaultBridge({
   sendDebugLog: (msg: string) => { console.log('[chessray]', msg); },
 
   onFrameResult: (cb) => { frameResultListeners.push(cb); },
-  onStopTracking: noop,
 
-  setMousePassthrough: noop,
-  setAlwaysOnTop: noop,
   onDisplayInfo: (cb) => {
     displayInfoListeners.push(cb);
     cb({
@@ -270,49 +260,26 @@ const bridge: ChessRayAPI = {
       displayBounds: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
     });
   },
-  onSourceVisibility: (cb) => { cb(true); },
-
-  getSources: () => Promise.resolve([]),
-  selectSource: noop,
-  reopenPicker: noop,
 
   setMultiPvMax: (n) => applySetting({ key: 'multi-pv-max', value: n }),
-  onSetMultiPvMax: noop,
   setChangeDetect: (enabled) => applySetting({ key: 'change-detect', value: enabled }),
-  onSetChangeDetect: noop,
   setManualFlip: (v) => applySetting({ key: 'manual-flip', value: v }),
-  onSetManualFlip: noop,
   setTargetFps: (fps) => applySetting({ key: 'target-fps', value: fps }),
-  onSetTargetFps: noop,
 
-  onResetPanelPosition: noop,
-  onTogglePanel: noop,
-  onResetAllSettings: noop,
-  requestResetPanelPosition: noop,
   requestResetAllSettings: () => {
     if (confirm('Reset all panel settings to defaults?')) {
       try { localStorage.removeItem('chessray-prefs'); } catch { /* ignore */ }
       location.reload();
     }
   },
-  getDisplays: (): Promise<HostDisplay[]> => Promise.resolve([]),
-  switchDisplay: noop,
-  onDisplaysChanged: noop,
 
-  startRecording: noop,
-  stopRecording: noop,
-  onRecordingStateChanged: noop,
-  saveFrameArtifact: noop,
-
-  minimizeApp: noop,
   closeApp: () => { window.close(); },
   openExternal: (url) => { chrome.tabs.create({ url }); },
   toggleLichess: (fen) => {
     const fenPath = encodeURIComponent(fen.split(' ')[0] ?? fen);
     chrome.tabs.create({ url: `https://lichess.org/analysis/${fenPath}` });
   },
-  updateLichess: noop,
-};
+});
 
 mountOverlay(bridge);
 

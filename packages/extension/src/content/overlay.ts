@@ -12,7 +12,7 @@
  * without `?.()` guards.
  */
 
-import { mountOverlay, type ChessRayAPI, type DisplayInfo, type HostDisplay, videoHitCache, hitTestArrows, hitTestAnimBoard } from '@chessray/overlay-ui';
+import { mountOverlay, createDefaultBridge, type ChessRayAPI, type DisplayInfo, videoHitCache, hitTestArrows, hitTestAnimBoard } from '@chessray/overlay-ui';
 import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
 // Minimal CSS for the on-screen canvas only. We deliberately don't
 // import overlay-ui's panel.css here — it sets body{overflow:hidden}
@@ -130,27 +130,12 @@ function emitDisplayInfo(): void {
 }
 window.addEventListener('resize', emitDisplayInfo);
 
-const noop = (): void => { /* intentionally empty — capability not present in this host */ };
-
-const bridge: ChessRayAPI = {
-  // ── Capture lifecycle (analysis-side) ──
-  // Content script doesn't run analysis; these are no-ops here. The
-  // offscreen document handles capture; our service worker triggers it.
-  onStartCapture: noop,
-  onStopCapture: noop,
-  sendRendererReady: noop,
-  getSourceId: () => Promise.resolve(null),
-  sendFrameResult: noop,
+const bridge: ChessRayAPI = createDefaultBridge({
   sendDebugLog: (msg: string) => { console.log('[chessray]', msg); },
 
-  // Frame results: subscribe to chrome.runtime messages.
   onFrameResult: (cb) => { frameResultListeners.push(cb); },
   onStopTracking: (cb) => { stopTrackingListeners.push(cb); },
 
-  // ── Window/panel controls ──
-  // Content overlay is pointer-events: none; passthrough is implicit.
-  setMousePassthrough: noop,
-  setAlwaysOnTop: noop,
   onDisplayInfo: (cb) => {
     displayInfoListeners.push(cb);
     // Push an initial value so the renderer has DPR/bounds before the
@@ -161,28 +146,12 @@ const bridge: ChessRayAPI = {
       displayBounds: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
     });
   },
-  onSourceVisibility: (cb) => { cb(true); },
 
-  // Source picker — no analog in tab-bound extension. Stub.
-  getSources: () => Promise.resolve([]),
-  selectSource: noop,
-  reopenPicker: noop,
-
-  // ── Engine settings → forward to offscreen ──
   setMultiPvMax: (n) => applySetting({ key: 'multi-pv-max', value: n }),
-  onSetMultiPvMax: noop, // analysis-side; not used in content
   setChangeDetect: (enabled) => applySetting({ key: 'change-detect', value: enabled }),
-  onSetChangeDetect: noop,
   setManualFlip: (v) => applySetting({ key: 'manual-flip', value: v }),
-  onSetManualFlip: noop,
   setTargetFps: (fps) => applySetting({ key: 'target-fps', value: fps }),
-  onSetTargetFps: noop,
 
-  // ── Panel / system actions ──
-  // The content panel handles these locally — no main-process roundtrip.
-  onResetPanelPosition: noop,
-  onTogglePanel: noop,
-  onResetAllSettings: noop,
   requestResetPanelPosition: () => {
     const panel = document.getElementById('user-panel') as HTMLElement | null;
     if (panel) {
@@ -197,18 +166,7 @@ const bridge: ChessRayAPI = {
       location.reload();
     }
   },
-  getDisplays: (): Promise<HostDisplay[]> => Promise.resolve([]),
-  switchDisplay: noop,
-  onDisplaysChanged: noop,
 
-  // ── Frame recording — no fs in content script ──
-  startRecording: noop,
-  stopRecording: noop,
-  onRecordingStateChanged: noop,
-  saveFrameArtifact: noop,
-
-  // ── Window/app controls ──
-  minimizeApp: noop,
   closeApp: () => {
     const panel = document.getElementById('user-panel') as HTMLElement | null;
     if (panel) panel.style.display = 'none';
@@ -218,8 +176,7 @@ const bridge: ChessRayAPI = {
     const fenPath = encodeURIComponent(fen.split(' ')[0] ?? fen);
     window.open(`https://lichess.org/analysis/${fenPath}`, '_blank', 'noopener');
   },
-  updateLichess: noop, // tab is detached; no live-sync
-};
+});
 
 // Mount the overlay-ui but hide the floating panel — the popup is the
 // canonical UI surface in the extension. The on-screen #video-overlay

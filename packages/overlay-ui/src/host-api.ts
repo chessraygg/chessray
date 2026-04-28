@@ -78,3 +78,70 @@ export interface ChessRayAPI {
   toggleLichess: (fen: string, color: string) => void;
   updateLichess: (fen: string, color: string) => void;
 }
+
+/**
+ * Build a ChessRayAPI from a partial set of host implementations, filling
+ * the gaps with safe no-op defaults. Hosts that can't honor a capability
+ * (e.g. the extension can't toggle mouse passthrough on a tab) just omit
+ * those keys; the helper supplies stubs.
+ *
+ * Why this exists: ChessRayAPI is ~35 methods, and previously every host
+ * — popup, content script — re-declared `noop = () => {}` and wired ~25
+ * stubs by hand. When the interface grew, those wrappers fell out of sync
+ * silently because TypeScript's structural typing accepted under-typed
+ * objects. Funnelling through `createDefaultBridge` means TS only has to
+ * verify that the *helper* covers every key, and adding a new method
+ * automatically gets a default for hosts that don't override it.
+ */
+export function createDefaultBridge(overrides: Partial<ChessRayAPI> = {}): ChessRayAPI {
+  const noop = (): void => { /* host doesn't support this method */ };
+  const defaults: ChessRayAPI = {
+    onStartCapture: noop,
+    onStopCapture: noop,
+    sendRendererReady: noop,
+    getSourceId: () => Promise.resolve(null),
+    sendFrameResult: noop,
+    sendDebugLog: noop,
+    onFrameResult: noop,
+    onStopTracking: noop,
+
+    setMousePassthrough: noop,
+    setAlwaysOnTop: noop,
+    onDisplayInfo: noop,
+    onSourceVisibility: (cb: (visible: boolean) => void) => { cb(true); },
+
+    getSources: () => Promise.resolve([]),
+    selectSource: noop,
+    reopenPicker: noop,
+
+    setMultiPvMax: noop,
+    onSetMultiPvMax: noop,
+    setChangeDetect: noop,
+    onSetChangeDetect: noop,
+    setManualFlip: noop,
+    onSetManualFlip: noop,
+    setTargetFps: noop,
+    onSetTargetFps: noop,
+
+    onResetPanelPosition: noop,
+    onTogglePanel: noop,
+    onResetAllSettings: noop,
+    requestResetPanelPosition: noop,
+    requestResetAllSettings: noop,
+    getDisplays: () => Promise.resolve([]),
+    switchDisplay: noop,
+    onDisplaysChanged: noop,
+
+    startRecording: noop,
+    stopRecording: noop,
+    onRecordingStateChanged: noop,
+    saveFrameArtifact: noop,
+
+    minimizeApp: noop,
+    closeApp: noop,
+    openExternal: noop,
+    toggleLichess: noop,
+    updateLichess: noop,
+  };
+  return { ...defaults, ...overrides };
+}
