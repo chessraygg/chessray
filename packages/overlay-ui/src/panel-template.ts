@@ -39,7 +39,7 @@ export const PANEL_HTML = `\
       </div>
       <div class="r2-status-bar" id="cv-status-bar" role="heading" aria-level="2">
         <span class="r2-status-cell" id="cv-status-turn" data-tip="Whose turn it is to move." data-tip-pos="below">
-          <span class="r2-status-dot turn-dot"></span><span class="r2-status-text">—</span>
+          <span class="r2-status-text">—</span><span class="r2-status-dot turn-dot"></span>
         </span>
         <span class="r2-status-cell r2-status-orient" id="cv-status-orient" data-tip="Detected board orientation. Click to override; click again to return to auto-detection." data-tip-pos="below">
           <span class="r2-status-text">—</span><span class="r2-status-suffix">auto</span>
