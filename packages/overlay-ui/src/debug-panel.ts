@@ -235,20 +235,41 @@ export function updateDebugPanel(
   }
 
   // Turn indicator — use highlight-based turn (always current), fall back to eval FEN
+  const turn = result.turn ?? result.evaluation?.fen?.split(' ')[1] ?? null;
   const turnDot = document.getElementById('cv-turn-dot');
   const turnText = document.getElementById('cv-turn-text');
-  if (turnDot && turnText) {
-    const turn = result.turn ?? result.evaluation?.fen?.split(' ')[1] ?? null;
-    if (turn) {
-      turnDot.className = `turn-dot ${turn === 'w' ? 'white' : 'black'}`;
-      turnText.textContent = turn === 'w' ? "White's turn" : "Black's turn";
-    }
+  if (turnDot && turnText && turn) {
+    turnDot.className = `turn-dot ${turn === 'w' ? 'white' : 'black'}`;
+    turnText.textContent = turn === 'w' ? "White's turn" : "Black's turn";
   }
 
-  // Orientation arrow
+  // Orientation arrow (header)
   const pawnDir = document.getElementById('cv-pawn-dir');
   if (pawnDir) {
     pawnDir.textContent = result.flipped ? '\u2B07' : '\u2B06';
+  }
+
+  // Status bar (Analysis view): turn / orientation / depth as a merged H2-style strip.
+  const statusTurn = document.getElementById('cv-status-turn');
+  if (statusTurn && turn) {
+    const dot = statusTurn.querySelector('.r2-status-dot') as HTMLElement | null;
+    const txt = statusTurn.querySelector('.r2-status-text') as HTMLElement | null;
+    if (dot) dot.className = `r2-status-dot turn-dot ${turn === 'w' ? 'white' : 'black'}`;
+    if (txt) txt.textContent = turn === 'w' ? "White's turn" : "Black's turn";
+  }
+  const statusOrient = document.getElementById('cv-status-orient');
+  if (statusOrient) {
+    const txt = statusOrient.querySelector('.r2-status-text') as HTMLElement | null;
+    const suf = statusOrient.querySelector('.r2-status-suffix') as HTMLElement | null;
+    if (txt) txt.textContent = result.flipped ? 'White at top' : 'White at bottom';
+    const isManual = result.orientation_source === 'manual';
+    statusOrient.classList.toggle('manual', isManual);
+    if (suf) suf.textContent = isManual ? 'manual' : 'auto';
+  }
+  const statusDepth = document.getElementById('cv-status-depth');
+  if (statusDepth) {
+    const txt = statusDepth.querySelector('.r2-status-text') as HTMLElement | null;
+    if (txt) txt.textContent = result.eval_depth ? `Depth ${result.eval_depth}` : 'Depth —';
   }
 
   // Debug orientation info

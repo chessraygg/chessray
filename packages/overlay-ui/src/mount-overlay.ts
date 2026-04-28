@@ -1446,27 +1446,33 @@ function initOverlay(): void {
     }
   });
 
-  // ── Orientation badge click: toggle manual orientation override ──
+  // ── Orientation flip: toggle manual orientation override ──
   // First click: pin the opposite of whatever's currently detected (i.e. flip
   // the board). Second click: return to auto-detection. The override is also
   // auto-cleared in processPendingResult when the position changes enough to
-  // look like a new game (FEN similarity < 0.5).
+  // look like a new game (FEN similarity < 0.5). Two surfaces share the
+  // handler: the header badge and the analysis-view status-bar cell.
   const orientationBadge = document.getElementById('cv-orientation-badge');
-  orientationBadge?.addEventListener('click', () => {
+  const statusOrientCell = document.getElementById('cv-status-orient');
+  function toggleManualOrientation(): void {
     if (state.manualOrientationFlip === null) {
-      // Pin to the opposite of what we're currently rendering
       const detected = state.displayFlipped;
       state.manualOrientationFlip = !detected;
     } else {
       state.manualOrientationFlip = null;
     }
-    orientationBadge.classList.toggle('manual', state.manualOrientationFlip !== null);
+    const isManual = state.manualOrientationFlip !== null;
+    orientationBadge?.classList.toggle('manual', isManual);
+    statusOrientCell?.classList.toggle('manual', isManual);
     savePrefs({ manualOrientationFlip: state.manualOrientationFlip });
     chessRay.setManualFlip(state.manualOrientationFlip);
-  });
-  // Reflect the initial pref on the badge.
+  }
+  orientationBadge?.addEventListener('click', toggleManualOrientation);
+  statusOrientCell?.addEventListener('click', toggleManualOrientation);
+  // Reflect the initial pref on both surfaces.
   if (state.manualOrientationFlip !== null) {
     orientationBadge?.classList.add('manual');
+    statusOrientCell?.classList.add('manual');
   }
 
   // ── Window controls ──
@@ -1644,6 +1650,7 @@ function processPendingResult(): void {
         savePrefs({ manualOrientationFlip: null });
         chessRay.setManualFlip(null);
         document.getElementById('cv-orientation-badge')?.classList.remove('manual');
+        document.getElementById('cv-status-orient')?.classList.remove('manual');
       }
     }
     lastRecogFen = recogFen;

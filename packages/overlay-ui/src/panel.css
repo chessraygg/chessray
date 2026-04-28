@@ -1283,6 +1283,58 @@ canvas#video-overlay {
   display: flex;
   flex-direction: column;
 }
+/* Status bar: H2-style merged strip between the board and the moves list.
+   Three segments (turn, orientation, depth) share one rounded shell with
+   hairline dividers. Orientation segment is clickable and toggles a
+   .manual class when the user has overridden auto-detection. */
+.r2-status-bar {
+  display: flex;
+  align-items: stretch;
+  margin: 6px 8px 4px;
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  border-radius: var(--radius-sm, 6px);
+  background: rgba(255,255,255,0.02);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  overflow: hidden;
+  user-select: none;
+}
+.r2-status-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 6px 8px;
+  text-align: center;
+  border-left: 1px solid var(--border, rgba(255,255,255,0.08));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.r2-status-cell:first-child { border-left: 0; }
+.r2-status-orient {
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.r2-status-orient:hover {
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+}
+.r2-status-orient.manual { color: var(--accent); }
+.r2-status-suffix {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.r2-status-orient.manual .r2-status-suffix { color: var(--accent); }
+.r2-status-dot {
+  flex: 0 0 auto;
+}
+
 .r2-moves {
   display: flex;
   flex-direction: column;
