@@ -1366,36 +1366,44 @@ canvas#video-overlay {
 }
 
 /* Surface (settings + debug) */
-.r2-surface-head {
+.r2-tabs {
   display: flex;
-  align-items: center;
-  height: 26px;
-  padding: 0 6px;
-  gap: 4px;
+  align-items: stretch;
+  height: 28px;
+  padding: 0 4px;
+  gap: 2px;
   border-bottom: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.15);
   flex-shrink: 0;
 }
-.r2-back {
-  width: 22px; height: 22px;
+.r2-tabs-spacer { flex: 1; }
+.r2-tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0 12px;
   background: transparent;
   border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--text-dim);
+  border-bottom: 2px solid transparent;
+  color: var(--text-faint);
   cursor: pointer;
-  font-size: 13px;
-}
-.r2-back:hover { color: var(--text); background: rgba(255,255,255,0.06); }
-.r2-surface-title {
-  font-size: 10px;
+  font-family: var(--sans);
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--text-dim);
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
+.r2-tab:hover { color: var(--text-dim); }
+.r2-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.r2-tab-diag {
+  padding: 0 8px;
+}
+.r2-tab-diag svg { width: 13px; height: 13px; }
+.r2-tab-diag.active { background: rgba(34, 197, 94, 0.1); }
 .r2-surface-body {
   flex: 1;
   min-height: 0;

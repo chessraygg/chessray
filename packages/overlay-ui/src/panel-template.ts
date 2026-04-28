@@ -19,14 +19,17 @@ export const PANEL_HTML = `\
       </span>
     </span>
     <span class="r2-spacer"></span>
-    <button class="r2-btn" id="r2-btn-settings" data-tip="Settings" data-tip-pos="below">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2"/><path d="M13.4 9.5l1.4 1.1-1.4 2.4-1.7-.5a5.6 5.6 0 0 1-1.4.8l-.4 1.7H7.1l-.4-1.7a5.6 5.6 0 0 1-1.4-.8l-1.7.5-1.4-2.4 1.4-1.1a5.6 5.6 0 0 1 0-1.6L2.2 6.6 3.6 4.2l1.7.5a5.6 5.6 0 0 1 1.4-.8l.4-1.7h2.8l.4 1.7c.5.2 1 .5 1.4.8l1.7-.5 1.4 2.4-1.4 1.1c.1.5.1 1.1 0 1.6z"/></svg>
-    </button>
-    <button class="r2-btn" id="r2-btn-debug" data-tip="Diagnostics" data-tip-pos="below">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="6" height="8" rx="3"/><path d="M2 6h2M2 9h2M2 12h2M12 6h2M12 9h2M12 12h2M8 2v3M5 4l-1-1M11 4l1-1"/></svg>
-    </button>
     <button class="r2-btn" id="cv-hide-btn" data-tip="Hide control panel (toggle: Cmd/Ctrl+Shift+H)" data-tip-pos="below">&#x2014;</button>
     <button class="r2-btn danger" id="cv-close-btn" data-tip="Close" data-tip-pos="below">&#xD7;</button>
+  </div>
+
+  <div class="r2-tabs" id="r2-tabs">
+    <button class="r2-tab active" id="r2-tab-moves" data-view="moves">Analysis</button>
+    <button class="r2-tab" id="r2-tab-settings" data-view="settings">Settings</button>
+    <span class="r2-tabs-spacer"></span>
+    <button class="r2-tab r2-tab-diag" id="r2-tab-debug" data-view="debug" data-tip="Diagnostics" data-tip-pos="below">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="6" height="8" rx="3"/><path d="M2 6h2M2 9h2M2 12h2M12 6h2M12 9h2M12 12h2M8 2v3M5 4l-1-1M11 4l1-1"/></svg>
+    </button>
   </div>
 
   <div class="panel-body" id="cv-panel-body">
@@ -49,10 +52,6 @@ export const PANEL_HTML = `\
 
     <!-- Settings view -->
     <div class="r2-view" id="r2-view-settings" hidden>
-      <div class="r2-surface-head">
-        <button class="r2-back" id="r2-back-settings" data-tip="Back to moves" data-tip-pos="below">&#x2190;</button>
-        <span class="r2-surface-title">Settings</span>
-      </div>
       <div class="r2-surface-body">
 
         <div class="r2-group">
@@ -141,10 +140,6 @@ export const PANEL_HTML = `\
 
     <!-- Debug view -->
     <div class="r2-view" id="r2-view-debug" hidden>
-      <div class="r2-surface-head">
-        <button class="r2-back" id="r2-back-debug" data-tip="Back to moves" data-tip-pos="below">&#x2190;</button>
-        <span class="r2-surface-title">Diagnostics</span>
-      </div>
       <div class="r2-surface-body debug-section" id="debug-section">
         <div class="debug-history-nav" id="cv-debug-history-nav" style="display:none"></div>
         <div class="debug-img-wrap" id="cv-debug-img-wrap">

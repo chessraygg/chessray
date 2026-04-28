@@ -486,28 +486,24 @@ function initOverlay(): void {
   }
 
   // ── View switcher (moves / settings / debug) ──
-  // The panel has three exclusive views; ⚙ and 🐛 in the header swap them.
-  // Clicking the active button (or ←) returns to moves.
+  // The panel has three exclusive views; the tab strip below the header swaps them.
+  // Diagnostics lives as a small inline tab on the right.
   const viewMoves    = document.getElementById('r2-view-moves');
   const viewSettings = document.getElementById('r2-view-settings');
   const viewDebug    = document.getElementById('r2-view-debug');
-  const btnSettings  = document.getElementById('r2-btn-settings');
-  const btnDebug     = document.getElementById('r2-btn-debug');
+  const tabs = Array.from(document.querySelectorAll<HTMLElement>('.r2-tab[data-view]'));
   function showView(name: 'moves' | 'settings' | 'debug'): void {
     if (viewMoves)    viewMoves.hidden    = name !== 'moves';
     if (viewSettings) viewSettings.hidden = name !== 'settings';
     if (viewDebug)    viewDebug.hidden    = name !== 'debug';
-    btnSettings?.classList.toggle('active', name === 'settings');
-    btnDebug?.classList.toggle('active', name === 'debug');
+    for (const tab of tabs) tab.classList.toggle('active', tab.dataset.view === name);
   }
-  btnSettings?.addEventListener('click', () => {
-    showView(viewSettings?.hidden === false ? 'moves' : 'settings');
-  });
-  btnDebug?.addEventListener('click', () => {
-    showView(viewDebug?.hidden === false ? 'moves' : 'debug');
-  });
-  document.getElementById('r2-back-settings')?.addEventListener('click', () => showView('moves'));
-  document.getElementById('r2-back-debug')?.addEventListener('click', () => showView('moves'));
+  for (const tab of tabs) {
+    tab.addEventListener('click', () => {
+      const view = tab.dataset.view as 'moves' | 'settings' | 'debug' | undefined;
+      if (view) showView(view);
+    });
+  }
 
   // ── Resize grips (drag corners to resize panel width/height) ──
   // `anchorRight`/`anchorBottom` mean the OPPOSITE edge is anchored, so dragging the grip
