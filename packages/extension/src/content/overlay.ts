@@ -159,9 +159,13 @@ const bridge: ChessRayAPI = createDefaultBridge({
     if (panel) panel.style.display = 'none';
   },
   openExternal: (url) => { window.open(url, '_blank', 'noopener,noreferrer'); },
-  toggleLichess: (fen) => {
-    const fenPath = encodeURIComponent(fen.split(' ')[0] ?? fen);
-    window.open(`https://lichess.org/analysis/${fenPath}`, '_blank', 'noopener');
+  toggleLichess: (fen, color) => {
+    // Match the Electron path: pass the *full* FEN with spaces → underscores
+    // so Lichess parses side-to-move, castling, etc. Position-only FENs
+    // silently render the starting position.
+    const fenPath = fen.replace(/ /g, '_');
+    const side = color === 'black' ? 'black' : 'white';
+    window.open(`https://lichess.org/analysis/${fenPath}?color=${side}`, '_blank', 'noopener');
   },
 });
 

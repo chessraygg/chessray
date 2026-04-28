@@ -108,9 +108,13 @@ const bridge: ChessRayAPI = createDefaultBridge({
 
   closeApp: () => { window.close(); },
   openExternal: (url) => { chrome.tabs.create({ url }); },
-  toggleLichess: (fen) => {
-    const fenPath = encodeURIComponent(fen.split(' ')[0] ?? fen);
-    chrome.tabs.create({ url: `https://lichess.org/analysis/${fenPath}` });
+  toggleLichess: (fen, color) => {
+    // Match the Electron path: pass the *full* FEN with spaces → underscores
+    // so Lichess parses side-to-move, castling, etc. Position-only FENs
+    // silently render the starting position.
+    const fenPath = fen.replace(/ /g, '_');
+    const side = color === 'black' ? 'black' : 'white';
+    chrome.tabs.create({ url: `https://lichess.org/analysis/${fenPath}?color=${side}` });
   },
 });
 
