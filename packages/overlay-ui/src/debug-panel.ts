@@ -242,6 +242,12 @@ export function updateDebugPanel(
 
   // Status bar (Analysis view): turn / orientation / depth / lines / fps as a merged H2-style strip.
   const turn = result.turn ?? result.evaluation?.fen?.split(' ')[1] ?? null;
+  // Header status dot tracks side-to-move so the panel keeps a turn cue even
+  // when the merged header doesn't render the full status bar (Settings view).
+  if (turn) {
+    const appDot = document.getElementById('cv-app-dot');
+    if (appDot) appDot.className = `r2-head-dot turn-dot ${turn === 'w' ? 'white' : 'black'}`;
+  }
   const statusTurn = document.getElementById('cv-status-turn');
   if (statusTurn && turn) {
     const dot = statusTurn.querySelector('.r2-status-dot') as HTMLElement | null;

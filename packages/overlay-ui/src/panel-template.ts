@@ -7,21 +7,19 @@ export const PANEL_HTML = `\
 <canvas id="video-overlay"></canvas>
 
 <div class="panel user-panel" id="user-panel">
-  <!-- Slim header: window controls only. Live status (turn, orientation,
-       depth, lines, fps) lives in the merged status bar below the board. -->
-  <div class="r2-head" id="cv-main-toggles">
+  <!-- Single-row header: status dot · tabs · diagnostics · window controls. -->
+  <div class="r2-head r2-head-merged" id="cv-main-toggles">
+    <span class="r2-head-dot turn-dot white" id="cv-app-dot" data-tip="ChessRay is running. Color reflects whose turn it is to move." data-tip-pos="below"></span>
+    <div class="r2-tabs" id="r2-tabs">
+      <button class="r2-tab active" id="r2-tab-moves" data-view="moves">Analysis</button>
+      <button class="r2-tab" id="r2-tab-settings" data-view="settings">Settings</button>
+    </div>
     <span class="r2-spacer"></span>
-    <button class="r2-btn" id="cv-hide-btn" data-tip="Hide control panel (toggle: Cmd/Ctrl+Shift+H)" data-tip-pos="below">&#x2014;</button>
-    <button class="r2-btn danger" id="cv-close-btn" data-tip="Close" data-tip-pos="below">&#xD7;</button>
-  </div>
-
-  <div class="r2-tabs" id="r2-tabs">
-    <button class="r2-tab active" id="r2-tab-moves" data-view="moves">Analysis</button>
-    <button class="r2-tab" id="r2-tab-settings" data-view="settings">Settings</button>
-    <span class="r2-tabs-spacer"></span>
     <button class="r2-tab r2-tab-diag" id="r2-tab-debug" data-view="debug" data-tip="Diagnostics" data-tip-pos="below">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="6" height="8" rx="3"/><path d="M2 6h2M2 9h2M2 12h2M12 6h2M12 9h2M12 12h2M8 2v3M5 4l-1-1M11 4l1-1"/></svg>
     </button>
+    <button class="r2-btn" id="cv-hide-btn" data-tip="Hide control panel (toggle: Cmd/Ctrl+Shift+H)" data-tip-pos="below">&#x2014;</button>
+    <button class="r2-btn danger" id="cv-close-btn" data-tip="Close" data-tip-pos="below">&#xD7;</button>
   </div>
 
   <div class="panel-body" id="cv-panel-body">

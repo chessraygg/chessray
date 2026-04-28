@@ -1191,6 +1191,33 @@ canvas#video-overlay {
   border-top-left-radius: var(--radius);
   border-top-right-radius: var(--radius);
 }
+/* Single-row variant: tabs share the row with status dot, diag icon, and
+   window controls. Inner .r2-tabs lays out side-by-side with the buttons. */
+.r2-head-merged {
+  height: 32px;
+  padding: 0 4px 0 8px;
+  gap: 6px;
+}
+.r2-head-merged .r2-tabs {
+  height: 100%;
+  padding: 0;
+  gap: 0;
+  border-bottom: 0;
+  background: transparent;
+}
+.r2-head-merged .r2-tab {
+  align-self: stretch;
+  padding: 0 10px;
+}
+.r2-head-merged .r2-tab.active {
+  border-bottom-width: 2px;
+}
+.r2-head-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255,255,255,0.2);
+}
 /* The header turn-dot reuses the global .turn-dot class because debug-panel.ts
    rewrites className to "turn-dot white|black" each frame; selector targets
    the dot only when it lives inside the header. */
@@ -1294,7 +1321,7 @@ canvas#video-overlay {
   border: 1px solid var(--border, rgba(255,255,255,0.08));
   border-radius: var(--radius-sm, 6px);
   background: rgba(255,255,255,0.02);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--text-dim);
   overflow: hidden;
@@ -1302,16 +1329,24 @@ canvas#video-overlay {
 }
 .r2-status-cell {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  flex: 1;
-  padding: 6px 8px;
+  row-gap: 1px;
+  column-gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 4px 6px;
   text-align: center;
   border-left: 1px solid var(--border, rgba(255,255,255,0.08));
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.r2-status-cell .r2-status-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .r2-status-cell:first-child { border-left: 0; }
 .r2-status-orient {
@@ -1324,11 +1359,11 @@ canvas#video-overlay {
 }
 .r2-status-orient.manual { color: var(--accent); }
 .r2-status-suffix {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 500;
   color: var(--text-faint);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 .r2-status-orient.manual .r2-status-suffix { color: var(--accent); }
 .r2-status-dot {
