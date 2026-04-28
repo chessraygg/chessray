@@ -102,10 +102,6 @@ function applyPrefsToHiddenPanel(prefs: Record<string, unknown>): void {
   if (typeof prefs.pvDepth === 'number') setRange('cv-pv-depth', prefs.pvDepth);
   if (typeof prefs.pvGrowDelaySec === 'number') setRange('cv-pv-grow-delay', prefs.pvGrowDelaySec);
   if (typeof prefs.pvPreviewSec === 'number') setRange('cv-pv-preview-sec', prefs.pvPreviewSec);
-  if (typeof prefs.showMovesDelaySec === 'number') setRange('cv-show-moves-delay', prefs.showMovesDelaySec);
-  if (typeof prefs.autoDelaySec === 'number') setRange('cv-auto-delay', prefs.autoDelaySec);
-  if (typeof prefs.pvAutoplay === 'boolean') setCheckbox('cv-pv-autoplay', prefs.pvAutoplay);
-  if (typeof prefs.changeDetect === 'boolean') setCheckbox('cv-change-detect', prefs.changeDetect);
   if (typeof prefs.overlayVisible === 'boolean') {
     clickIfStateMismatch('cv-overlay-btn', prefs.overlayVisible);
   }
@@ -148,7 +144,6 @@ const bridge: ChessRayAPI = createDefaultBridge({
   },
 
   setMultiPvMax: (n) => applySetting({ key: 'multi-pv-max', value: n }),
-  setChangeDetect: (enabled) => applySetting({ key: 'change-detect', value: enabled }),
   setManualFlip: (v) => applySetting({ key: 'manual-flip', value: v }),
   setTargetFps: (fps) => applySetting({ key: 'target-fps', value: fps }),
 

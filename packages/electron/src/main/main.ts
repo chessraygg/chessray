@@ -265,8 +265,8 @@ function buildDockMenu(): void {
     for (const display of displays) {
       const isPrimary = display.id === screen.getPrimaryDisplay().id;
       const label = isPrimary
-        ? `Built-in Display (${display.size.width}\u00d7${display.size.height})`
-        : `Display (${display.size.width}\u00d7${display.size.height})`;
+        ? `Built-in Display \u00b7 ${display.size.width}\u00d7${display.size.height}`
+        : `External Display \u00b7 ${display.size.width}\u00d7${display.size.height}`;
       template.push({
         label,
         type: 'checkbox',
@@ -278,7 +278,7 @@ function buildDockMenu(): void {
   }
 
   template.push({
-    label: 'Reset Panel Position',
+    label: 'Move Panel to Default Position',
     click: () => {
       if (overlayWindow && !overlayWindow.isDestroyed()) {
         overlayWindow.webContents.send('reset-panel-position');
@@ -287,13 +287,13 @@ function buildDockMenu(): void {
   });
 
   template.push({
-    label: 'Show/Hide Panel',
+    label: 'Toggle Control Panel',
     accelerator: 'CommandOrControl+Shift+H',
     click: togglePanel,
   });
 
   template.push({
-    label: 'Reset All Settings…',
+    label: 'Restore Default Settings\u2026',
     click: () => confirmAndResetAllSettings(),
   });
 
@@ -310,8 +310,8 @@ async function confirmAndResetAllSettings(): Promise<void> {
     buttons: ['Cancel', 'Reset'],
     defaultId: 0,
     cancelId: 0,
-    title: 'Reset all settings',
-    message: 'Reset all panel settings to defaults?',
+    title: 'Restore default settings',
+    message: 'Restore all panel settings to defaults?',
     detail: 'Clears your saved layout, panel size/position, sliders, hidden sections, and all other preferences. The display capture choice is preserved.',
   });
   if (response === 1) {
@@ -485,12 +485,6 @@ ipcMain.on('update-lichess', (_e, fen: string, color: string) => {
 ipcMain.on('set-multi-pv-max', (_e, n: number) => {
   if (analysisWindow && !analysisWindow.isDestroyed()) {
     analysisWindow.webContents.send('set-multi-pv-max', n);
-  }
-});
-
-ipcMain.on('set-change-detect', (_e, enabled: boolean) => {
-  if (analysisWindow && !analysisWindow.isDestroyed()) {
-    analysisWindow.webContents.send('set-change-detect', enabled);
   }
 });
 

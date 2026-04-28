@@ -262,7 +262,6 @@ const bridge: ChessRayAPI = createDefaultBridge({
   },
 
   setMultiPvMax: (n) => applySetting({ key: 'multi-pv-max', value: n }),
-  setChangeDetect: (enabled) => applySetting({ key: 'change-detect', value: enabled }),
   setManualFlip: (v) => applySetting({ key: 'manual-flip', value: v }),
   setTargetFps: (fps) => applySetting({ key: 'target-fps', value: fps }),
 

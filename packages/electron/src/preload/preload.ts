@@ -55,12 +55,6 @@ const api: ChessRayAPI = {
   onSetMultiPvMax: (cb: (n: number) => void) =>
     ipcRenderer.on('set-multi-pv-max', (_e, n: number) => cb(n)),
 
-  // Change detection
-  setChangeDetect: (enabled: boolean) =>
-    ipcRenderer.send('set-change-detect', enabled),
-  onSetChangeDetect: (cb: (enabled: boolean) => void) =>
-    ipcRenderer.on('set-change-detect', (_e, enabled: boolean) => cb(enabled)),
-
   // Manual orientation override (null = auto-detect, true/false = user choice)
   setManualFlip: (v: boolean | null) =>
     ipcRenderer.send('set-manual-flip', v),

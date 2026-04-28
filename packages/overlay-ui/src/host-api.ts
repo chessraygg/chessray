@@ -48,8 +48,6 @@ export interface ChessRayAPI {
   // Engine settings
   setMultiPvMax: (n: number) => void;
   onSetMultiPvMax: (cb: (n: number) => void) => void;
-  setChangeDetect: (enabled: boolean) => void;
-  onSetChangeDetect: (cb: (enabled: boolean) => void) => void;
   setManualFlip: (v: boolean | null) => void;
   onSetManualFlip: (cb: (v: boolean | null) => void) => void;
   setTargetFps: (fps: number) => void;
@@ -116,8 +114,6 @@ export function createDefaultBridge(overrides: Partial<ChessRayAPI> = {}): Chess
 
     setMultiPvMax: noop,
     onSetMultiPvMax: noop,
-    setChangeDetect: noop,
-    onSetChangeDetect: noop,
     setManualFlip: noop,
     onSetManualFlip: noop,
     setTargetFps: noop,

@@ -10,21 +10,16 @@ export interface Prefs {
   evalBarVisible: boolean;
   panelScale: number;
   collapsed: boolean;
-  autoDelaySec: number;
-  /** When true, auto-play the PV piece-by-piece animation after the top-moves delay. */
-  pvAutoplay: boolean;
   pvGrowDelaySec: number;
   /** Seconds the PV preview phase (single highlighted move, others hidden)
    *  stays visible before the per-step PV animation starts. */
   pvPreviewSec: number;
-  showMovesDelaySec: number;
   vboardOverlayVisible: boolean;
   compactMode: boolean;
   /** @deprecated kept for migration only — superseded by fpsMin/fpsMax. */
   targetFps: number;
   /** Upper bound of the auto-tuned FPS range. Floor is hardcoded to 1. */
   fpsMax: number;
-  changeDetect: boolean;
   collapsedSections: string[];
   hiddenSections: string[];
   panelLeft: number | null;
@@ -56,17 +51,13 @@ export interface Prefs {
 export const DEFAULT_PREFS: Prefs = {
   overlayVisible: true,
   borderVisible: false,
-  autoDelaySec: 5,
-  pvAutoplay: false,
   pvGrowDelaySec: 1,
   pvPreviewSec: 1,
-  showMovesDelaySec: 0,
   vboardOverlayVisible: true,
   compactMode: false,
   targetFps: 2,
   fpsMax: 5,
-  changeDetect: true,
-  pvDepth: 10,
+  pvDepth: 999,
   lossThreshold: 100,
   multiPvMax: 5,
   evalBarVisible: true,

@@ -403,7 +403,6 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
   if (msg.type === 'apply-setting') {
     const s = msg.setting;
     if (s.key === 'multi-pv-max') processor.setMultiPvMax(s.value);
-    else if (s.key === 'change-detect') processor.setChangeDetect(s.value);
     else if (s.key === 'manual-flip') processor.setManualFlip(s.value);
     // 'target-fps' would resize the capture loop; out of scope for the
     // initial extension parity pass — the loop runs at TARGET_FPS.

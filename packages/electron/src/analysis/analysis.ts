@@ -92,11 +92,6 @@ window.chessRay.onSetMultiPvMax((n: number) => {
   processor.setMultiPvMax(n);
 });
 
-window.chessRay.onSetChangeDetect((enabled: boolean) => {
-  debugLog(`Change detection ${enabled ? 'enabled' : 'disabled'}`);
-  processor.setChangeDetect(enabled);
-});
-
 window.chessRay.onSetManualFlip((v: boolean | null) => {
   debugLog(`Manual orientation override: ${v === null ? 'auto' : v ? 'white top' : 'white bottom'}`);
   processor.setManualFlip(v);

@@ -14,7 +14,6 @@ import type { PipelineResult } from '@chessray/core';
  *  it's the one that has to apply each change. */
 export type ExtensionSetting =
   | { key: 'multi-pv-max'; value: number }
-  | { key: 'change-detect'; value: boolean }
   | { key: 'manual-flip'; value: boolean | null }
   | { key: 'target-fps'; value: number };
 

@@ -34,9 +34,6 @@ let chessRay!: ChessRayAPI;
 let lichessOpen = false;
 let lichessSync = true;
 let lastLichessFen: string | null = null;
-let showMovesDelaySec = 0;
-let movesHeld = false;
-let movesHeldTimer: ReturnType<typeof setTimeout> | null = null;
 
 let userPanel: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
@@ -614,12 +611,9 @@ function initOverlay(): void {
       if (state.overlayVisible) {
         (window as any).__chessrayResetAutoTimer?.();
         if (state.lineVisible) pvCycleStart();
-      } else {
+      } else if (!state.vboardOverlayVisible) {
         // Stop everything only if both overlays are hidden
-        if (!state.vboardOverlayVisible) {
-          (window as any).__chessrayClearAutoTimer?.();
-          pvCycleStop();
-        }
+        pvCycleStop();
       }
     });
   }
@@ -778,6 +772,8 @@ function initOverlay(): void {
   const pvPreviewSlider = document.getElementById('cv-pv-preview-sec') as HTMLInputElement | null;
   const pvPreviewVal = document.getElementById('cv-pv-preview-sec-val');
   let pvPreviewSec = prefs.pvPreviewSec;
+  // Hold the moves view this long between lines while cycling through PVs.
+  const PV_LINE_INTERLUDE_MS = 5000;
   let pvCycleTimer: ReturnType<typeof setInterval> | null = null;
   let pvCycleLastPv: string[] = [];
   let pvCycleBaseFen = '';
@@ -836,7 +832,7 @@ function initOverlay(): void {
       state.arrowsVisible = pvCycleArrowsWas;
       state.lineVisible = true;
       pvCycleStartCurrentLine();
-    }, autoDelaySec * 1000);
+    }, PV_LINE_INTERLUDE_MS);
   }
 
   function pvCycleStep(): void {
@@ -1201,22 +1197,7 @@ function initOverlay(): void {
     });
   }
 
-  // ── Show moves delay ──
-  const showMovesSlider = document.getElementById('cv-show-moves-delay') as HTMLInputElement | null;
-  const showMovesVal = document.getElementById('cv-show-moves-delay-val');
-  showMovesDelaySec = prefs.showMovesDelaySec;
-
-  if (showMovesSlider && showMovesVal) {
-    showMovesSlider.value = String(showMovesDelaySec);
-    showMovesVal.textContent = String(showMovesDelaySec);
-    showMovesSlider.addEventListener('input', () => {
-      showMovesDelaySec = parseInt(showMovesSlider.value, 10);
-      showMovesVal.textContent = String(showMovesDelaySec);
-      savePrefs({ showMovesDelaySec });
-    });
-  }
-
-  // ── Loss threshold slider ──
+// ── Loss threshold slider ──
   const lossSlider = document.getElementById('cv-loss-threshold') as HTMLInputElement | null;
   const lossVal = document.getElementById('cv-loss-threshold-val');
   state.lossThreshold = prefs.lossThreshold;
@@ -1267,18 +1248,7 @@ function initOverlay(): void {
     writeLinesHeader(prefs.multiPvMax);
   }
 
-  // ── Change detection toggle ──
-  const changeDetectCheckbox = document.getElementById('cv-change-detect') as HTMLInputElement | null;
-  if (changeDetectCheckbox) {
-    changeDetectCheckbox.checked = prefs.changeDetect;
-    chessRay.setChangeDetect(prefs.changeDetect);
-    changeDetectCheckbox.addEventListener('change', () => {
-      savePrefs({ changeDetect: changeDetectCheckbox.checked });
-      chessRay.setChangeDetect(changeDetectCheckbox.checked);
-    });
-  }
-
-  // ── Overlay size / opacity sliders ──
+// ── Overlay size / opacity sliders ──
   // Control all on-board decorations: arrows, PV step labels, played-move markers.
   const overlaySizeSlider = document.getElementById('cv-overlay-size') as HTMLInputElement | null;
   const overlaySizeVal = document.getElementById('cv-overlay-size-val');
@@ -1343,67 +1313,19 @@ function initOverlay(): void {
   // Initial render of the history nav (shows nothing until the first slow frame).
   refreshHistoryNav(document.getElementById('cv-debug-history-nav'));
 
-  // ── Auto cycle: always show moves, then switch to PV animation after delay ──
-  const autoDelaySlider = document.getElementById('cv-auto-delay') as HTMLInputElement | null;
-  const autoDelayVal = document.getElementById('cv-auto-delay-val');
-
-  let autoDelaySec = prefs.autoDelaySec;
-  let pvAutoplay = prefs.pvAutoplay;
-  let autoTimer: ReturnType<typeof setTimeout> | null = null;
-
+  // Reset arrows/line visibility on every position change. PV auto-play is
+  // gone, so this just snaps to the "show top moves" view and stops any
+  // in-flight piece animation.
   function resetAutoTimer(): void {
-    if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
     if (!state.overlayVisible && !state.vboardOverlayVisible) return;
-
     state.arrowsVisible = true;
     state.lineVisible = false;
     pvCycleStop();
     renderArrows(state);
     renderVideoOverlay(state);
-
-    if (!pvAutoplay) return;
-
-    autoTimer = setTimeout(() => {
-      autoTimer = null;
-      state.arrowsVisible = false;
-      state.lineVisible = true;
-      pvCycleStart();
-      renderArrows(state);
-      renderVideoOverlay(state);
-    }, autoDelaySec * 1000);
   }
 
   (window as any).__chessrayResetAutoTimer = resetAutoTimer;
-  (window as any).__chessrayClearAutoTimer = () => {
-    if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; }
-  };
-
-  if (autoDelaySlider && autoDelayVal) {
-    autoDelaySlider.value = String(autoDelaySec);
-    autoDelayVal.textContent = String(autoDelaySec);
-    autoDelaySlider.addEventListener('input', () => {
-      autoDelaySec = parseInt(autoDelaySlider.value, 10);
-      autoDelayVal.textContent = String(autoDelaySec);
-      savePrefs({ autoDelaySec });
-      resetAutoTimer();
-    });
-  }
-
-  const pvAutoplayCheckbox = document.getElementById('cv-pv-autoplay') as HTMLInputElement | null;
-  const autoDelayRow = document.getElementById('cv-auto-delay-row');
-  function applyPvAutoplayUI(): void {
-    if (autoDelayRow) autoDelayRow.style.display = pvAutoplay ? '' : 'none';
-  }
-  if (pvAutoplayCheckbox) {
-    pvAutoplayCheckbox.checked = pvAutoplay;
-    pvAutoplayCheckbox.addEventListener('change', () => {
-      pvAutoplay = pvAutoplayCheckbox.checked;
-      savePrefs({ pvAutoplay });
-      applyPvAutoplayUI();
-      resetAutoTimer();
-    });
-  }
-  applyPvAutoplayUI();
 
 
   // ── Collapse panel ──
@@ -1659,10 +1581,7 @@ let lastEvalDepth: number = 0;
 function selectLine(index: number): void {
   state.selectedLineIndex = index;
   if (state.currentResult) {
-    // User explicitly picked a line — play its PV animation regardless of the
-    // autoplay setting (autoplay only controls whether PVs start on their own
-    // after the top-moves delay).
-    (window as any).__chessrayClearAutoTimer?.();
+    // User explicitly picked a line — play its PV animation.
     state.arrowsVisible = false;
     state.lineVisible = true;
     (window as any).__chessrayPvGrowStart?.();
@@ -1735,23 +1654,6 @@ function processPendingResult(): void {
     (window as any).__chessrayPvPlayStop?.();
     // Snap old PV arrows away so they don't fade out over the new position
     resetVideoArrowAnimation();
-
-    // Hold moves if showMovesDelay is configured
-    if (showMovesDelaySec > 0) {
-      movesHeld = true;
-      if (movesHeldTimer !== null) clearTimeout(movesHeldTimer);
-      movesHeldTimer = setTimeout(() => {
-        movesHeldTimer = null;
-        movesHeld = false;
-        // Position is stable — apply arrows from latest state and trigger normal flow
-        const r = state.currentResult;
-        state.currentArrows = r?.arrows?.length ? r.arrows : [];
-        renderArrows(state);
-        renderVideoOverlay(state);
-        (window as any).__chessrayResetAutoTimer?.();
-        if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
-      }, showMovesDelaySec * 1000);
-    }
   }
 
   // Reset to best line when position changes
@@ -1762,21 +1664,19 @@ function processPendingResult(): void {
     userLockedLine = -1;
     lastEvalFen = evalFen;
     lastEvalDepth = evalDepth;
-    if (!movesHeld) {
-      (window as any).__chessrayResetAutoTimer?.();
-      // If line is already visible (non-auto mode), restart grow from 2
-      if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
-    }
+    (window as any).__chessrayResetAutoTimer?.();
+    // If line is already visible (non-auto mode), restart grow from 2
+    if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
   } else if (evalDepth >= lastEvalDepth) {
     // Same position, same or deeper eval — continue grow if displayed moves still match
     lastEvalDepth = evalDepth;
-    if (!movesHeld && state.lineVisible) (window as any).__chessrayPvGrowContinue?.();
+    if (state.lineVisible) (window as any).__chessrayPvGrowContinue?.();
   }
 
   const snap = historyIndex !== null ? snapshotToResult(debugHistory[historyIndex]) : null;
   updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine, snap);
   (window as any).__chessrayUpdateCompactMoves?.();
-  state.currentArrows = movesHeld ? [] : (result.arrows?.length > 0 ? result.arrows : []);
+  state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
   renderVideoOverlay(state);
 
@@ -1878,7 +1778,6 @@ export function mountOverlay(api: ChessRayAPI, options?: { hidePanel?: boolean }
   chessRay.onStopTracking(() => {
     state.currentArrows = [];
     state.currentResult = null;
-    (window as any).__chessrayClearAutoTimer?.();
     (window as any).__chessrayPvGrowStop?.();
     (window as any).__chessrayPvPlayStop?.();
     renderArrows(state);

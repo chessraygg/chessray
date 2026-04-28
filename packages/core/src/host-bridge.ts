@@ -65,12 +65,10 @@ export interface CaptureBridge {
 
 export interface EngineBridge {
   setMultiPvMax(n: number): void;
-  setChangeDetect(enabled: boolean): void;
   setManualFlip(value: boolean | null): void;
   setTargetFps(fps: number): void;
 
   onSetMultiPvMax(cb: (n: number) => void): Unsubscribe;
-  onSetChangeDetect(cb: (enabled: boolean) => void): Unsubscribe;
   onSetManualFlip(cb: (value: boolean | null) => void): Unsubscribe;
   onSetTargetFps(cb: (fps: number) => void): Unsubscribe;
 }
