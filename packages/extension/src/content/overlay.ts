@@ -147,14 +147,6 @@ const bridge: ChessRayAPI = createDefaultBridge({
   setManualFlip: (v) => applySetting({ key: 'manual-flip', value: v }),
   setTargetFps: (fps) => applySetting({ key: 'target-fps', value: fps }),
 
-  requestResetPanelPosition: () => {
-    const panel = document.getElementById('user-panel') as HTMLElement | null;
-    if (panel) {
-      panel.style.left = '20px';
-      panel.style.top = '20px';
-      panel.style.right = 'auto';
-    }
-  },
   requestResetAllSettings: () => {
     if (confirm('Reset all panel settings to defaults?')) {
       try { localStorage.removeItem('chessray-prefs'); } catch { /* ignore */ }

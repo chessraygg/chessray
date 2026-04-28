@@ -67,22 +67,16 @@ const api: ChessRayAPI = {
   onSetTargetFps: (cb: (fps: number) => void) =>
     ipcRenderer.on('set-target-fps', (_e, fps: number) => cb(fps)),
 
-  // Panel reset
-  onResetPanelPosition: (cb: () => void) =>
-    ipcRenderer.on('reset-panel-position', () => cb()),
-
   // Panel show/hide toggle (driven by global shortcut + dock menu)
   onTogglePanel: (cb: () => void) =>
     ipcRenderer.on('toggle-panel', () => cb()),
 
-  // Wipe saved prefs and reload the overlay (dock-menu "Reset All Settings")
+  // Wipe saved prefs and reload the overlay (dock-menu "Restore Default Settings")
   onResetAllSettings: (cb: () => void) =>
     ipcRenderer.on('reset-all-settings', () => cb()),
 
-  // Trigger the same flows the dock menu does (so the in-panel System group
-  // mirrors the dock menu without re-implementing dialogs / display logic).
-  requestResetPanelPosition: () =>
-    ipcRenderer.send('request-reset-panel-position'),
+  // Trigger the same flow the dock menu does (so the in-panel System group
+  // mirrors the dock menu without re-implementing the confirm dialog).
   requestResetAllSettings: () =>
     ipcRenderer.send('request-reset-all-settings'),
   getDisplays: (): Promise<{ id: number; width: number; height: number; primary: boolean; activeId: number | null }[]> =>

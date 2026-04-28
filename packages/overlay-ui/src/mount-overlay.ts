@@ -1405,28 +1405,7 @@ function initOverlay(): void {
     setCompactMode(!compactMode);
   });
 
-  // ── Reset panel position (triggered from dock menu) ──
-  chessRay.onResetPanelPosition(() => {
-    const panel = userPanel;
-    if (panel) {
-      panel.style.left = '20px';
-      panel.style.top = '20px';
-      panel.style.right = 'auto';
-      savePrefs({ panelLeft: 20, panelTop: 20 });
-      // Dim everything and highlight the panel
-      document.querySelectorAll('.reset-dim').forEach(el => el.remove());
-      const dim = document.createElement('div');
-      dim.className = 'reset-dim';
-      document.body.appendChild(dim);
-      dim.addEventListener('animationend', () => dim.remove());
-      panel.classList.remove('flash');
-      void panel.offsetWidth;
-      panel.classList.add('flash');
-      panel.addEventListener('animationend', () => panel.classList.remove('flash'), { once: true });
-    }
-  });
-
-  // ── Orientation flip: toggle manual orientation override ──
+// ── Orientation flip: toggle manual orientation override ──
   // First click: pin the opposite of whatever's currently detected (i.e. flip
   // the board). Second click: return to auto-detection. The override is also
   // auto-cleared in processPendingResult when the position changes enough to
@@ -1512,9 +1491,6 @@ function initOverlay(): void {
   });
 
   // ── Settings → System group (mirrors the dock menu) ──
-  document.getElementById('cv-reset-panel-btn')?.addEventListener('click', () => {
-    chessRay.requestResetPanelPosition();
-  });
   document.getElementById('cv-reset-all-btn')?.addEventListener('click', () => {
     // Main shows the same Electron confirm dialog the dock-menu entry uses,
     // then sends `reset-all-settings` if the user confirms.

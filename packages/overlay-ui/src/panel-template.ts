@@ -119,8 +119,7 @@ export const PANEL_HTML = `\
         <div class="r2-group" id="cv-system-group">
           <div class="r2-group-label">System</div>
           <div class="r2-system-actions">
-            <button class="toggle-btn" id="cv-reset-panel-btn" data-tip="Move the panel back to the top-right corner of the screen and reset its size.">Move panel to default position</button>
-            <button class="toggle-btn" id="cv-reset-all-btn" data-tip="Wipe every saved preference and reload the panel with defaults. Display capture choice is preserved.">Restore default settings…</button>
+            <button class="toggle-btn" id="cv-reset-all-btn" data-tip="Wipe every saved preference (including panel position and size) and reload with defaults. Display capture choice is preserved.">Restore default settings…</button>
           </div>
           <div class="r2-display-switcher" id="cv-display-switcher" hidden></div>
         </div>

@@ -54,10 +54,8 @@ export interface ChessRayAPI {
   onSetTargetFps: (cb: (fps: number) => void) => void;
 
   // Panel/system actions
-  onResetPanelPosition: (cb: () => void) => void;
   onTogglePanel: (cb: () => void) => void;
   onResetAllSettings: (cb: () => void) => void;
-  requestResetPanelPosition: () => void;
   requestResetAllSettings: () => void;
   getDisplays: () => Promise<HostDisplay[]>;
   switchDisplay: (id: number) => void;
@@ -119,10 +117,8 @@ export function createDefaultBridge(overrides: Partial<ChessRayAPI> = {}): Chess
     setTargetFps: noop,
     onSetTargetFps: noop,
 
-    onResetPanelPosition: noop,
     onTogglePanel: noop,
     onResetAllSettings: noop,
-    requestResetPanelPosition: noop,
     requestResetAllSettings: noop,
     getDisplays: () => Promise.resolve([]),
     switchDisplay: noop,

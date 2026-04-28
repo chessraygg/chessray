@@ -278,15 +278,6 @@ function buildDockMenu(): void {
   }
 
   template.push({
-    label: 'Move Panel to Default Position',
-    click: () => {
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send('reset-panel-position');
-      }
-    },
-  });
-
-  template.push({
     label: 'Toggle Control Panel',
     accelerator: 'CommandOrControl+Shift+H',
     click: togglePanel,
@@ -312,7 +303,7 @@ async function confirmAndResetAllSettings(): Promise<void> {
     cancelId: 0,
     title: 'Restore default settings',
     message: 'Restore all panel settings to defaults?',
-    detail: 'Clears your saved layout, panel size/position, sliders, hidden sections, and all other preferences. The display capture choice is preserved.',
+    detail: 'Clears your saved layout, panel size/position (returns to top-right), sliders, hidden sections, and all other preferences. The display capture choice is preserved.',
   });
   if (response === 1) {
     overlayWindow.webContents.send('reset-all-settings');
@@ -545,12 +536,6 @@ ipcMain.on('save-frame-artifact', (_e, filename: string, buf: Uint8Array) => {
 });
 
 // In-panel System group — same flows the dock menu offers.
-ipcMain.on('request-reset-panel-position', () => {
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.webContents.send('reset-panel-position');
-  }
-});
-
 ipcMain.on('request-reset-all-settings', () => {
   void confirmAndResetAllSettings();
 });

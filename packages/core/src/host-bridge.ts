@@ -95,10 +95,6 @@ export interface OverlayBridge {
    *  to hide the on-screen overlay when the source isn't visible. */
   onSourceVisibility?(cb: (visible: boolean) => void): Unsubscribe;
 
-  /** Reset the panel's position to a known-good location. */
-  requestResetPanelPosition?(): void;
-  onResetPanelPosition?(cb: () => void): Unsubscribe;
-
   /** Wipe saved prefs and reload. The host shows the confirm dialog. */
   requestResetAllSettings?(): void;
   onResetAllSettings?(cb: () => void): Unsubscribe;
