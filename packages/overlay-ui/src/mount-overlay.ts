@@ -32,8 +32,6 @@ let chessRay!: ChessRayAPI;
 
 // ── Module-level state ──
 let lichessOpen = false;
-let lichessSync = true;
-let lastLichessFen: string | null = null;
 
 let userPanel: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
@@ -63,7 +61,7 @@ const state: OverlayState = {
   hoveredArrowIndex: null,
   overlaySize: 5,
   overlayOpacity: 0.85,
-  evalBarStaleOpacity: 0.75,
+  evalBarStaleOpacity: 0.9,
   manualOrientationFlip: null,
   panelScale: 1,
   boardScale: 1,
@@ -578,68 +576,31 @@ function initOverlay(): void {
   document.getElementById('cv-zoom-in')?.addEventListener('click', () => setZoom(panelScale + 0.1));
   document.getElementById('cv-zoom-out')?.addEventListener('click', () => setZoom(panelScale - 0.1));
 
-  // Restore visual state from prefs
-  if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
-  if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
+  // The on-screen overlay canvas is always shown; the Move-hints toggle is
+  // applied inside renderVideoOverlay (canvas-renderer.ts) so the eval bar
+  // stays visible even when arrows/markers are off.
 
   // Section headers are now drag handles for gridstack; hide uses the × button
   // and re-add uses the hidden-sections tray.
 
-  // ── Overlay/Box toggles (debug panel) ──
+  // ── Move-hints toggle (gates arrows/PV labels/markers/animations on the
+  // on-screen overlay; the eval bar has its own toggle). The legacy
+  // cv-overlay-btn target is kept hidden so the Show-on-screen checkbox can
+  // still drive this via .click(). The virtual board canvas is always shown. */
   const overlayBtn = document.getElementById('cv-overlay-btn');
-  const childToggles = document.querySelectorAll('#cv-eval-btn');
-
-  function updateChildToggles(): void {
-    childToggles.forEach(btn => btn.classList.toggle('parent-hidden', !state.overlayVisible));
-  }
-
-  // Actual board overlay toggle
   if (overlayBtn) {
     overlayBtn.classList.toggle('active', state.overlayVisible);
-    updateChildToggles();
     overlayBtn.addEventListener('click', () => {
       state.overlayVisible = !state.overlayVisible;
-      if (state.videoCanvas) state.videoCanvas.style.display = state.overlayVisible ? '' : 'none';
       overlayBtn.classList.toggle('active', state.overlayVisible);
-      updateChildToggles();
       syncDisplayToggles();
       savePrefs({ overlayVisible: state.overlayVisible });
+      // Force a redraw so the gate inside renderVideoOverlay applies right
+      // away (without waiting for the next frame from the analysis side).
+      renderVideoOverlay(state);
       if (state.overlayVisible) {
         (window as any).__chessrayResetAutoTimer?.();
         if (state.lineVisible) pvCycleStart();
-      } else if (!state.vboardOverlayVisible) {
-        // Stop everything only if both overlays are hidden
-        pvCycleStop();
-      }
-    });
-  }
-
-  // Virtual board overlay toggle
-  const vboardBtn = document.getElementById('cv-vboard-btn');
-  state.vboardOverlayVisible = prefs.vboardOverlayVisible;
-  if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
-
-  if (vboardBtn) {
-    vboardBtn.classList.toggle('active', state.vboardOverlayVisible);
-    vboardBtn.addEventListener('click', () => {
-      state.vboardOverlayVisible = !state.vboardOverlayVisible;
-      if (state.canvas) state.canvas.style.display = state.vboardOverlayVisible ? '' : 'none';
-      document.querySelectorAll('.piece-anim').forEach(el => el.remove());
-      vboardBtn.classList.toggle('active', state.vboardOverlayVisible);
-      syncDisplayToggles();
-      savePrefs({ vboardOverlayVisible: state.vboardOverlayVisible });
-      if (state.vboardOverlayVisible) {
-        // Redraw virtual board arrows if cycle is running
-        renderArrows(state);
-        if (state.lineVisible && !pvCycleTimer) pvCycleStart();
-      } else {
-        // Clean up virtual board visuals only — keep the cycle running so the
-        // actual-board piece animation continues uninterrupted.
-        document.querySelectorAll('.piece-anim').forEach(el => el.remove());
-        if (state.canvas) {
-          const ctx = state.canvas.getContext('2d');
-          if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-        }
       }
     });
   }
@@ -730,17 +691,14 @@ function initOverlay(): void {
 
   // ── Display section checkboxes ──
   const dispOverlay = document.getElementById('cv-disp-overlay') as HTMLInputElement | null;
-  const dispVboard = document.getElementById('cv-disp-vboard') as HTMLInputElement | null;
   const dispEval = document.getElementById('cv-disp-eval') as HTMLInputElement | null;
 
   function syncDisplayToggles(): void {
     if (dispOverlay) dispOverlay.checked = state.overlayVisible;
-    if (dispVboard) dispVboard.checked = state.vboardOverlayVisible;
     if (dispEval) dispEval.checked = state.evalBarVisible;
   }
 
   dispOverlay?.addEventListener('change', () => document.getElementById('cv-overlay-btn')?.click());
-  dispVboard?.addEventListener('change', () => document.getElementById('cv-vboard-btn')?.click());
   dispEval?.addEventListener('change', () => document.getElementById('cv-eval-btn')?.click());
 
   if (pvDepthSlider && pvDepthVal) {
@@ -765,9 +723,7 @@ function initOverlay(): void {
   const pvGrowSlider = document.getElementById('cv-pv-grow-delay') as HTMLInputElement | null;
   const pvGrowVal = document.getElementById('cv-pv-grow-delay-val');
   let pvGrowDelaySec = prefs.pvGrowDelaySec;
-  const pvPreviewSlider = document.getElementById('cv-pv-preview-sec') as HTMLInputElement | null;
-  const pvPreviewVal = document.getElementById('cv-pv-preview-sec-val');
-  let pvPreviewSec = prefs.pvPreviewSec;
+  const pvPreviewSec = prefs.pvPreviewSec;
   // Hold the moves view this long between lines while cycling through PVs.
   const PV_LINE_INTERLUDE_MS = 5000;
   let pvCycleTimer: ReturnType<typeof setInterval> | null = null;
@@ -1182,17 +1138,6 @@ function initOverlay(): void {
     });
   }
 
-  if (pvPreviewSlider && pvPreviewVal) {
-    pvPreviewSlider.value = String(pvPreviewSec);
-    pvPreviewVal.textContent = String(pvPreviewSec);
-    pvPreviewSlider.addEventListener('input', () => {
-      pvPreviewSec = parseInt(pvPreviewSlider.value, 10);
-      pvPreviewVal.textContent = String(pvPreviewSec);
-      savePrefs({ pvPreviewSec });
-      // No need to restart the cycle — the new value picks up on the next preview phase.
-    });
-  }
-
 // ── Loss threshold slider ──
   const lossSlider = document.getElementById('cv-loss-threshold') as HTMLInputElement | null;
   const lossVal = document.getElementById('cv-loss-threshold-val');
@@ -1265,20 +1210,6 @@ function initOverlay(): void {
       renderVideoOverlay(state);
     });
   }
-  const evalStaleSlider = document.getElementById('cv-eval-stale-opacity') as HTMLInputElement | null;
-  const evalStaleVal = document.getElementById('cv-eval-stale-opacity-val');
-  if (evalStaleSlider && evalStaleVal) {
-    evalStaleSlider.value = String(Math.round(state.evalBarStaleOpacity * 100));
-    evalStaleVal.textContent = String(Math.round(state.evalBarStaleOpacity * 100));
-    evalStaleSlider.addEventListener('input', () => {
-      const pct = parseInt(evalStaleSlider.value, 10);
-      state.evalBarStaleOpacity = pct / 100;
-      evalStaleVal.textContent = String(pct);
-      savePrefs({ evalBarStaleOpacity: state.evalBarStaleOpacity });
-      renderVideoOverlay(state);
-    });
-  }
-
   // ── Frame rate ceiling (auto-tuner floor is hardcoded to 1) ──
   // No user-facing slider — fps is internal auto-tuning state. The pref
   // still controls the ceiling so existing saved values are honored.
@@ -1463,10 +1394,10 @@ function initOverlay(): void {
     location.reload();
   });
 
-  // Lichess analysis — toggle floating window + sync control
+  // Lichess analysis — open the floating window/tab with the current
+  // position. No auto-sync: clicking again closes (Electron) or opens a new
+  // tab with the latest position; the existing window/tab stays put.
   const lichessBtn = document.getElementById('cv-lichess-btn');
-  const lichessSyncCheckbox = document.getElementById('cv-lichess-sync') as HTMLInputElement | null;
-
   lichessBtn?.addEventListener('click', () => {
     const fen = state.currentResult?.evaluation?.fen ?? state.currentResult?.recognition?.fen;
     if (fen) {
@@ -1474,19 +1405,6 @@ function initOverlay(): void {
       lichessBtn.classList.toggle('active', lichessOpen);
       const color = state.displayFlipped ? 'black' : 'white';
       chessRay.toggleLichess(fen, color);
-    }
-  });
-
-  lichessSyncCheckbox?.addEventListener('change', () => {
-    lichessSync = lichessSyncCheckbox.checked;
-    // If re-enabling sync, immediately update to current position
-    if (lichessSync && lichessOpen) {
-      const fen = state.currentResult?.evaluation?.fen ?? state.currentResult?.recognition?.fen;
-      if (fen) {
-        lastLichessFen = fen.split(' ')[0];
-        const color = state.displayFlipped ? 'black' : 'white';
-        chessRay.updateLichess(fen, color);
-      }
     }
   });
 
@@ -1652,19 +1570,6 @@ function processPendingResult(): void {
   state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
   renderVideoOverlay(state);
-
-  // Auto-update Lichess window when position changes (if sync enabled).
-  // Compare position-only part of FEN to avoid reloading on eval depth changes
-  // or recognition→eval FEN format transitions.
-  if (lichessOpen && lichessSync) {
-    const fen = result.evaluation?.fen ?? result.recognition?.fen;
-    const positionOnly = fen?.split(' ')[0];
-    if (fen && positionOnly && positionOnly !== lastLichessFen) {
-      lastLichessFen = positionOnly;
-      const color = state.displayFlipped ? 'black' : 'white';
-      chessRay.updateLichess(fen, color);
-    }
-  }
 
   lastRenderMs = Date.now() - tRender;
 }

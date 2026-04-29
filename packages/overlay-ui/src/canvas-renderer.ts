@@ -1087,6 +1087,10 @@ export function renderVideoOverlay(state: OverlayState): void {
     ctx.restore();
   }
 
+  // Move hints (arrows, PV step labels, played-move markers, piece-by-piece
+  // animation) are gated by the Show-on-screen → Move hints toggle. The eval
+  // bar is gated separately below so users can keep it on a "clean" board.
+  if (state.overlayVisible) {
   // During PV animation, draw analysis board (background + pieces + animated arrow)
   if (state.pvBoardState) {
     drawAnalysisBoard(ctx, boardRect, state.pvBoardState);
@@ -1157,6 +1161,13 @@ export function renderVideoOverlay(state: OverlayState): void {
       if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
         videoHitCache.arrows = [];
     }
+  }
+  } else {
+    // Move hints turned off: clear hit-test cache and pause arrow fade so we
+    // don't draw anything but the eval bar.
+    if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
+    videoHitCache.arrows = [];
+    videoHitCache.animBoardRect = null;
   }
 
   // Eval bar (semi-transparent when showing stale eval from previous position)

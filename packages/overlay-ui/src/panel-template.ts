@@ -75,45 +75,31 @@ export const PANEL_HTML = `\
             <input type="range" id="cv-pv-grow-delay" min="1" max="10" value="1" step="1">
             <span id="cv-pv-grow-delay-val">1</span><span class="pv-unit">s</span>
           </div>
-          <div class="pv-depth-row">
-            <label data-tip="Seconds the preview phase stays visible (selected move highlighted, others hidden) before the per-step PV piece animation begins.">Preview hold</label>
-            <input type="range" id="cv-pv-preview-sec" min="0" max="5" value="1" step="1">
-            <span id="cv-pv-preview-sec-val">1</span><span class="pv-unit">s</span>
-          </div>
         </div>
 
         <div class="r2-group">
           <div class="r2-group-label">Overlay</div>
           <div class="pv-depth-row">
-            <label data-tip="Size of all on-board decorations: arrows, PV move numbers, and played-move markers.">Marker size</label>
+            <label data-tip="Size of all on-board move hints: arrows, PV move numbers, and played-move markers.">Move-hint size</label>
             <input type="range" id="cv-overlay-size" min="3" max="10" value="5" step="1">
             <span id="cv-overlay-size-val">5</span>
           </div>
           <div class="pv-depth-row">
-            <label data-tip="Opacity of all on-board decorations: arrows, PV move numbers, and played-move markers. Color still carries quality.">Marker opacity</label>
+            <label data-tip="Opacity of all on-board move hints: arrows, PV move numbers, and played-move markers. Color still carries quality.">Move-hint opacity</label>
             <input type="range" id="cv-overlay-opacity" min="20" max="100" value="50" step="5">
             <span id="cv-overlay-opacity-val">50</span><span class="pv-unit">%</span>
-          </div>
-          <div class="pv-depth-row">
-            <label data-tip="Eval bar opacity on the actual-board overlay while the eval is stale (position changed, engine is catching up). Higher = easier to follow; lower = more subtle.">Stale eval-bar opacity</label>
-            <input type="range" id="cv-eval-stale-opacity" min="30" max="100" value="90" step="5">
-            <span id="cv-eval-stale-opacity-val">90</span><span class="pv-unit">%</span>
           </div>
         </div>
 
         <div class="r2-group">
           <div class="r2-group-label">Show on screen</div>
-          <label class="display-toggle" data-tip="On-screen markers drawn directly over the detected board: best-move arrows, PV step labels, and played-move markers."><input type="checkbox" id="cv-disp-overlay" checked><span>Live-board markers</span></label>
+          <label class="display-toggle" data-tip="Best-move arrows, PV step labels, and played-move markers drawn directly over the detected board on screen. Turn off for a clean board; the eval bar stays visible."><input type="checkbox" id="cv-disp-overlay" checked><span>Move hints</span></label>
           <label class="display-toggle" data-tip="Vertical evaluation bar drawn next to the detected board on screen."><input type="checkbox" id="cv-disp-eval" checked><span>Eval bar</span></label>
-          <label class="display-toggle" data-tip="Mini chessboard inside the control panel that mirrors the recognized position and animates the best line."><input type="checkbox" id="cv-disp-vboard" checked><span>Mini board (panel)</span></label>
         </div>
 
         <div class="r2-group">
           <div class="r2-group-label">Tools</div>
-          <div class="lichess-controls">
-            <button class="toggle-btn" id="cv-lichess-btn" data-tip="Open the current position in a floating Lichess analysis board.">&#9816; Open in Lichess analysis</button>
-            <label class="lichess-sync-label" data-tip="Keep the Lichess analysis board in sync with the live recognized position as it changes."><input type="checkbox" id="cv-lichess-sync" checked><span>Mirror current position</span></label>
-          </div>
+          <button class="toggle-btn" id="cv-lichess-btn" data-tip="Open the current position in a floating Lichess analysis board.">&#9816; Open in Lichess analysis</button>
         </div>
 
         <div class="r2-group" id="cv-system-group">
@@ -157,7 +143,6 @@ export const PANEL_HTML = `\
        checkboxes) still find their target elements without throwing. -->
   <div class="r2-legacy-hidden" hidden>
     <button id="cv-overlay-btn"></button>
-    <button id="cv-vboard-btn"></button>
     <button id="cv-eval-btn"></button>
     <button id="cv-compact-btn"></button>
     <button id="cv-collapse-btn"></button>
