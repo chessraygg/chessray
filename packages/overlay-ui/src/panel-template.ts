@@ -57,6 +57,9 @@ export const PANEL_HTML = `\
         <span id="cv-loss-threshold-val">100</span>
       </div>
       <div class="r2-moves" id="cv-best-moves"></div>
+      <div class="r2-bottom-bar">
+        <button class="toggle-btn r2-lichess-btn" id="cv-lichess-btn" data-tip="Open the current position in a floating Lichess analysis board.">&#9816; Open in Lichess analysis</button>
+      </div>
     </div>
 
     <!-- Settings view -->
@@ -95,11 +98,6 @@ export const PANEL_HTML = `\
           <div class="r2-group-label">Show on screen</div>
           <label class="display-toggle" data-tip="Best-move arrows, PV step labels, and played-move markers drawn directly over the detected board on screen. Turn off for a clean board; the eval bar stays visible."><input type="checkbox" id="cv-disp-overlay" checked><span>Move hints</span></label>
           <label class="display-toggle" data-tip="Vertical evaluation bar drawn next to the detected board on screen."><input type="checkbox" id="cv-disp-eval" checked><span>Eval bar</span></label>
-        </div>
-
-        <div class="r2-group">
-          <div class="r2-group-label">Tools</div>
-          <button class="toggle-btn" id="cv-lichess-btn" data-tip="Open the current position in a floating Lichess analysis board.">&#9816; Open in Lichess analysis</button>
         </div>
 
         <div class="r2-group" id="cv-system-group">

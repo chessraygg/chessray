@@ -1404,6 +1404,41 @@ canvas#video-overlay {
   min-height: 0;
   overflow: auto;
 }
+
+/* Sticky action bar under the moves list. Holds the Open in Lichess CTA so
+   it stays reachable in one click without scrolling the moves out. */
+.r2-bottom-bar {
+  display: flex;
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
+}
+.r2-bottom-bar .r2-lichess-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(34, 197, 94, 0.10);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.r2-bottom-bar .r2-lichess-btn:hover {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.45);
+}
+.r2-bottom-bar .r2-lichess-btn.active {
+  background: rgba(34, 197, 94, 0.25);
+  border-color: var(--accent);
+  color: #fff;
+}
 /* Re-style the existing .move-line markup emitted by debug-panel.renderBestMoves
    so the rest of the codebase doesn't need to change. */
 .r2-moves .move-line {
