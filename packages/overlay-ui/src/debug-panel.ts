@@ -142,6 +142,24 @@ export function renderBoardGrid(
   grid.innerHTML = html;
 }
 
+/** Replace the leading piece letter in a SAN move with the corresponding
+ *  filled black Unicode chess glyph. Pawn moves (no leading piece letter),
+ *  castling (O-O / O-O-O), and the trailing promotion suffix (=Q, =R …)
+ *  are passed through unchanged. The black-filled set reads better than
+ *  the outline-white set at the panel's small font sizes. */
+const SAN_PIECE_GLYPHS: Record<string, string> = {
+  K: '\u265A', Q: '\u265B', R: '\u265C', B: '\u265D', N: '\u265E',
+};
+function sanToUnicode(san: string): string {
+  if (!san) return san;
+  // Promotion suffix: "=Q" → "=♛"
+  const promo = san.replace(/=([KQRBN])/, (_m, p: string) => `=${SAN_PIECE_GLYPHS[p]}`);
+  // Leading piece letter (uppercase only — lowercase 'a'..'h' are files).
+  const lead = promo[0];
+  if (SAN_PIECE_GLYPHS[lead]) return SAN_PIECE_GLYPHS[lead] + promo.slice(1);
+  return promo;
+}
+
 /** Format best moves with SAN or UCI notation, clickable to select line */
 function renderBestMoves(
   container: HTMLElement,
@@ -176,8 +194,8 @@ function renderBestMoves(
     let continuation: string;
     if (useSan && fen) {
       const sanMoves = uciToSan(fen, move.pv.slice(0, 5));
-      primarySan = sanMoves[0] ?? move.pv[0] ?? '';
-      continuation = sanMoves.slice(1).join(' ');
+      primarySan = sanToUnicode(sanMoves[0] ?? move.pv[0] ?? '');
+      continuation = sanMoves.slice(1).map(sanToUnicode).join(' ');
     } else {
       primarySan = move.pv[0] ?? '';
       continuation = move.pv.slice(1, 5).join(' ');
