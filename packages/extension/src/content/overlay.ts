@@ -74,7 +74,13 @@ function applyPrefsToHiddenPanel(prefs: Record<string, unknown>): void {
   const setRange = (id: string, value: number): void => {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) return;
-    el.value = String(value);
+    const next = String(value);
+    if (el.value === next) return; // skip when nothing changed; otherwise
+    // every pref-update broadcast causes the content script to re-fire
+    // every slider's input handler (savePrefs + renderArrows + renderVideoOverlay).
+    // On the captured tab those repaints feed back into tabCapture and
+    // tank its framerate to single digits.
+    el.value = next;
     el.dispatchEvent(new Event('input', { bubbles: true }));
   };
   const setCheckbox = (id: string, value: boolean): void => {
@@ -97,11 +103,9 @@ function applyPrefsToHiddenPanel(prefs: Record<string, unknown>): void {
   }
   if (typeof prefs.overlaySize === 'number') setRange('cv-overlay-size', prefs.overlaySize);
   if (typeof prefs.overlayOpacity === 'number') setRange('cv-overlay-opacity', Math.round(prefs.overlayOpacity * 100));
-  if (typeof prefs.evalBarStaleOpacity === 'number') setRange('cv-eval-stale-opacity', Math.round(prefs.evalBarStaleOpacity * 100));
   if (typeof prefs.lossThreshold === 'number') setRange('cv-loss-threshold', prefs.lossThreshold);
   if (typeof prefs.pvDepth === 'number') setRange('cv-pv-depth', prefs.pvDepth);
   if (typeof prefs.pvGrowDelaySec === 'number') setRange('cv-pv-grow-delay', prefs.pvGrowDelaySec);
-  if (typeof prefs.pvPreviewSec === 'number') setRange('cv-pv-preview-sec', prefs.pvPreviewSec);
   if (typeof prefs.overlayVisible === 'boolean') {
     clickIfStateMismatch('cv-overlay-btn', prefs.overlayVisible);
   }
