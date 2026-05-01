@@ -1654,10 +1654,16 @@ export function mountOverlay(api: ChessRayAPI, options?: { hidePanel?: boolean }
   });
 
   chessRay.onStopTracking(() => {
+    // Drop any in-flight frame-result so the queued processPendingResult
+    // can't repopulate state.currentResult after we've cleared it (the
+    // setTimeout-scheduled handler doesn't see capture-stopped otherwise).
+    pendingResult = null;
     state.currentArrows = [];
     state.currentResult = null;
     (window as any).__chessrayPvGrowStop?.();
     (window as any).__chessrayPvPlayStop?.();
+    // Stop the arrow fade interval so it can't tick a render after the clear.
+    resetVideoArrowAnimation();
     renderArrows(state);
     clearVideoOverlay(state);
   });
