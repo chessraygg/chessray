@@ -39,6 +39,15 @@ const BUILD_TAG = BUILD_TIME ? `${BUILD_COMMIT} · ${BUILD_TIME}` : BUILD_COMMIT
 // ── Module-level state ──
 let lichessOpen = false;
 
+// Set while applying a remote PV action so the local execution path
+// doesn't re-broadcast it back through the host. Cross-context hosts
+// (extension popup ↔ content script) round-trip PV control via the SW.
+let pvSyncSuppress = false;
+function broadcastPvIfLocal(action: import('./host-api.js').PvAction): void {
+  if (pvSyncSuppress) return;
+  chessRay?.broadcastPvAction?.(action);
+}
+
 let userPanel: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
 let debugFen: HTMLDivElement | null = null;
@@ -1111,6 +1120,7 @@ function initOverlay(): void {
     // Lift the SW capture-pause (extension content script polls this flag).
     (window as any).__chessrayPvPlaying = false;
     syncPvControls();
+    broadcastPvIfLocal({ kind: 'pause' });
   }
 
   function pvCycleResume(): void {
@@ -1127,6 +1137,7 @@ function initOverlay(): void {
       pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
     }
     syncPvControls();
+    broadcastPvIfLocal({ kind: 'resume' });
   }
 
   function pvCycleJumpTo(depth: number): void {
@@ -1139,6 +1150,7 @@ function initOverlay(): void {
     // Lift the SW capture-pause (extension content script polls this flag).
     (window as any).__chessrayPvPlaying = false;
     syncPvControls();
+    broadcastPvIfLocal({ kind: 'jump-to', depth: d });
   }
 
   /** Update both control bars' progress + button visibility from state. */
@@ -1268,6 +1280,27 @@ function initOverlay(): void {
     videoBarEl.addEventListener('mouseenter', () => chessRay.setMousePassthrough(false));
     videoBarEl.addEventListener('mouseleave', () => chessRay.setMousePassthrough(true));
   }
+
+  // Cross-surface PV control sync. In the extension the popup and the
+  // content script run separate mount-overlay instances; without this
+  // the panel virtual board and the on-page video overlay would get
+  // out of sync (clicking a top move in one surface would only animate
+  // there). Suppress the re-broadcast around the local dispatch so the
+  // message doesn't bounce back to the originator.
+  chessRay.onPvAction((action) => {
+    pvSyncSuppress = true;
+    try {
+      switch (action.kind) {
+        case 'trigger-line': triggerLine(action.lineIndex); break;
+        case 'pause':        pvCyclePause(); break;
+        case 'resume':       pvCycleResume(); break;
+        case 'jump-to':      pvCycleJumpTo(action.depth); break;
+        case 'stop':         stopPvLine(); break;
+      }
+    } finally {
+      pvSyncSuppress = false;
+    }
+  });
 
   (window as any).__chessrayPvGrowStart = pvCycleStart;
   (window as any).__chessrayPvGrowContinue = pvCycleContinue;
@@ -1632,6 +1665,7 @@ function triggerLine(index: number): void {
   state.hoveredArrowIndex = null;
   selectLine(index);
   (window as any).__chessrayUpdateCompactMoves?.();
+  broadcastPvIfLocal({ kind: 'trigger-line', lineIndex: index });
 }
 
 /** User clicked the animated board (or compact pill while a line is playing) —
@@ -1645,6 +1679,7 @@ function stopPvLine(): void {
   renderArrows(state);
   renderVideoOverlay(state);
   (window as any).__chessrayUpdateCompactMoves?.();
+  broadcastPvIfLocal({ kind: 'stop' });
 }
 
 function processPendingResult(): void {

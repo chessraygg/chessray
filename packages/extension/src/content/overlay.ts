@@ -171,6 +171,20 @@ const bridge: ChessRayAPI = createDefaultBridge({
     const side = color === 'black' ? 'black' : 'white';
     window.open(`https://lichess.org/analysis/${fenPath}?color=${side}`, '_blank', 'noopener');
   },
+
+  // PV control sync: content script ↔ popup. Content-side broadcasts go
+  // via chrome.runtime.sendMessage which already reaches the side panel
+  // directly (extension-context recipient); popup→content is relayed by
+  // the SW (see service-worker.ts pv-action handler).
+  broadcastPvAction: (action) => {
+    chrome.runtime.sendMessage({ type: 'pv-action', action, from: 'content' } satisfies ExtensionMessage)
+      .catch(() => {});
+  },
+  onPvAction: (cb) => {
+    chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
+      if (msg?.type === 'pv-action' && msg.from === 'popup') cb(msg.action);
+    });
+  },
 });
 
 // Mount the overlay-ui but hide the floating panel — the popup is the

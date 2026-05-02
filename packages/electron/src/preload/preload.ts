@@ -105,6 +105,11 @@ const api: ChessRayAPI = {
     ipcRenderer.send('toggle-lichess', fen, color),
   updateLichess: (fen: string, color: string) =>
     ipcRenderer.send('update-lichess', fen, color),
+
+  // PV control sync — Electron's panel + on-screen overlay live in the
+  // same overlay window's DOM and share state, so no broadcast needed.
+  broadcastPvAction: () => { /* same-document host: state sync is direct */ },
+  onPvAction: () => { /* same-document host: state sync is direct */ },
 };
 
 contextBridge.exposeInMainWorld('chessRay', api);

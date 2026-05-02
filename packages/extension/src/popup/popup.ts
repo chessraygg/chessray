@@ -116,6 +116,19 @@ const bridge: ChessRayAPI = createDefaultBridge({
     const side = color === 'black' ? 'black' : 'white';
     chrome.tabs.create({ url: `https://lichess.org/analysis/${fenPath}?color=${side}` });
   },
+
+  // PV control sync: popup ↔ content script. Each surface broadcasts its
+  // own user-initiated PV actions; the SW relays popup→content via
+  // chrome.tabs.sendMessage, content→popup auto-broadcasts via runtime.
+  broadcastPvAction: (action) => {
+    chrome.runtime.sendMessage({ type: 'pv-action', action, from: 'popup' } satisfies ExtensionMessage)
+      .catch(() => {});
+  },
+  onPvAction: (cb) => {
+    chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
+      if (msg?.type === 'pv-action' && msg.from === 'content') cb(msg.action);
+    });
+  },
 });
 
 mountOverlay(bridge);

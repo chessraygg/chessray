@@ -7,6 +7,18 @@
 // can stub the method but should still be present so the contract is
 // total — that lets mountOverlay call any method without `?.()` guards.
 
+/** PV control actions broadcast across surfaces so the panel's virtual
+ *  board and the on-page video overlay stay in sync. Single-document
+ *  hosts (Electron) can no-op the broadcast/listener pair — both
+ *  surfaces share state directly there. Cross-context hosts (extension:
+ *  popup ↔ content script) round-trip through the SW. */
+export type PvAction =
+  | { kind: 'trigger-line'; lineIndex: number }
+  | { kind: 'pause' }
+  | { kind: 'resume' }
+  | { kind: 'jump-to'; depth: number }
+  | { kind: 'stop' };
+
 export interface DisplayInfo {
   scaleFactor: number;
   size?: { width: number; height: number };
@@ -73,6 +85,12 @@ export interface ChessRayAPI {
   openExternal: (url: string) => void;
   toggleLichess: (fen: string, color: string) => void;
   updateLichess: (fen: string, color: string) => void;
+
+  // PV control sync (cross-surface broadcast). Only meaningful in the
+  // extension where popup + content script have isolated state; Electron
+  // can leave both as no-ops since both surfaces share one document.
+  broadcastPvAction: (action: PvAction) => void;
+  onPvAction: (cb: (action: PvAction) => void) => void;
 }
 
 /**
@@ -134,6 +152,9 @@ export function createDefaultBridge(overrides: Partial<ChessRayAPI> = {}): Chess
     openExternal: noop,
     toggleLichess: noop,
     updateLichess: noop,
+
+    broadcastPvAction: noop,
+    onPvAction: noop,
   };
   return { ...defaults, ...overrides };
 }

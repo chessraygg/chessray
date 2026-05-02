@@ -195,6 +195,19 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, sender, sendRespons
     chrome.runtime.sendMessage(out).catch(() => { /* no extension surface open */ });
     return false;
   }
+  if (msg.type === 'pv-action') {
+    // PV control sync. Only popup→content needs an explicit relay —
+    // chrome.runtime.sendMessage from a content script already reaches
+    // the side panel directly. The popup's message arrives here with
+    // sender.tab undefined (extension context); forward it to the
+    // active capture tab. Content-script-origin messages just trace.
+    if (msg.from === 'popup') {
+      void getCaptureState().then((s) => {
+        if (s.tabId != null) chrome.tabs.sendMessage(s.tabId, msg).catch(() => {});
+      });
+    }
+    return false;
+  }
   return false;
 });
 

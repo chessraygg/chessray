@@ -8,6 +8,7 @@
  */
 
 import type { PipelineResult } from '@chessray/core';
+import type { PvAction } from '@chessray/overlay-ui';
 
 /** Settings the panel can change at runtime. Mirrors the analogous IPC
  *  channels in the Electron preload. Offscreen owns the FrameProcessor so
@@ -90,4 +91,12 @@ export type ExtensionMessage =
   | { type: 'capture-stopped' }
   /** Offscreen → side panel (broadcast). Push engine info on update
    *  so the diagnostics view refreshes live without polling. */
-  | { type: 'engine-info-update'; info: { yolo?: string; stream?: string; constraints?: string } };
+  | { type: 'engine-info-update'; info: { yolo?: string; stream?: string; constraints?: string } }
+  /** Cross-surface PV control sync. The popup (panel virtual board) and
+   *  the content script (on-page overlay) each run a separate mount-
+   *  overlay, so a click on one doesn't reach the other. Either side
+   *  fires this with `from` set to its origin; the SW relays popup→
+   *  content via chrome.tabs.sendMessage to the active capture tab.
+   *  Content→popup needs no relay — chrome.runtime.sendMessage from a
+   *  content script already broadcasts to all open extension pages. */
+  | { type: 'pv-action'; action: PvAction; from: 'popup' | 'content' };
