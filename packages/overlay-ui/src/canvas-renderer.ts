@@ -19,6 +19,16 @@ export interface PvBoardState {
     afterFen: string;    // Position after this move completes
     afterHighlight: number[];
   } | null;
+  /** Set when the user manually scrubs to a depth via the control bar
+   *  (first/prev/next/last/pause). Drawn at full opacity with the step
+   *  number so the user sees "this is move N of the line" without the
+   *  bell-shaped animated arrow that only renders during auto-advance. */
+  staticArrow?: {
+    fromSq: string;
+    toSq: string;
+    isWhite: boolean;
+    step: number;
+  };
 }
 
 export interface OverlayState {
@@ -436,6 +446,17 @@ function drawAnalysisBoard(
       width: 3, opacity: bellOpacity, loss_cp: 0,
       label: String(a.step),
     }, boardRect, arrowScale, pvBoard.flipped, 0, t, true);
+  } else if (pvBoard.staticArrow) {
+    // Manual-scrub frame: no animation, no piece-slide, but the user still
+    // wants to see "this is move N" — draw the labeled arrow at full opacity.
+    const s = pvBoard.staticArrow;
+    const arrowScale = (boardRect.width + boardRect.height) / 2 / 192;
+    drawArrow(ctx, {
+      from: s.fromSq, to: s.toSq,
+      color: s.isWhite ? '#e5e5e5' : '#1a1a1a',
+      width: 3, opacity: 0.8, loss_cp: 0,
+      label: String(s.step),
+    }, boardRect, arrowScale, pvBoard.flipped, 0, 1, true);
   }
 }
 

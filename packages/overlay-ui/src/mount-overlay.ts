@@ -11,7 +11,7 @@
 import type { PipelineResult } from '@chessray/core';
 import { applyUciMoves, uciToSan, fenSimilarity, lossToColor } from '@chessray/core';
 import { loadPrefs, savePrefs } from './preferences.js';
-import { type OverlayState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow, videoHitCache, vboardHitCache, hitTestArrows, hitTestAnimBoard } from './canvas-renderer.js';
+import { type OverlayState, type PvBoardState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow, videoHitCache, vboardHitCache, hitTestArrows, hitTestAnimBoard } from './canvas-renderer.js';
 import { preloadPieceImages, pieceSvg } from './piece-svg.js';
 import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid, setFpsBudgetMs, setActiveFpsDisplay, renderDebugHistoryNav, formatDebugReport, type DebugHistoryNavState } from './debug-panel.js';
 import { loadHistory, pushSlowFrame, clearHistory, snapshotToResult, type DebugSnapshot } from './debug-history.js';
@@ -1088,10 +1088,22 @@ function initOverlay(): void {
       highlight = pos.highlight;
     }
 
+    // Static arrow describing the move that *brought us to* this depth — so
+    // First/Prev/Next/Last/Pause all show the numbered step label that the
+    // animated path normally draws via pvBoardState.anim.
+    let staticArrow: PvBoardState['staticArrow'];
+    if (depth > 0) {
+      const uci = pvCyclePv[depth - 1];
+      const turn = pvCycleBaseFen.split(' ')[1] || 'w';
+      const isWhite = (depth % 2 === 1) === (turn === 'w');
+      staticArrow = { fromSq: uci.slice(0, 2), toSq: uci.slice(2, 4), isWhite, step: depth };
+    }
+
     state.pvBoardState = {
       fen, flipped: pvCycleFlipped, highlight,
       squareColors: state.currentResult?.square_colors,
       anim: null,
+      staticArrow,
     };
     renderVideoOverlay(state);
 
@@ -1101,9 +1113,31 @@ function initOverlay(): void {
         grid.classList.add('analysis');
         renderBoardGrid(grid, fen, pvCycleFlipped, highlight, state.currentResult?.square_colors);
       }
+      // Mirror the labeled step arrow onto the panel's arrow canvas.
       if (state.canvas) {
         const ctx = state.canvas.getContext('2d');
-        if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+        if (ctx) {
+          const size = 200;
+          const dpr = window.devicePixelRatio || 1;
+          const effectiveDpr = dpr * (state.panelScale || 1) * (state.boardScale || 1);
+          const bufferSize = Math.ceil(size * effectiveDpr);
+          if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
+            state.canvas.width = bufferSize;
+            state.canvas.height = bufferSize;
+            state.canvas.style.width = `${size}px`;
+            state.canvas.style.height = `${size}px`;
+          }
+          ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
+          ctx.clearRect(0, 0, size, size);
+          if (staticArrow) {
+            drawArrow(ctx, {
+              from: staticArrow.fromSq, to: staticArrow.toSq,
+              color: staticArrow.isWhite ? '#e5e5e5' : '#1a1a1a',
+              width: 3, opacity: 0.8, loss_cp: 0,
+              label: String(staticArrow.step),
+            }, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, 1, true);
+          }
+        }
       }
     }
   }
