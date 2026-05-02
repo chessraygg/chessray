@@ -20,3 +20,5 @@ packages/*/tsconfig.tsbuildinfo
 scripts/local/
 # Chrome for Testing (used by the local extension smoke-test harness).
 chrome/
+# UI mock playground — local design exploration, not part of the app.
+packages/electron/src/overlay/playground/
