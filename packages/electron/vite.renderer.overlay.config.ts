@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite';
 import path from 'path';
+import { buildInfoPlugin } from '../overlay-ui/vite-plugin-build-info.ts';
 
 export default defineConfig({
   root: path.resolve(__dirname, 'src/overlay'),
+  plugins: [buildInfoPlugin()],
   build: {
     outDir: path.resolve(__dirname, '.vite/renderer/overlay_window'),
   },

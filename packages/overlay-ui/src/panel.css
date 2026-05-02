@@ -338,6 +338,15 @@ canvas#video-overlay {
 
 .debug-section.hidden { display: none; }
 
+.debug-build {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--text-faint, rgba(255, 255, 255, 0.45));
+  letter-spacing: 0.02em;
+  padding: 2px 4px;
+  align-self: flex-start;
+}
+
 .debug-history-nav {
   display: flex;
   align-items: center;

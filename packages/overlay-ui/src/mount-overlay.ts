@@ -30,6 +30,12 @@ import type { ChessRayAPI } from './host-api.js';
 // initOverlay(), which mountOverlay calls *after* setting this.
 let chessRay!: ChessRayAPI;
 
+// Stamped by the build-info vite plugin into build-info.generated.ts on
+// every rebuild — surfaces the current commit + build time in the
+// diagnostics view so we can verify which dist Chrome / Electron loaded.
+import { BUILD_COMMIT, BUILD_TIME } from './build-info.generated.js';
+const BUILD_TAG = BUILD_TIME ? `${BUILD_COMMIT} · ${BUILD_TIME}` : BUILD_COMMIT;
+
 // ── Module-level state ──
 let lichessOpen = false;
 
@@ -309,6 +315,9 @@ function initOverlay(): void {
   debugFen = document.getElementById('cv-debug-fen') as HTMLDivElement;
   debugInfo = document.getElementById('cv-debug-info') as HTMLDivElement;
   state.canvas = document.getElementById('cv-arrow-canvas') as HTMLCanvasElement;
+  // Stamp the running bundle's commit/build into the diagnostics view.
+  const debugBuild = document.getElementById('cv-debug-build');
+  if (debugBuild) debugBuild.textContent = `build ${BUILD_TAG}`;
 
   // Arrow canvas size is set in renderArrows() with DPR scaling
   if (state.canvas) {
