@@ -788,23 +788,6 @@ function initOverlay(): void {
   }
 
   function pvCycleStep(): void {
-    // If the cached PV has diverged from the live eval (deeper search changed
-    // this line's moves at the same index), stop instead of silently restarting
-    // the same line from step 1 — user sees "animation reset" without any
-    // sense that the line's content has actually changed.
-    const liveResult = state.currentResult;
-    if (liveResult?.evaluation?.top_moves?.length) {
-      const idx = Math.min(pvCycleLineIndex, liveResult.evaluation.top_moves.length - 1);
-      const livePv = liveResult.evaluation.top_moves[idx].pv;
-      const depth = Math.max(state.pvDisplayDepth, 1);
-      const stale = depth > livePv.length ||
-        pvCyclePv.slice(0, depth).some((m, i) => m !== livePv[i]);
-      if (stale) {
-        stopPvLine();
-        return;
-      }
-    }
-
     if (state.pvDisplayDepth >= state.pvDepth || state.pvDisplayDepth >= pvCyclePv.length) {
       // Sequence complete
       if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
@@ -1547,21 +1530,25 @@ function processPendingResult(): void {
     resetVideoArrowAnimation();
   }
 
-  // Reset to best line when position changes
+  // Reset to best line when position changes. Skip restart/continue while a
+  // PV line is actively animating — let it play out so deeper-eval refreshes
+  // don't reset the playback. Next pvCycleStartCurrentLine reads fresh from
+  // state.currentResult, so the new eval is picked up at the next line.
   const evalFen = result.evaluation?.fen ?? null;
   const evalDepth = result.eval_depth ?? 0;
+  const isPlaying = !!(window as any).__chessrayPvPlaying;
   if (evalFen && evalFen !== lastEvalFen) {
-    state.selectedLineIndex = 0;
-    userLockedLine = -1;
     lastEvalFen = evalFen;
     lastEvalDepth = evalDepth;
-    (window as any).__chessrayResetAutoTimer?.();
-    // If line is already visible (non-auto mode), restart grow from 2
-    if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
+    if (!isPlaying) {
+      state.selectedLineIndex = 0;
+      userLockedLine = -1;
+      (window as any).__chessrayResetAutoTimer?.();
+      if (state.lineVisible) (window as any).__chessrayPvGrowStart?.();
+    }
   } else if (evalDepth >= lastEvalDepth) {
-    // Same position, same or deeper eval — continue grow if displayed moves still match
     lastEvalDepth = evalDepth;
-    if (state.lineVisible) (window as any).__chessrayPvGrowContinue?.();
+    if (state.lineVisible && !isPlaying) (window as any).__chessrayPvGrowContinue?.();
   }
 
   const snap = historyIndex !== null ? snapshotToResult(debugHistory[historyIndex]) : null;
