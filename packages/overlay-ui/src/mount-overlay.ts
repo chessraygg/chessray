@@ -1689,8 +1689,19 @@ function processPendingResult(): void {
   pendingResult = null;
   const tRender = Date.now();
 
+  // While the user has the PV view paused or parked at end-of-sequence,
+  // the analysis-board frame is a deliberate freeze the user is studying.
+  // A transient YOLO miss or a single noisy recognition shouldn't clobber
+  // it — that produces "click pause → board disappears + no arrows"
+  // (state.arrowsVisible was set false when the line started, and the
+  // pvCycleStop path here doesn't restore it). Detect "frozen" as
+  // pvBoardState set but auto-advance not running, and skip the two
+  // destructive branches (no-board / recogFen-changed) for those frames.
+  const pvFrozen = state.pvBoardState !== null && !(window as any).__chessrayPvPlaying;
+
   // No board detected — clear everything
   if (!result.board_detection?.found) {
+    if (pvFrozen) return; // keep the paused frame; transient miss
     state.currentResult = null;
     state.currentArrows = [];
     lastEvalFen = null;
@@ -1707,6 +1718,11 @@ function processPendingResult(): void {
   // Stop playback immediately when recognition FEN changes (before eval arrives)
   const recogFen = result.recognition?.fen ?? null;
   if (recogFen && recogFen !== lastRecogFen) {
+    if (pvFrozen) {
+      // Update the tracker so we don't fire the change on every frame, but
+      // leave the paused frame alone — user explicitly chose to study it.
+      lastRecogFen = recogFen;
+    } else {
     if (pendingManualToggleApply) {
       // First FEN change after the user toggled manual orientation. The new
       // FEN is the mirror of the old (because the override applied), not a
@@ -1728,6 +1744,7 @@ function processPendingResult(): void {
     (window as any).__chessrayPvPlayStop?.();
     // Snap old PV arrows away so they don't fade out over the new position
     resetVideoArrowAnimation();
+    }
   }
 
   // Reset to best line when position changes. Skip restart/continue while
