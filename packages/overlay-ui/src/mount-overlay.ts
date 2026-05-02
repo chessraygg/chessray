@@ -1113,32 +1113,12 @@ function initOverlay(): void {
         grid.classList.add('analysis');
         renderBoardGrid(grid, fen, pvCycleFlipped, highlight, state.currentResult?.square_colors);
       }
-      // Mirror the labeled step arrow onto the panel's arrow canvas.
-      if (state.canvas) {
-        const ctx = state.canvas.getContext('2d');
-        if (ctx) {
-          const size = 200;
-          const dpr = window.devicePixelRatio || 1;
-          const effectiveDpr = dpr * (state.panelScale || 1) * (state.boardScale || 1);
-          const bufferSize = Math.ceil(size * effectiveDpr);
-          if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
-            state.canvas.width = bufferSize;
-            state.canvas.height = bufferSize;
-            state.canvas.style.width = `${size}px`;
-            state.canvas.style.height = `${size}px`;
-          }
-          ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
-          ctx.clearRect(0, 0, size, size);
-          if (staticArrow) {
-            drawArrow(ctx, {
-              from: staticArrow.fromSq, to: staticArrow.toSq,
-              color: staticArrow.isWhite ? '#e5e5e5' : '#1a1a1a',
-              width: 3, opacity: 0.8, loss_cp: 0,
-              label: String(staticArrow.step),
-            }, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, 1, true);
-          }
-        }
-      }
+      // renderArrows now owns the panel arrow canvas in the frozen-PV
+      // case too — it draws pvBoardState.staticArrow and skips the regular
+      // top-move arrows. Doing it inside renderArrows means subsequent
+      // frame results that call renderArrows() will keep the step number
+      // visible instead of clearing it.
+      renderArrows(state);
     }
   }
 

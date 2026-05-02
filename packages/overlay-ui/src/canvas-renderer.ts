@@ -859,6 +859,40 @@ export function renderArrows(state: OverlayState): void {
   }
   if (!state.canvas) return;
 
+  // Frozen PV frame (paused / scrubbed via the control bar). Keep ONLY the
+  // labeled step arrow visible — the regular top-move arrows would
+  // otherwise be hidden anyway (state.arrowsVisible was set false when the
+  // line started), and without an explicit draw here the next renderArrows
+  // pass clears the canvas and the step number disappears.
+  const pvFrozen = !!state.pvBoardState && !(window as any).__chessrayPvPlaying;
+  if (pvFrozen) {
+    const size = 200;
+    const dpr = window.devicePixelRatio || 1;
+    const effectiveDpr = dpr * (state.panelScale || 1) * (state.boardScale || 1);
+    const bufferSize = Math.ceil(size * effectiveDpr);
+    if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
+      state.canvas.width = bufferSize;
+      state.canvas.height = bufferSize;
+      state.canvas.style.width = `${size}px`;
+      state.canvas.style.height = `${size}px`;
+    }
+    const fctx = state.canvas.getContext('2d')!;
+    fctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
+    fctx.clearRect(0, 0, size, size);
+    const sa = state.pvBoardState!.staticArrow;
+    if (sa) {
+      drawArrow(fctx, {
+        from: sa.fromSq, to: sa.toSq,
+        color: sa.isWhite ? '#e5e5e5' : '#1a1a1a',
+        width: 3, opacity: 0.8, loss_cp: 0,
+        label: String(sa.step),
+      }, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, 1, true);
+    }
+    vboardHitCache.arrows = [];
+    vboardHitCache.animBoardRect = { x: 0, y: 0, width: size, height: size };
+    return;
+  }
+
   const size = 200;
   const dpr = window.devicePixelRatio || 1;
   // Compensate for both CSS transforms stacking on this canvas: the outer
