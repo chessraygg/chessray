@@ -741,8 +741,12 @@ function initOverlay(): void {
     if (state.pvDisplayDepth >= state.pvDepth || state.pvDisplayDepth >= pvCyclePv.length) {
       // End of sequence — pause at the final position. The control bar's
       // Play button restarts from depth 0; First/Prev let the user scrub.
+      // Drop the playing flag so the content script's capture-pause lifts
+      // and live frames resume; pvBoardState stays so the analysis board
+      // keeps showing the final frame.
       if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
       pvCyclePaused = true;
+      (window as any).__chessrayPvPlaying = false;
       syncPvControls();
       return;
     }
@@ -1090,6 +1094,13 @@ function initOverlay(): void {
     if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
     if (pvCyclePreviewTimer !== null) { clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null; }
     pvCyclePaused = true;
+    // If we're mid-step (a piece is sliding), snap to the post-step frame
+    // statically — otherwise removing the floater + the playing-flag drop
+    // below would leave the virtual grid stuck in the "piece picked up"
+    // intermediate state.
+    if (state.pvBoardState?.anim) pvRenderFrame(state.pvDisplayDepth);
+    // Lift the SW capture-pause (extension content script polls this flag).
+    (window as any).__chessrayPvPlaying = false;
     syncPvControls();
   }
 
@@ -1116,6 +1127,8 @@ function initOverlay(): void {
     const max = pvEffectiveMaxDepth();
     const d = Math.max(0, Math.min(depth, max));
     pvRenderFrame(d);
+    // Lift the SW capture-pause (extension content script polls this flag).
+    (window as any).__chessrayPvPlaying = false;
     syncPvControls();
   }
 
@@ -1673,17 +1686,18 @@ function processPendingResult(): void {
     resetVideoArrowAnimation();
   }
 
-  // Reset to best line when position changes. Skip restart/continue while a
-  // PV line is actively animating — let it play out so deeper-eval refreshes
-  // don't reset the playback. Next pvCycleStartCurrentLine reads fresh from
-  // state.currentResult, so the new eval is picked up at the next line.
+  // Reset to best line when position changes. Skip restart/continue while
+  // the PV view is mounted (whether actively animating or paused on a
+  // scrubbed/end-of-line frame) so deeper-eval refreshes don't reset the
+  // playback. Next pvCycleStartCurrentLine reads fresh from state.currentResult,
+  // so the new eval is picked up the next time the user starts a line.
   const evalFen = result.evaluation?.fen ?? null;
   const evalDepth = result.eval_depth ?? 0;
-  const isPlaying = !!(window as any).__chessrayPvPlaying;
+  const pvActive = state.pvBoardState !== null;
   if (evalFen && evalFen !== lastEvalFen) {
     lastEvalFen = evalFen;
     lastEvalDepth = evalDepth;
-    if (!isPlaying) {
+    if (!pvActive) {
       state.selectedLineIndex = 0;
       userLockedLine = -1;
       (window as any).__chessrayResetAutoTimer?.();
@@ -1691,7 +1705,7 @@ function processPendingResult(): void {
     }
   } else if (evalDepth >= lastEvalDepth) {
     lastEvalDepth = evalDepth;
-    if (state.lineVisible && !isPlaying) (window as any).__chessrayPvGrowContinue?.();
+    if (state.lineVisible && !pvActive) (window as any).__chessrayPvGrowContinue?.();
   }
 
   const snap = historyIndex !== null ? snapshotToResult(debugHistory[historyIndex]) : null;

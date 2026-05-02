@@ -312,6 +312,14 @@ queueMicrotask(() => reportViewportSize('initial'));
 // trigger capture on user request.
 chrome.runtime.sendMessage({ type: 'ping' }).catch(() => {});
 
+// Defensive resume: if the previous session left the capture loop paused
+// (PV animation was active when the tab was closed/refreshed), the SW
+// survives the tab reload in a paused state. The polling loop below only
+// emits on transitions, so a fresh content script with __chessrayPvPlaying
+// undefined→false won't ever send 'resume-capture'. Send it once on init
+// so the SW comes out of any stuck-paused state.
+chrome.runtime.sendMessage({ type: 'resume-capture' }).catch(() => {});
+
 // ── On-page overlay click handling ──
 // The video-overlay canvas is pointer-events: none by default so the
 // page underneath receives clicks. We selectively flip it to 'auto'
