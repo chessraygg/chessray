@@ -20,6 +20,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..', '..');
 
 export default defineConfig({
+  // Force IPv4 binding so CRXJS's dev-mode loader (which fetches
+  // http://localhost:5173 from the page) connects on macOS where Chrome
+  // resolves localhost→::1 first and Vite's default would only bind IPv6.
+  server: {
+    host: '127.0.0.1',
+    port: 5173,
+    strictPort: true,
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
