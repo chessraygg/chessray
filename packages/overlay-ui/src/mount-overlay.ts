@@ -1159,12 +1159,10 @@ function initOverlay(): void {
 
   function pvCycleResume(): void {
     if (!pvCyclePv.length) return;
+    // Nothing to resume at end-of-sequence — the play button is hidden
+    // there anyway (no auto-replay; clicking an arrow re-triggers the line).
+    if (state.pvDisplayDepth >= pvEffectiveMaxDepth()) return;
     pvCyclePaused = false;
-    // If parked at the end, restart from the beginning.
-    if (state.pvDisplayDepth >= pvEffectiveMaxDepth()) {
-      state.pvDisplayDepth = 0;
-      pvRenderFrame(0);
-    }
     (window as any).__chessrayPvPlaying = true;
     if (pvCycleTimer === null) {
       pvCycleStep();
@@ -1208,7 +1206,13 @@ function initOverlay(): void {
       if (!isActive) bar.classList.remove('is-visible');
 
       const playBtn = bar.querySelector('[data-action="play"]') as HTMLElement | null;
-      if (playBtn) playBtn.innerHTML = showPause ? PAUSE_SVG : PLAY_SVG;
+      if (playBtn) {
+        playBtn.innerHTML = showPause ? PAUSE_SVG : PLAY_SVG;
+        // At end-of-sequence there's nothing left to play — hide the button
+        // entirely rather than offering a "replay from start" affordance
+        // (that was the legacy auto-rotate behavior we removed).
+        playBtn.classList.toggle('is-hidden', atEnd);
+      }
       bar.querySelector('[data-action="first"]')?.classList.toggle('is-hidden', atStart);
       bar.querySelector('[data-action="prev"]')?.classList.toggle('is-hidden', atStart);
       bar.querySelector('[data-action="next"]')?.classList.toggle('is-hidden', atEnd);
