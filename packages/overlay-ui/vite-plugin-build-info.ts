@@ -52,11 +52,21 @@ export function buildInfoPlugin(): Plugin {
     name: 'chessray-build-info',
     // Production / one-shot build path: write before bundling starts.
     buildStart() { refresh(); },
-    // Dev server path: refresh once at boot, then on every file change so
-    // post-commit rebuilds (HMR) pick up the new commit hash.
+    // Dev server path: refresh once at boot, on every file change, and
+    // also poll the git HEAD so a `git commit` (which doesn't touch any
+    // source file) still triggers a rebundle. Without the poll, the
+    // running bundle keeps the pre-commit sha until the user happens to
+    // edit a source file — and chrome://extensions reload becomes the
+    // only way to see the new hash. 1s is cheap (one rev-parse per tick).
     configureServer(server) {
       refresh();
       server.watcher.on('change', () => refresh());
+      let lastSha = gitShortSha();
+      const interval = setInterval(() => {
+        const sha = gitShortSha();
+        if (sha !== lastSha) { lastSha = sha; refresh(); }
+      }, 1000);
+      server.httpServer?.on('close', () => clearInterval(interval));
     },
   };
 }
