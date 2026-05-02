@@ -8,6 +8,9 @@
  *
  * The file is gitignored. tsc only needs a placeholder to typecheck;
  * the plugin overwrites it before each bundle is produced.
+ *
+ * Note: editing THIS file requires restarting vite-dev — vite caches the
+ * resolved config and doesn't reload plugin source on HMR.
  */
 
 import { execSync } from 'node:child_process';
