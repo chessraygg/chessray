@@ -134,7 +134,7 @@ export const PANEL_HTML = `\
     <!-- Debug view -->
     <div class="r2-view" id="r2-view-debug" hidden>
       <div class="r2-surface-body debug-section" id="debug-section">
-        <div class="debug-build" id="cv-debug-build" data-tip="Git commit baked into the running bundle, plus its build time. Lets you confirm the dev-server actually deployed the latest changes."></div>
+        <div class="debug-build" id="cv-debug-build" data-tip="Git commit baked into the running bundle, plus its build time. Lets you confirm the dev-server actually deployed the latest changes." data-tip-pos="below"></div>
         <div class="debug-history-nav" id="cv-debug-history-nav" style="display:none"></div>
         <div class="debug-img-wrap" id="cv-debug-img-wrap">
           <img id="cv-debug-img" src="" alt="Board capture" data-tip="JPEG preview of the cropped board pixels actually fed into the recognition pipeline. Useful for verifying the bbox is on the board and not on adjacent UI." data-tip-pos="below">
