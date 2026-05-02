@@ -1,16 +1,20 @@
 /**
- * Vite plugin: writes packages/overlay-ui/src/build-info.generated.ts with
- * the current short git SHA + build time on every build / HMR rebuild.
+ * Vite plugin: stamps packages/overlay-ui/src/build-info.generated.ts with
+ * the current short git SHA + build time before each bundle is produced.
+ *
+ * Used only by one-shot vite builds (the Electron renderer build invoked
+ * via commit.sh's `npm run install-app`, and the extension's production
+ * `npm run build` when vite-dev isn't running). Dev-server file refresh
+ * is handled by scripts/local/build-info-watcher.sh — keeping this plugin
+ * out of any long-running vite-dev process means editing its source
+ * doesn't restart vite, which would otherwise kill CRXJS's HMR connection
+ * and force a manual chrome://extensions reload.
  *
  * mount-overlay imports the generated module and surfaces the values in
- * the diagnostics view, so the user can see at a glance whether Chrome /
- * Electron is running the latest dist.
+ * the diagnostics view so the running bundle's commit is visible.
  *
- * The file is gitignored. tsc only needs a placeholder to typecheck;
- * the plugin overwrites it before each bundle is produced.
- *
- * Note: editing THIS file requires restarting vite-dev — vite caches the
- * resolved config and doesn't reload plugin source on HMR.
+ * The generated file is gitignored. tsc only needs a placeholder to
+ * typecheck; the plugin overwrites it before each bundle.
  */
 
 import { execSync } from 'node:child_process';
@@ -36,13 +40,11 @@ function refresh(): void {
     `// Do not edit; gitignored.\n` +
     `export const BUILD_COMMIT = ${JSON.stringify(commit)};\n` +
     `export const BUILD_TIME = ${JSON.stringify(time)};\n`;
-  // Skip the write (and the resulting HMR ping) when nothing changed —
-  // otherwise every transform-trigger refreshes BUILD_TIME and forces a
-  // full reload on every dev-server tick.
+  // Skip the write when only BUILD_TIME would differ — avoids rewriting
+  // the file (and triggering downstream watchers) on every consecutive
+  // build that lands on the same commit.
   if (existsSync(targetPath)) {
     const cur = readFileSync(targetPath, 'utf8');
-    // Compare only the COMMIT line so a steady stream of HMR updates
-    // doesn't churn BUILD_TIME and reload the page every second.
     const cleanCur = cur.replace(/BUILD_TIME = "[^"]*"/, '');
     const cleanNew = content.replace(/BUILD_TIME = "[^"]*"/, '');
     if (cleanCur === cleanNew) return;
@@ -53,23 +55,6 @@ function refresh(): void {
 export function buildInfoPlugin(): Plugin {
   return {
     name: 'chessray-build-info',
-    // Production / one-shot build path: write before bundling starts.
     buildStart() { refresh(); },
-    // Dev server path: refresh once at boot, on every file change, and
-    // also poll the git HEAD so a `git commit` (which doesn't touch any
-    // source file) still triggers a rebundle. Without the poll, the
-    // running bundle keeps the pre-commit sha until the user happens to
-    // edit a source file — and chrome://extensions reload becomes the
-    // only way to see the new hash. 1s is cheap (one rev-parse per tick).
-    configureServer(server) {
-      refresh();
-      server.watcher.on('change', () => refresh());
-      let lastSha = gitShortSha();
-      const interval = setInterval(() => {
-        const sha = gitShortSha();
-        if (sha !== lastSha) { lastSha = sha; refresh(); }
-      }, 1000);
-      server.httpServer?.on('close', () => clearInterval(interval));
-    },
   };
 }

@@ -14,7 +14,13 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import manifest from './src/manifest.ts';
-import { buildInfoPlugin } from '../overlay-ui/vite-plugin-build-info.ts';
+
+// build-info.generated.ts is updated by scripts/local/build-info-watcher.sh
+// (running alongside vite-dev) and by the buildInfoPlugin in the Electron
+// renderer's one-shot vite build. Keeping that plugin out of THIS config
+// avoids vite treating its source as a config dependency — editing it
+// would otherwise restart vite-dev and kill CRXJS's HMR connection,
+// forcing a manual extension reload.
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..', '..');
@@ -39,7 +45,6 @@ export default defineConfig({
     },
   },
   plugins: [
-    buildInfoPlugin(),
     crx({ manifest }),
     viteStaticCopy({
       // Single target with the parent dir as src puts each subdir (stockfish,
