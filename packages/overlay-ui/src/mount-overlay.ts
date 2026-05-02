@@ -724,96 +724,32 @@ function initOverlay(): void {
   const pvGrowVal = document.getElementById('cv-pv-grow-delay-val');
   let pvGrowDelaySec = prefs.pvGrowDelaySec;
   const pvPreviewSec = prefs.pvPreviewSec;
-  // Hold the moves view this long between lines while cycling through PVs.
-  const PV_LINE_INTERLUDE_MS = 5000;
   let pvCycleTimer: ReturnType<typeof setInterval> | null = null;
   let pvCycleLastPv: string[] = [];
   let pvCycleBaseFen = '';
   let pvCycleFlipped = false;
   let pvCyclePv: string[] = [];
 
-  let pvCycleMovesTimer: ReturnType<typeof setTimeout> | null = null;
   let pvCyclePreviewTimer: ReturnType<typeof setTimeout> | null = null;
   let pvCycleLineIndex = 0;
-
-  /** Get line indices eligible for cycling (filtered by loss threshold) */
-  function getCycleLineIndices(): number[] {
-    const moves = state.currentResult?.evaluation?.top_moves;
-    if (!moves?.length) return [];
-    const indices: number[] = [];
-    for (let i = 0; i < moves.length; i++) {
-      if (moves[i].loss_cp <= state.lossThreshold) indices.push(i);
-    }
-    return indices;
-  }
-
-  let pvCycleArrowsWas = false; // remember arrows state before interlude
-
-  /** Advance to next line, show moves in between, then start animating */
-  function pvCycleNextLine(): void {
-    const indices = getCycleLineIndices();
-    if (indices.length === 0) return;
-
-    if (userLockedLine >= 0) {
-      // User explicitly picked this line (arrow/pill click) — play once and
-      // stop; do not loop. Auto-cycle (userLockedLine < 0) keeps rotating.
-      stopPvLine();
-      return;
-    }
-    // Advance to next line in the cycle
-    const curPos = indices.indexOf(pvCycleLineIndex);
-    const nextPos = (curPos + 1) % indices.length;
-    pvCycleLineIndex = indices[nextPos];
-    state.selectedLineIndex = pvCycleLineIndex;
-
-    // Exit analysis view for the interlude
-    (window as any).__chessrayPvPlaying = false;
-    document.getElementById('cv-debug-grid')?.classList.remove('analysis');
-    document.querySelectorAll('.piece-anim').forEach(el => el.remove());
-
-    // Show moves briefly between lines
-    pvCycleArrowsWas = state.arrowsVisible;
-    state.arrowsVisible = true;
-    state.lineVisible = false;
-    renderArrows(state);
-    renderVideoOverlay(state);
-    updateCompactMoves();
-
-    pvCycleMovesTimer = setTimeout(() => {
-      pvCycleMovesTimer = null;
-      state.arrowsVisible = pvCycleArrowsWas;
-      state.lineVisible = true;
-      pvCycleStartCurrentLine();
-    }, PV_LINE_INTERLUDE_MS);
-  }
+  // True when the PV animation is mounted but the auto-advance interval is
+  // halted (user clicked Pause, or the sequence completed). The current frame
+  // stays visible. Reset by pvCycleStop / pvCycleStartCurrentLine.
+  let pvCyclePaused = false;
 
   function pvCycleStep(): void {
     if (state.pvDisplayDepth >= state.pvDepth || state.pvDisplayDepth >= pvCyclePv.length) {
-      // Sequence complete
+      // End of sequence — pause at the final position. The control bar's
+      // Play button restarts from depth 0; First/Prev let the user scrub.
       if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
-      state.pvDisplayDepth = 0;
-
-      // Clear actual board overlay
-      state.pvBoardState = null;
-      renderVideoOverlay(state);
-
-      // Reset virtual board if visible
-      if (state.vboardOverlayVisible) {
-        const grid = document.getElementById('cv-debug-grid');
-        if (grid) renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, [], state.currentResult?.square_colors);
-        if (state.canvas) {
-          const ctx = state.canvas.getContext('2d');
-          if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-        }
-      }
-
-      // Advance to next line (with moves interlude)
-      pvCycleNextLine();
+      pvCyclePaused = true;
+      syncPvControls();
       return;
     }
 
     state.pvDisplayDepth++;
     const step = state.pvDisplayDepth;
+    syncPvControls();
 
     // ── Shared computation for both actual and virtual board ──
 
@@ -1083,12 +1019,9 @@ function initOverlay(): void {
       clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null;
       state.pvPreviewLineIndex = null;
     }
-    if (pvCycleMovesTimer !== null) {
-      clearTimeout(pvCycleMovesTimer); pvCycleMovesTimer = null;
-      state.arrowsVisible = pvCycleArrowsWas;
-    }
     const wasPlaying = (window as any).__chessrayPvPlaying;
     (window as any).__chessrayPvPlaying = false;
+    pvCyclePaused = false;
     // Clear actual board overlay
     state.pvBoardState = null;
     const grid = document.getElementById('cv-debug-grid');
@@ -1103,12 +1036,222 @@ function initOverlay(): void {
       renderArrows(state);
       renderVideoOverlay(state);
     }
+    syncPvControls();
+  }
+
+  // ── PV playback control bar ────────────────────────────────────────────
+  // Two surfaces (panel virtual board + screen video overlay) share one
+  // state machine. Buttons jump/pause/resume; YouTube-style hover reveals
+  // the bar with a 1s idle hide.
+
+  function pvEffectiveMaxDepth(): number {
+    return Math.min(state.pvDepth, pvCyclePv.length);
+  }
+
+  /** Snap the PV view to a given depth (no animation). Pauses auto-advance. */
+  function pvRenderFrame(depth: number): void {
+    if (!pvCyclePv.length || !pvCycleBaseFen) return;
+    state.pvDisplayDepth = depth;
+    document.querySelectorAll('.piece-anim').forEach(el => el.remove());
+
+    let fen: string;
+    let highlight: number[];
+    if (depth === 0) {
+      fen = pvCycleBaseFen.split(' ')[0];
+      highlight = [];
+    } else {
+      const pos = applyUciMoves(pvCycleBaseFen, pvCyclePv, depth);
+      if (!pos) return;
+      fen = pos.fen;
+      highlight = pos.highlight;
+    }
+
+    state.pvBoardState = {
+      fen, flipped: pvCycleFlipped, highlight,
+      squareColors: state.currentResult?.square_colors,
+      anim: null,
+    };
+    renderVideoOverlay(state);
+
+    if (state.vboardOverlayVisible) {
+      const grid = document.getElementById('cv-debug-grid');
+      if (grid) {
+        grid.classList.add('analysis');
+        renderBoardGrid(grid, fen, pvCycleFlipped, highlight, state.currentResult?.square_colors);
+      }
+      if (state.canvas) {
+        const ctx = state.canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+      }
+    }
+  }
+
+  function pvCyclePause(): void {
+    if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
+    if (pvCyclePreviewTimer !== null) { clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null; }
+    pvCyclePaused = true;
+    syncPvControls();
+  }
+
+  function pvCycleResume(): void {
+    if (!pvCyclePv.length) return;
+    pvCyclePaused = false;
+    // If parked at the end, restart from the beginning.
+    if (state.pvDisplayDepth >= pvEffectiveMaxDepth()) {
+      state.pvDisplayDepth = 0;
+      pvRenderFrame(0);
+    }
+    (window as any).__chessrayPvPlaying = true;
+    if (pvCycleTimer === null) {
+      pvCycleStep();
+      pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
+    }
+    syncPvControls();
+  }
+
+  function pvCycleJumpTo(depth: number): void {
+    if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
+    if (pvCyclePreviewTimer !== null) { clearTimeout(pvCyclePreviewTimer); pvCyclePreviewTimer = null; }
+    pvCyclePaused = true;
+    const max = pvEffectiveMaxDepth();
+    const d = Math.max(0, Math.min(depth, max));
+    pvRenderFrame(d);
+    syncPvControls();
+  }
+
+  /** Update both control bars' progress + button visibility from state. */
+  function syncPvControls(): void {
+    const max = pvEffectiveMaxDepth();
+    const depth = state.pvDisplayDepth;
+    const isActive = !!state.pvBoardState && pvCyclePv.length > 0;
+    const atStart = depth <= 0;
+    const atEnd = depth >= max;
+    const progressPct = max > 0 ? (depth / max) * 100 : 0;
+
+    const PLAY_SVG  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    const PAUSE_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+    const showPause = (window as any).__chessrayPvPlaying && !pvCyclePaused;
+
+    for (const id of ['cv-pv-controls-virtual', 'cv-pv-controls-video']) {
+      const bar = document.getElementById(id);
+      if (!bar) continue;
+      bar.style.setProperty('--pv-progress', `${progressPct}%`);
+      bar.classList.toggle('is-active', isActive);
+      if (!isActive) bar.classList.remove('is-visible');
+
+      const playBtn = bar.querySelector('[data-action="play"]') as HTMLElement | null;
+      if (playBtn) playBtn.innerHTML = showPause ? PAUSE_SVG : PLAY_SVG;
+      bar.querySelector('[data-action="first"]')?.classList.toggle('is-hidden', atStart);
+      bar.querySelector('[data-action="prev"]')?.classList.toggle('is-hidden', atStart);
+      bar.querySelector('[data-action="next"]')?.classList.toggle('is-hidden', atEnd);
+      bar.querySelector('[data-action="last"]')?.classList.toggle('is-hidden', atEnd);
+    }
+  }
+
+  function wirePvControlsBar(barId: string): void {
+    const bar = document.getElementById(barId);
+    if (!bar) return;
+    bar.addEventListener('click', (e) => {
+      const target = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
+      if (!target) return;
+      e.stopPropagation();
+      switch (target.getAttribute('data-action')) {
+        case 'first': pvCycleJumpTo(0); break;
+        case 'prev':  pvCycleJumpTo(state.pvDisplayDepth - 1); break;
+        case 'next':  pvCycleJumpTo(state.pvDisplayDepth + 1); break;
+        case 'last':  pvCycleJumpTo(pvEffectiveMaxDepth()); break;
+        case 'play':
+          if (pvCyclePaused || pvCycleTimer === null) pvCycleResume();
+          else pvCyclePause();
+          break;
+      }
+    });
+  }
+  wirePvControlsBar('cv-pv-controls-virtual');
+  wirePvControlsBar('cv-pv-controls-video');
+
+  // YouTube-style auto-hide: show on hover-area mousemove, hide after 1s idle,
+  // hovering the bar pauses the idle timer, mouseleave hides immediately.
+  // Pinned visible whenever the cycle is paused.
+  function attachPvControlsAutoHide(barId: string, getHoverRect: () => DOMRect | null): void {
+    const bar = document.getElementById(barId);
+    if (!bar) return;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    let cursorOnBar = false;
+
+    const isActive = (): boolean => !!state.pvBoardState && pvCyclePv.length > 0;
+    const hide = (): void => {
+      if (pvCyclePaused) return;
+      bar.classList.remove('is-visible');
+    };
+    const resetIdle = (): void => {
+      if (idleTimer !== null) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => { idleTimer = null; hide(); }, 1000);
+    };
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isActive()) {
+        bar.classList.remove('is-visible');
+        if (idleTimer !== null) { clearTimeout(idleTimer); idleTimer = null; }
+        return;
+      }
+      const rect = getHoverRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) {
+        if (!cursorOnBar) bar.classList.remove('is-visible');
+        return;
+      }
+      const inside = e.clientX >= rect.left && e.clientX <= rect.right
+                  && e.clientY >= rect.top && e.clientY <= rect.bottom;
+      if (!inside) {
+        if (!cursorOnBar) hide();
+        if (idleTimer !== null) { clearTimeout(idleTimer); idleTimer = null; }
+        return;
+      }
+      bar.classList.add('is-visible');
+      if (!cursorOnBar) resetIdle();
+    });
+
+    bar.addEventListener('mouseenter', () => {
+      cursorOnBar = true;
+      if (idleTimer !== null) { clearTimeout(idleTimer); idleTimer = null; }
+      bar.classList.add('is-visible');
+    });
+    bar.addEventListener('mouseleave', () => {
+      cursorOnBar = false;
+      resetIdle();
+    });
+  }
+  attachPvControlsAutoHide('cv-pv-controls-virtual', () => {
+    const el = document.querySelector('.board-container') as HTMLElement | null;
+    return el ? el.getBoundingClientRect() : null;
+  });
+  attachPvControlsAutoHide('cv-pv-controls-video', () => {
+    const cs = getComputedStyle(document.documentElement);
+    const x = parseFloat(cs.getPropertyValue('--pv-vboard-x'));
+    const y = parseFloat(cs.getPropertyValue('--pv-vboard-y'));
+    const w = parseFloat(cs.getPropertyValue('--pv-vboard-w'));
+    const h = parseFloat(cs.getPropertyValue('--pv-vboard-h'));
+    if (!w || !h || isNaN(x) || isNaN(y)) return null;
+    return new DOMRect(x, y, w, h);
+  });
+
+  // Electron: the overlay window is click-through by default. The video-board
+  // hot-region handler on state.videoCanvas already disables passthrough
+  // while the cursor is over the animated board, but once the cursor enters
+  // the bar element itself the canvas no longer receives mousemove events,
+  // so we explicitly hold passthrough off for the duration of bar hover.
+  // (No-op in the extension — host-api.ts wires it to noop there.)
+  const videoBarEl = document.getElementById('cv-pv-controls-video');
+  if (videoBarEl) {
+    videoBarEl.addEventListener('mouseenter', () => chessRay.setMousePassthrough(false));
+    videoBarEl.addEventListener('mouseleave', () => chessRay.setMousePassthrough(true));
   }
 
   (window as any).__chessrayPvGrowStart = pvCycleStart;
   (window as any).__chessrayPvGrowContinue = pvCycleContinue;
   (window as any).__chessrayPvGrowStop = pvCycleStop;
   (window as any).__chessrayPvPlayStop = pvCycleStop;
+  (window as any).__chessraySyncPvControls = syncPvControls;
 
   if (pvGrowSlider && pvGrowVal) {
     pvGrowSlider.value = String(pvGrowDelaySec);

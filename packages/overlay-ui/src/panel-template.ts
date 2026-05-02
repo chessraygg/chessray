@@ -6,6 +6,17 @@
 export const PANEL_HTML = `\
 <canvas id="video-overlay"></canvas>
 
+<!-- PV playback controls — video overlay variant. Positioned via CSS vars set
+     by canvas-renderer at the detected board bbox while pvBoardState is set. -->
+<div class="pv-controls pv-controls--video" id="cv-pv-controls-video">
+  <div class="pv-controls__progress"></div>
+  <button class="pv-controls__btn" data-action="first" title="First"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zM9.5 12l8.5-6v12z"/></svg></button>
+  <button class="pv-controls__btn" data-action="prev"  title="Previous"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 6l-8 6 8 6z"/></svg></button>
+  <button class="pv-controls__btn" data-action="play"  title="Play / pause"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+  <button class="pv-controls__btn" data-action="next"  title="Next"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6l8 6-8 6z"/></svg></button>
+  <button class="pv-controls__btn" data-action="last"  title="Last"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 6l8.5 6L6 18z"/></svg></button>
+</div>
+
 <div class="panel user-panel" id="user-panel">
   <!-- Single-row header: tabs · diagnostics · window controls. Turn now lives
        in the Analysis-view status bar; no need for a header dot. -->
@@ -30,6 +41,15 @@ export const PANEL_HTML = `\
           <div class="board-container">
             <div class="piece-grid" id="cv-debug-grid"></div>
             <canvas id="cv-arrow-canvas" width="200" height="200"></canvas>
+            <!-- PV playback controls — virtual board variant. -->
+            <div class="pv-controls" id="cv-pv-controls-virtual">
+              <div class="pv-controls__progress"></div>
+              <button class="pv-controls__btn" data-action="first" title="First"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zM9.5 12l8.5-6v12z"/></svg></button>
+              <button class="pv-controls__btn" data-action="prev"  title="Previous"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 6l-8 6 8 6z"/></svg></button>
+              <button class="pv-controls__btn" data-action="play"  title="Play / pause"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+              <button class="pv-controls__btn" data-action="next"  title="Next"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6l8 6-8 6z"/></svg></button>
+              <button class="pv-controls__btn" data-action="last"  title="Last"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 6l8.5 6L6 18z"/></svg></button>
+            </div>
           </div>
         </div>
         <div class="eval-bar">

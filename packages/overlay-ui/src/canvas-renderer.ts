@@ -1102,8 +1102,17 @@ export function renderVideoOverlay(state: OverlayState): void {
     // so a click anywhere on the animated board resets the animation.
     videoHitCache.arrows = [];
     videoHitCache.animBoardRect = { x: bx, y: by, width: bw, height: bh };
+    // Publish the live board bbox as CSS custom properties so the video-
+    // overlay PV control bar can pin itself to the board's bottom edge.
+    const root = document.documentElement;
+    root.style.setProperty('--pv-vboard-x', `${bx}px`);
+    root.style.setProperty('--pv-vboard-y', `${by}px`);
+    root.style.setProperty('--pv-vboard-w', `${bw}px`);
+    root.style.setProperty('--pv-vboard-h', `${bh}px`);
+    document.getElementById('cv-pv-controls-video')?.classList.add('is-active');
   } else {
     videoHitCache.animBoardRect = null;
+    document.getElementById('cv-pv-controls-video')?.classList.remove('is-active');
     // Mark the played move's target square (on the moved piece) with a loss-colored dot
     const userSizeScaleVideo = state.overlaySize / 5;
     const pmVideo = result.played_move;
