@@ -96,12 +96,30 @@ export interface HitCache {
 export const videoHitCache: HitCache = { arrows: [], animBoardRect: null };
 export const vboardHitCache: HitCache = { arrows: [], animBoardRect: null };
 
-// Signature of the last frozen-PV repaint on the vboard canvas. Used to skip
-// redundant clear+redraw on every processPendingResult tick (~30 FPS) when the
-// staticArrow hasn't actually changed — the unconditional repaint caused
-// visible flicker on paused/scrubbed PV frames.
-let pvFrozenLastSig: string | null = null;
-let pvFrozenLastCanvas: HTMLCanvasElement | null = null;
+// Per-canvas paint memoization. processPendingResult fires the render
+// functions on every pipeline frame (~30 FPS); without this gate every render
+// repaints even when nothing visual has changed, which the user sees as
+// flicker. Each cache holds the last canvas element + signature painted; if
+// both match on the next call, the entire clear+redraw is skipped.
+type PaintCache = { canvas: HTMLCanvasElement | null; sig: string | null };
+const pvFrozenCache: PaintCache = { canvas: null, sig: null };
+const vboardCache: PaintCache = { canvas: null, sig: null };
+const videoCache: PaintCache = { canvas: null, sig: null };
+
+/** Skip `paint` when the canvas + signature match the previous call.
+ *  Returns true if `paint` ran (cache miss), false if the call was skipped. */
+function memoizedPaint(
+  cache: PaintCache,
+  canvas: HTMLCanvasElement,
+  sig: string,
+  paint: () => void,
+): boolean {
+  if (cache.canvas === canvas && cache.sig === sig) return false;
+  paint();
+  cache.canvas = canvas;
+  cache.sig = sig;
+  return true;
+}
 
 function distPointToSegment(
   px: number, py: number,
@@ -203,9 +221,13 @@ interface AnimatedArrow extends ArrowDescriptor {
 const FADE_DURATION = 200; // ms
 const FADE_STEP = 16; // ~60fps
 
-// Separate animation states for video overlay and virtual board
-const videoArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
-const vboardArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any };
+// Separate animation states for video overlay and virtual board.
+// `positionKey` is the FEN of the position the animated arrows belong to.
+// When the position changes, all arrows are treated as new (re-animated from
+// progress=0) — even those whose from-to coincidentally matches a prior arrow
+// — so the user sees a fresh "this is the new top move" animation per move.
+const videoArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any, positionKey: '' };
+const vboardArrowState = { animated: [] as AnimatedArrow[], timer: 0 as any, positionKey: '' };
 
 // ── Eval bar disappearance trace ──
 // Logs ONLY when the visible state changes (drawn → gone or gone → drawn) so
@@ -272,9 +294,18 @@ function arrowKey(a: ArrowDescriptor): string {
 
 function updateAnimatedArrows(
   target: ArrowDescriptor[],
-  animState: { animated: AnimatedArrow[]; timer: any },
+  animState: { animated: AnimatedArrow[]; timer: any; positionKey: string },
+  positionKey: string,
   onTick: () => void,
 ): AnimatedArrow[] {
+  // Position changed → animate every arrow from scratch. Without this, an
+  // arrow with the same from-to across positions would silently "transfer"
+  // (no animation) which violates the per-position animate-once contract.
+  if (positionKey !== animState.positionKey) {
+    animState.animated = [];
+    animState.positionKey = positionKey;
+  }
+
   const targetMap = new Map<string, ArrowDescriptor>();
   for (const a of target) targetMap.set(arrowKey(a), a);
 
@@ -873,51 +904,40 @@ export function renderArrows(state: OverlayState): void {
   // pass clears the canvas and the step number disappears.
   const pvFrozen = !!state.pvBoardState && !(window as any).__chessrayPvPlaying;
   if (pvFrozen) {
+    const canvas = state.canvas;
     const size = 200;
     const dpr = window.devicePixelRatio || 1;
     const effectiveDpr = dpr * (state.panelScale || 1) * (state.boardScale || 1);
     const bufferSize = Math.ceil(size * effectiveDpr);
     const sa = state.pvBoardState!.staticArrow;
-    // Skip the clear+redraw if nothing visible has changed since the last
-    // frozen-PV pass on this same canvas. processPendingResult fires renderArrows
-    // on every incoming pipeline frame; without this guard we repaint the same
-    // arrow ~30 times/sec, which flickers.
-    const sig = sa
-      ? `${sa.fromSq}|${sa.toSq}|${sa.step}|${sa.isWhite}|${bufferSize}|${state.displayFlipped}`
-      : `_|${bufferSize}|${state.displayFlipped}`;
-    if (pvFrozenLastCanvas === state.canvas && pvFrozenLastSig === sig
-        && state.canvas.width === bufferSize && state.canvas.height === bufferSize) {
-      vboardHitCache.arrows = [];
-      vboardHitCache.animBoardRect = { x: 0, y: 0, width: size, height: size };
-      return;
-    }
-    if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
-      state.canvas.width = bufferSize;
-      state.canvas.height = bufferSize;
-      state.canvas.style.width = `${size}px`;
-      state.canvas.style.height = `${size}px`;
-    }
-    const fctx = state.canvas.getContext('2d')!;
-    fctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
-    fctx.clearRect(0, 0, size, size);
-    if (sa) {
-      drawArrow(fctx, {
-        from: sa.fromSq, to: sa.toSq,
-        color: sa.isWhite ? '#e5e5e5' : '#1a1a1a',
-        width: 3, opacity: 0.8, loss_cp: 0,
-        label: String(sa.step),
-      }, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, 1, true);
-    }
-    pvFrozenLastCanvas = state.canvas;
-    pvFrozenLastSig = sig;
+    const sig = `${bufferSize}|${state.displayFlipped}|${sa ? `${sa.fromSq}-${sa.toSq}-${sa.step}-${sa.isWhite}` : '_'}|${canvas.width}x${canvas.height}`;
+    memoizedPaint(pvFrozenCache, canvas, sig, () => {
+      if (canvas.width !== bufferSize || canvas.height !== bufferSize) {
+        canvas.width = bufferSize;
+        canvas.height = bufferSize;
+        canvas.style.width = `${size}px`;
+        canvas.style.height = `${size}px`;
+      }
+      const fctx = canvas.getContext('2d')!;
+      fctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
+      fctx.clearRect(0, 0, size, size);
+      if (sa) {
+        drawArrow(fctx, {
+          from: sa.fromSq, to: sa.toSq,
+          color: sa.isWhite ? '#e5e5e5' : '#1a1a1a',
+          width: 3, opacity: 0.8, loss_cp: 0,
+          label: String(sa.step),
+        }, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, 1, true);
+      }
+    });
     vboardHitCache.arrows = [];
     vboardHitCache.animBoardRect = { x: 0, y: 0, width: size, height: size };
     return;
   }
   // Reset the frozen-PV cache so the next entry into the frozen branch always
   // repaints (e.g., user resumes auto-play, then pauses again on a new step).
-  pvFrozenLastSig = null;
-  pvFrozenLastCanvas = null;
+  pvFrozenCache.canvas = null;
+  pvFrozenCache.sig = null;
 
   const size = 200;
   const dpr = window.devicePixelRatio || 1;
@@ -927,97 +947,123 @@ export function renderArrows(state: OverlayState): void {
   // is larger than 200px, pixelating arrows/circles.
   const effectiveDpr = dpr * (state.panelScale || 1) * (state.boardScale || 1);
   const bufferSize = Math.ceil(size * effectiveDpr);
-
-  if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
-    state.canvas.width = bufferSize;
-    state.canvas.height = bufferSize;
-    state.canvas.style.width = `${size}px`;
-    state.canvas.style.height = `${size}px`;
-  }
-
-  const ctx = state.canvas.getContext('2d')!;
-  ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
-  ctx.clearRect(0, 0, size, size);
-
   const virtualBoard = { x: 0, y: 0, width: size, height: size };
 
-  // Game over — dim the whole board, then fade in a subtle watermark naming
-  // the outcome. Dim does the "game ended" work, watermark names the result.
-  if (state.currentResult?.game_over) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.fillRect(0, 0, size, size);
-    drawGameOverPill(ctx, virtualBoard, state.currentResult.game_over, state.currentResult.turn, state.overlayOpacity);
-    return;
-  }
-
-  // Mark the played move's target square (on the moved piece) with a loss-colored dot
+  // Compute every input that affects the canvas BEFORE deciding to paint, so
+  // we can build a signature and skip the entire clear+redraw when nothing has
+  // changed since the last render on this canvas. Without this the regular
+  // arrow path repainted on every processPendingResult tick (~30 FPS) and
+  // showed visible flicker on stable positions.
   const userSizeScale = state.overlaySize / 5;
-  // Skip the quality marker while loss is still unknown (eval pending) —
-  // rendering anything would either misleadingly claim "excellent" or paint
-  // a fake colored disc.
+  const userWidthMult = state.overlaySize / 5;
   const pmVboard = state.currentResult?.played_move;
-  if (pmVboard && pmVboard.loss_cp !== null) {
-    drawPlayedMoveMarker(ctx, pmVboard.to, pmVboard.loss_cp, virtualBoard, state.displayFlipped, 1, userSizeScale, state.overlayOpacity);
-  }
-
   const targetArrows = getActiveArrows(state);
   const isPreview = state.pvPreviewLineIndex !== null;
+  const hoveredIdx = state.hoveredArrowIndex;
+  const gameOver = state.currentResult?.game_over;
+  const turn = state.currentResult?.turn;
 
-  if (targetArrows.length === 0 && !state.currentResult?.played_move && !isPreview) {
-    // Nothing to draw, but keep `.animated` intact so arrows that return later
-    // (e.g. after playback, loss-threshold change, visibility toggle) are
-    // matched by from-to and stay steady instead of re-growing from source.
+  type Mode = 'gameover' | 'empty' | 'arrows';
+  let mode: Mode;
+  let sig: string;
+  let drawList: { arrow: ArrowDescriptor & { fadeOpacity: number }; progress: number }[] = [];
+  let offsets: number[] = [];
+  let effectiveOpacities: number[] = [];
+  let previewArrow: ArrowDescriptor | null = null;
+  let previewMoveTo = '';
+  let previewMoveLoss = 0;
+
+  if (gameOver) {
+    mode = 'gameover';
+    sig = `go|${bufferSize}|${state.displayFlipped}|${JSON.stringify(gameOver)}|${turn ?? ''}|${state.overlayOpacity}`;
+  } else if (targetArrows.length === 0 && !pmVboard && !isPreview) {
     if (vboardArrowState.timer) { clearInterval(vboardArrowState.timer); vboardArrowState.timer = 0; }
+    mode = 'empty';
+    sig = `empty|${bufferSize}`;
+  } else {
+    mode = 'arrows';
+    const scaledTargets = targetArrows.map(a => ({ ...a, opacity: state.overlayOpacity }));
+    const animated = updateAnimatedArrows(scaledTargets, vboardArrowState, state.currentResult?.recognition?.fen ?? '', () => renderArrows(state));
+    drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity, fadeOpacity: a.fadeOpacity }, progress: a.progress }));
+    offsets = computeCurveOffsets(drawList.map(d => d.arrow));
+    effectiveOpacities = drawList.map(d => {
+      const a = d.arrow;
+      const lineIdx = state.currentArrows.findIndex(c => c.from === a.from && c.to === a.to);
+      if (hoveredIdx !== null && lineIdx >= 0) {
+        return lineIdx === hoveredIdx ? 1.0 : a.opacity * 0.25;
+      }
+      return a.opacity;
+    });
+    if (isPreview) {
+      const moves = state.currentResult?.evaluation?.top_moves;
+      const candidate = getPreviewArrow(state);
+      if (candidate && moves?.length) {
+        previewArrow = candidate;
+        const idx = Math.min(state.pvPreviewLineIndex!, moves.length - 1);
+        const move = moves[idx];
+        previewMoveTo = move.move.slice(2, 4);
+        previewMoveLoss = move.loss_cp;
+      }
+    }
+    const arrowsSig = drawList.map((d, i) => {
+      const a = d.arrow;
+      return `${a.from}${a.to}|${a.color}|${a.width}|${a.opacity.toFixed(3)}|${d.progress.toFixed(3)}|${effectiveOpacities[i].toFixed(3)}|${offsets[i].toFixed(3)}|${a.label ?? ''}`;
+    }).join(';');
+    const pmSig = pmVboard && pmVboard.loss_cp !== null ? `${pmVboard.to}:${pmVboard.loss_cp}` : '';
+    const previewSig = previewArrow
+      ? `${previewArrow.from}${previewArrow.to}|${previewArrow.color}|${previewArrow.width}|${previewMoveTo}|${previewMoveLoss}`
+      : '';
+    sig = `arr|${bufferSize}|${state.displayFlipped}|${userWidthMult}|${userSizeScale}|${state.overlayOpacity}|${hoveredIdx}|${pmSig}|${previewSig}|${arrowsSig}`;
+  }
+
+  // Force a sig miss when the canvas was resized externally so we always
+  // reapply the size + transform.
+  const fullSig = `${sig}|${state.canvas.width}x${state.canvas.height}`;
+  const canvas = state.canvas;
+  memoizedPaint(vboardCache, canvas, fullSig, () => {
+    if (canvas.width !== bufferSize || canvas.height !== bufferSize) {
+      canvas.width = bufferSize;
+      canvas.height = bufferSize;
+      canvas.style.width = `${size}px`;
+      canvas.style.height = `${size}px`;
+    }
+    const ctx = canvas.getContext('2d')!;
+    ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+
+    if (mode === 'gameover') {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.fillRect(0, 0, size, size);
+      drawGameOverPill(ctx, virtualBoard, gameOver!, turn, state.overlayOpacity);
+      return;
+    }
+
+    if (mode === 'empty') {
+      vboardHitCache.arrows = [];
+      vboardHitCache.animBoardRect = null;
+      return;
+    }
+
+    if (pmVboard && pmVboard.loss_cp !== null) {
+      drawPlayedMoveMarker(ctx, pmVboard.to, pmVboard.loss_cp, virtualBoard, state.displayFlipped, 1, userSizeScale, state.overlayOpacity);
+    }
     vboardHitCache.arrows = [];
     vboardHitCache.animBoardRect = null;
-    return;
-  }
-
-  // Apply user opacity pref to the fade-in target so animated.fadeOpacity ramps
-  // toward the user's max, and keep user size pref as a widthScale multiplier.
-  const scaledTargets = targetArrows.map(a => ({ ...a, opacity: state.overlayOpacity }));
-  const animated = updateAnimatedArrows(scaledTargets, vboardArrowState, () => renderArrows(state));
-  const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
-
-  const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
-  vboardHitCache.arrows = [];
-  vboardHitCache.animBoardRect = null;
-  const hoveredIdx = state.hoveredArrowIndex;
-  const userWidthMult = state.overlaySize / 5;
-  for (let i = drawList.length - 1; i >= 0; i--) {
-    const isLineArrow = !!drawList[i].arrow.label;
-    const arrow = drawList[i].arrow;
-    const lineIdx = state.currentArrows.findIndex(a => a.from === arrow.from && a.to === arrow.to);
-    let effectiveOpacity = arrow.opacity;
-    if (hoveredIdx !== null && lineIdx >= 0) {
-      if (lineIdx === hoveredIdx) effectiveOpacity = 1.0;
-      else effectiveOpacity = arrow.opacity * 0.25;
+    for (let i = drawList.length - 1; i >= 0; i--) {
+      const isLineArrow = !!drawList[i].arrow.label;
+      const arrow = drawList[i].arrow;
+      const lineIdx = state.currentArrows.findIndex(a => a.from === arrow.from && a.to === arrow.to);
+      drawArrow(ctx, { ...arrow, opacity: effectiveOpacities[i] }, virtualBoard, userWidthMult, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow);
+      if (lineIdx >= 0 && drawList[i].progress >= 1) {
+        vboardHitCache.arrows.push(computeArrowHitShape(arrow, virtualBoard, userWidthMult, state.displayFlipped, offsets[i], lineIdx));
+      }
     }
-    drawArrow(ctx, { ...arrow, opacity: effectiveOpacity }, virtualBoard, userWidthMult, state.displayFlipped, offsets[i], drawList[i].progress, isLineArrow);
-    if (lineIdx >= 0 && drawList[i].progress >= 1) {
-      vboardHitCache.arrows.push(computeArrowHitShape(arrow, virtualBoard, userWidthMult, state.displayFlipped, offsets[i], lineIdx));
-    }
-  }
 
-  // Preview emphasis — render the highlighted line's arrow at full opacity
-  // over the normal arrows. No pulsing; just a steady, clearly-emphasized
-  // preview. Loss marker draws on the destination at the same steady alpha.
-  if (isPreview) {
-    const previewArrow = getPreviewArrow(state);
-    if (previewArrow && state.currentResult?.evaluation?.top_moves?.length) {
-      drawArrow(
-        ctx,
-        previewArrow,
-        virtualBoard, userWidthMult, state.displayFlipped,
-        0, 1, false, false,
-      );
-      const moves = state.currentResult.evaluation.top_moves;
-      const idx = Math.min(state.pvPreviewLineIndex!, moves.length - 1);
-      const move = moves[idx];
-      const to = move.move.slice(2, 4);
-      drawPlayedMoveMarker(ctx, to, move.loss_cp, virtualBoard, state.displayFlipped, 1, userSizeScale, state.overlayOpacity);
+    if (previewArrow) {
+      drawArrow(ctx, previewArrow, virtualBoard, userWidthMult, state.displayFlipped, 0, 1, false, false);
+      drawPlayedMoveMarker(ctx, previewMoveTo, previewMoveLoss, virtualBoard, state.displayFlipped, 1, userSizeScale, state.overlayOpacity);
     }
-  }
+  });
 }
 
 /** Draw arrows and eval bar on the full-screen overlay canvas */
@@ -1026,20 +1072,31 @@ export function renderVideoOverlay(state: OverlayState): void {
   const ctx = state.videoCanvas.getContext('2d');
   if (!ctx) return;
 
-  ctx.clearRect(0, 0, state.videoCanvas.width, state.videoCanvas.height);
+  // Compute every input that determines what gets drawn BEFORE touching the
+  // canvas. The signature lets us skip the entire clear+redraw when nothing
+  // visual has changed since the last render — without this, processPendingResult
+  // tickled the canvas at ~30 FPS even on a stable position.
+  const result = state.currentResult;
+
+  const videoCanvas = state.videoCanvas;
 
   if (!state.sourceVisible) {
-    logEvalBarTransition('video', false, 'sourceVisible=false (overlay canvas cleared)');
+    memoizedPaint(videoCache, videoCanvas, 'hidden', () => {
+      ctx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
+      logEvalBarTransition('video', false, 'sourceVisible=false (overlay canvas cleared)');
+    });
     return;
   }
 
-  const result = state.currentResult;
   if (!result?.board_detection?.found || !result.board_detection.bbox || !result.frame_dimensions) {
     const why = !result ? 'no result'
       : !result.board_detection?.found ? 'board not found'
       : !result.board_detection.bbox ? 'bbox=null'
       : 'frame_dimensions=null';
-    logEvalBarTransition('video', false, `early return: ${why}`);
+    memoizedPaint(videoCache, videoCanvas, `no-board|${why}`, () => {
+      ctx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
+      logEvalBarTransition('video', false, `early return: ${why}`);
+    });
     return;
   }
   // Gate the entire actual-board overlay on recognition confidence. Matches
@@ -1048,39 +1105,27 @@ export function renderVideoOverlay(state: OverlayState): void {
   // actually read. Exception: if the position is game-over (checkmate /
   // stalemate), keep rendering the dim + corner pill so it doesn't flicker
   // off on low-confidence frames — the game has ended, the board isn't
-  // changing. Canvas was cleared above, so returning here hides the overlay.
+  // changing.
   const recogConfidence = result.recognition?.confidence ?? 0;
   if (recogConfidence < 0.3 && !result.game_over) {
-    videoHitCache.arrows = [];
-    videoHitCache.animBoardRect = null;
-    if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
-    logEvalBarTransition('video', false, `low confidence: ${(recogConfidence * 100).toFixed(0)}%`);
+    memoizedPaint(videoCache, videoCanvas, `low-conf|${recogConfidence.toFixed(2)}`, () => {
+      ctx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
+      videoHitCache.arrows = [];
+      videoHitCache.animBoardRect = null;
+      if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
+      logEvalBarTransition('video', false, `low confidence: ${(recogConfidence * 100).toFixed(0)}%`);
+    });
     return;
   }
 
-  // The overlay window covers the work area (excludes menu bar/dock).
-  // The captured frame covers the full display (includes menu bar).
-  // We need to map frame pixels → overlay CSS pixels, accounting for:
-  // 1. devicePixelRatio (frame is in physical pixels, overlay is in CSS pixels)
-  // 2. Menu bar offset (frame y=0 is top of screen, overlay y=0 is top of work area)
-  //
-  // For the extension on a content-script page we want the same viewport
-  // units the capture is pinned to. Capture (offscreen.ts + SW) pins
-  // min=max to innerWidth/Height × DPR (the render-widget surface,
-  // includes scrollbar gutter). Using clientWidth/visualViewport here
-  // would underestimate by the scrollbar width and slightly compress
-  // the bbox horizontally. innerWidth keeps the units consistent end-
-  // to-end so frame ÷ DPR ≈ vw exactly.
+  // Compute every input that drives the canvas — but don't paint yet. We
+  // build a signature from these inputs and skip the entire clear+redraw
+  // when nothing has changed since the last frame. processPendingResult
+  // fires renderVideoOverlay on every pipeline tick (~30 FPS); without this
+  // gate, a stable position repaints constantly and flickers.
   const docEl = document.documentElement;
   const vw = window.innerWidth || docEl?.clientWidth || 0;
   const vh = window.innerHeight || docEl?.clientHeight || 0;
-
-  if (state.videoCanvas.width !== vw || state.videoCanvas.height !== vh) {
-    state.videoCanvas.width = vw;
-    state.videoCanvas.height = vh;
-    state.videoCanvas.style.width = vw + 'px';
-    state.videoCanvas.style.height = vh + 'px';
-  }
 
   // Two coordinate systems converge here:
   //   - Electron host: bbox is in the captured display's *physical* pixels,
@@ -1138,134 +1183,170 @@ export function renderVideoOverlay(state: OverlayState): void {
   }
 
   const boardRect = { x: bx, y: by, width: bw, height: bh };
+  const userSizeScaleVideo = state.overlaySize / 5;
+  const userWidthMult = state.overlaySize / 5;
+  const arrowScale = (bw + bh) / 2 / 192 * userWidthMult;
+  const hoveredIdx = state.hoveredArrowIndex;
+  const isPreview = state.pvPreviewLineIndex !== null;
+  const pmVideo = result.played_move;
+  const pvActive = !!state.pvBoardState;
+  const arrowsActive = !pvActive && state.overlayVisible && (state.arrowsVisible || isPreview);
 
-  if (state.borderVisible) {
-    ctx.strokeStyle = 'rgba(255, 0, 255, 0.7)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(bx, by, bw, bh);
+  let drawList: { arrow: ArrowDescriptor & { fadeOpacity: number }; progress: number }[] = [];
+  let offsets: number[] = [];
+  let effectiveOpacities: number[] = [];
+  let previewArrow: ArrowDescriptor | null = null;
+  let previewMoveTo = '';
+  let previewMoveLoss = 0;
 
-    // Diagnostic HUD — top-left corner, only when borderVisible is on so
-    // it's opt-in and easy to screenshot. Shows the numbers needed to
-    // diagnose any bbox→CSS misalignment without DevTools: viewport,
-    // DPR, the frame_dimensions the renderer received, and the raw vs
-    // mapped bbox. If raw bbox * (vw/fw) ≠ mapped bbox there's a math
-    // bug; if frame_dimensions don't match vw*DPR the captured stream
-    // didn't get the constraints we asked for.
-    const fw = result.frame_dimensions?.width ?? 0;
-    const fh = result.frame_dimensions?.height ?? 0;
-    const dpr = (window.devicePixelRatio || 1).toFixed(2);
-    ctx.save();
-    ctx.font = '12px ui-monospace, monospace';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
-    ctx.fillRect(4, 4, 380, 78);
-    ctx.fillStyle = '#22c55e';
-    ctx.fillText(`vp ${vw}x${vh}  dpr ${dpr}  expect ${Math.round(vw * (window.devicePixelRatio || 1))}x${Math.round(vh * (window.devicePixelRatio || 1))}`, 8, 20);
-    ctx.fillStyle = (Math.abs(fw - vw * (window.devicePixelRatio || 1)) > 8 || Math.abs(fh - vh * (window.devicePixelRatio || 1)) > 8) ? '#f87171' : '#a3e635';
-    ctx.fillText(`frame ${fw}x${fh}`, 8, 36);
-    ctx.fillStyle = '#cbd5e1';
-    ctx.fillText(`bbox raw ${Math.round(bbox.x)},${Math.round(bbox.y)} ${Math.round(bbox.width)}x${Math.round(bbox.height)}`, 8, 52);
-    ctx.fillText(`bbox css ${Math.round(bx)},${Math.round(by)} ${Math.round(bw)}x${Math.round(bh)}`, 8, 68);
-    ctx.restore();
+  if (arrowsActive) {
+    const targetArrows = getActiveArrows(state);
+    const scaledTargets = targetArrows.map(a => ({ ...a, opacity: state.overlayOpacity }));
+    const animated = updateAnimatedArrows(scaledTargets, videoArrowState, result.recognition?.fen ?? '', () => renderVideoOverlay(state));
+    drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity, fadeOpacity: a.fadeOpacity }, progress: a.progress }));
+    offsets = computeCurveOffsets(drawList.map(d => d.arrow));
+    effectiveOpacities = drawList.map(d => {
+      const a = d.arrow;
+      const lineIdx = state.currentArrows.findIndex(c => c.from === a.from && c.to === a.to);
+      if (hoveredIdx !== null && lineIdx >= 0) return lineIdx === hoveredIdx ? 1.0 : a.opacity * 0.25;
+      return a.opacity;
+    });
+    if (isPreview) {
+      const moves = result.evaluation?.top_moves;
+      const cand = getPreviewArrow(state);
+      if (cand && moves?.length) {
+        previewArrow = cand;
+        const idx = Math.min(state.pvPreviewLineIndex!, moves.length - 1);
+        const move = moves[idx];
+        previewMoveTo = move.move.slice(2, 4);
+        previewMoveLoss = move.loss_cp;
+      }
+    }
   }
 
-  // Move hints (arrows, PV step labels, played-move markers, piece-by-piece
-  // animation) are gated by the Show-on-screen → Move hints toggle. The eval
-  // bar is gated separately below so users can keep it on a "clean" board.
-  if (state.overlayVisible) {
-  // During PV animation, draw analysis board (background + pieces + animated arrow)
-  if (state.pvBoardState) {
-    drawAnalysisBoard(ctx, boardRect, state.pvBoardState);
-    // Pause the fade timer while the analysis board is active, but keep
-    // `.animated` intact so that when playback ends the same arrows re-appear
-    // at progress=1 (steady) instead of re-growing from source.
-    if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
-    // Arrows aren't visible during animation — hit-test the board region instead
-    // so a click anywhere on the animated board resets the animation.
-    videoHitCache.arrows = [];
-    videoHitCache.animBoardRect = { x: bx, y: by, width: bw, height: bh };
-    // Publish the live board bbox as CSS custom properties so the video-
-    // overlay PV control bar can pin itself to the board's bottom edge.
-    const root = document.documentElement;
-    root.style.setProperty('--pv-vboard-x', `${bx}px`);
-    root.style.setProperty('--pv-vboard-y', `${by}px`);
-    root.style.setProperty('--pv-vboard-w', `${bw}px`);
-    root.style.setProperty('--pv-vboard-h', `${bh}px`);
-    document.getElementById('cv-pv-controls-video')?.classList.add('is-active');
-  } else {
-    videoHitCache.animBoardRect = null;
-    document.getElementById('cv-pv-controls-video')?.classList.remove('is-active');
-    // Mark the played move's target square (on the moved piece) with a loss-colored dot
-    const userSizeScaleVideo = state.overlaySize / 5;
-    const pmVideo = result.played_move;
-    if (pmVideo && pmVideo.loss_cp !== null) {
-      drawPlayedMoveMarker(ctx, pmVideo.to, pmVideo.loss_cp, boardRect, state.displayFlipped, 1, userSizeScaleVideo, state.overlayOpacity);
+  // Eval bar payload — the win-prob tween is module-level state that ticks
+  // on its own setInterval, so we feed it into the sig (each tween step
+  // changes it; once settled, it stops changing and the sig stabilises).
+  const evalBarDrawable = !!(state.evalBarVisible && result.evaluation?.top_moves?.length);
+  let evalBarWinProb = 0;
+  let evalBarBarX = 0, evalBarBarW = 0, evalBarStale = false;
+  if (evalBarDrawable) {
+    const sideScore = result.evaluation!.top_moves[0].score_cp;
+    const evalTurn = result.evaluation!.fen?.split(' ')[1] || 'w';
+    const bestScore = evalTurn === 'b' ? -sideScore : sideScore;
+    const targetWinProb = 1 / (1 + Math.pow(10, -bestScore / 400));
+    setEvalBarTarget(state, targetWinProb);
+    evalBarWinProb = evalBarAnim.current;
+    evalBarStale = !!result.stale_eval;
+    evalBarBarW = Math.max(8, Math.round(bw * 0.04));
+    evalBarBarX = bx > evalBarBarW + 4 ? bx - evalBarBarW : bx + bw;
+  }
+
+  const arrowsSig = drawList.map((d, i) => {
+    const a = d.arrow;
+    return `${a.from}${a.to}|${a.color}|${a.width}|${a.opacity.toFixed(3)}|${d.progress.toFixed(3)}|${effectiveOpacities[i].toFixed(3)}|${offsets[i].toFixed(3)}`;
+  }).join(';');
+  const previewSig = previewArrow
+    ? `${previewArrow.from}${previewArrow.to}|${previewArrow.color}|${previewArrow.width}|${previewMoveTo}|${previewMoveLoss}`
+    : '';
+  const pmSig = pmVideo && pmVideo.loss_cp !== null ? `${pmVideo.to}:${pmVideo.loss_cp}` : '';
+  const pv = state.pvBoardState;
+  const pvSig = pv
+    ? `pv|${pv.fen}|${pv.flipped}|${pv.highlight.join(',')}`
+      + `|${pv.anim ? `a:${pv.anim.fromSq}-${pv.anim.toSq}-${pv.anim.step}-${pv.anim.progress.toFixed(3)}-${pv.anim.piece}-${pv.anim.isWhite}` : ''}`
+      + `|${pv.staticArrow ? `s:${pv.staticArrow.fromSq}-${pv.staticArrow.toSq}-${pv.staticArrow.step}-${pv.staticArrow.isWhite}` : ''}`
+    : '';
+  const goSig = result.game_over ? `go|${JSON.stringify(result.game_over)}|${result.turn ?? ''}` : '';
+  const borderSig = state.borderVisible
+    ? `br|${vw}x${vh}|${result.frame_dimensions?.width}x${result.frame_dimensions?.height}|${(window.devicePixelRatio || 1).toFixed(2)}|${Math.round(bbox.x)},${Math.round(bbox.y)} ${Math.round(bbox.width)}x${Math.round(bbox.height)}|${Math.round(bx)},${Math.round(by)} ${Math.round(bw)}x${Math.round(bh)}`
+    : '';
+  const evalBarSig = evalBarDrawable
+    ? `eb|${state.displayFlipped}|${evalBarStale}|${state.evalBarStaleOpacity}|${evalBarWinProb.toFixed(4)}|${evalBarBarX.toFixed(2)},${evalBarBarW.toFixed(2)},${by.toFixed(2)},${bh.toFixed(2)}`
+    : '';
+
+  const sig = `full|${vw}x${vh}|${bx.toFixed(2)},${by.toFixed(2)},${bw.toFixed(2)},${bh.toFixed(2)}`
+    + `|${state.overlayVisible}|${state.displayFlipped}|${state.overlayOpacity}|${state.overlaySize}`
+    + `|${state.arrowsVisible}|${hoveredIdx}|${pmSig}|${arrowsSig}|${previewSig}`
+    + `|${pvSig}|${evalBarSig}|${goSig}|${borderSig}|${videoCanvas.width}x${videoCanvas.height}`;
+
+  memoizedPaint(videoCache, videoCanvas, sig, () => {
+    if (videoCanvas.width !== vw || videoCanvas.height !== vh) {
+      videoCanvas.width = vw;
+      videoCanvas.height = vh;
+      videoCanvas.style.width = vw + 'px';
+      videoCanvas.style.height = vh + 'px';
+    }
+    ctx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
+
+    if (state.borderVisible) {
+      ctx.strokeStyle = 'rgba(255, 0, 255, 0.7)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx, by, bw, bh);
+
+      // Diagnostic HUD — top-left corner, only when borderVisible is on so
+      // it's opt-in and easy to screenshot. Shows the numbers needed to
+      // diagnose any bbox→CSS misalignment without DevTools.
+      const fw = result.frame_dimensions?.width ?? 0;
+      const fh = result.frame_dimensions?.height ?? 0;
+      const dpr = (window.devicePixelRatio || 1).toFixed(2);
+      ctx.save();
+      ctx.font = '12px ui-monospace, monospace';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+      ctx.fillRect(4, 4, 380, 78);
+      ctx.fillStyle = '#22c55e';
+      ctx.fillText(`vp ${vw}x${vh}  dpr ${dpr}  expect ${Math.round(vw * (window.devicePixelRatio || 1))}x${Math.round(vh * (window.devicePixelRatio || 1))}`, 8, 20);
+      ctx.fillStyle = (Math.abs(fw - vw * (window.devicePixelRatio || 1)) > 8 || Math.abs(fh - vh * (window.devicePixelRatio || 1)) > 8) ? '#f87171' : '#a3e635';
+      ctx.fillText(`frame ${fw}x${fh}`, 8, 36);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillText(`bbox raw ${Math.round(bbox.x)},${Math.round(bbox.y)} ${Math.round(bbox.width)}x${Math.round(bbox.height)}`, 8, 52);
+      ctx.fillText(`bbox css ${Math.round(bx)},${Math.round(by)} ${Math.round(bw)}x${Math.round(bh)}`, 8, 68);
+      ctx.restore();
     }
 
-    if (state.arrowsVisible || state.pvPreviewLineIndex !== null) {
-      const targetArrows = getActiveArrows(state);
-      // Apply user opacity pref as the fade-in target.
-      const scaledTargets = targetArrows.map(a => ({ ...a, opacity: state.overlayOpacity }));
-      const animated = updateAnimatedArrows(scaledTargets, videoArrowState, () => renderVideoOverlay(state));
-      const drawList = animated.map(a => ({ arrow: { ...a, opacity: a.fadeOpacity }, progress: a.progress }));
-      const userWidthMult = state.overlaySize / 5;
-      const arrowScale = (bw + bh) / 2 / 192 * userWidthMult;
-      const isPreview = state.pvPreviewLineIndex !== null;
-      const offsets = computeCurveOffsets(drawList.map(d => d.arrow));
-      videoHitCache.arrows = [];
-      const hoveredIdx = state.hoveredArrowIndex;
-      for (let i = drawList.length - 1; i >= 0; i--) {
-        const arrow = drawList[i].arrow;
-        const lineIdx = state.currentArrows.findIndex(a => a.from === arrow.from && a.to === arrow.to);
-        let effectiveOpacity = arrow.opacity;
-        if (hoveredIdx !== null && lineIdx >= 0) {
-          if (lineIdx === hoveredIdx) effectiveOpacity = 1.0;
-          else effectiveOpacity = arrow.opacity * 0.25;
+    if (state.overlayVisible) {
+      if (pvActive) {
+        drawAnalysisBoard(ctx, boardRect, state.pvBoardState!);
+        if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
+        videoHitCache.arrows = [];
+        videoHitCache.animBoardRect = { x: bx, y: by, width: bw, height: bh };
+        const root = document.documentElement;
+        root.style.setProperty('--pv-vboard-x', `${bx}px`);
+        root.style.setProperty('--pv-vboard-y', `${by}px`);
+        root.style.setProperty('--pv-vboard-w', `${bw}px`);
+        root.style.setProperty('--pv-vboard-h', `${bh}px`);
+        document.getElementById('cv-pv-controls-video')?.classList.add('is-active');
+      } else {
+        videoHitCache.animBoardRect = null;
+        document.getElementById('cv-pv-controls-video')?.classList.remove('is-active');
+        if (pmVideo && pmVideo.loss_cp !== null) {
+          drawPlayedMoveMarker(ctx, pmVideo.to, pmVideo.loss_cp, boardRect, state.displayFlipped, 1, userSizeScaleVideo, state.overlayOpacity);
         }
-        drawArrow(ctx, { ...arrow, opacity: effectiveOpacity }, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress, false);
-        if (lineIdx >= 0 && drawList[i].progress >= 1) {
-          videoHitCache.arrows.push(computeArrowHitShape(arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], lineIdx));
-        }
-      }
-
-      // Preview emphasis — render the highlighted line's arrow at full
-      // opacity (no pulse, no bell gradient). Steady and clear.
-        if (isPreview) {
-        const previewArrow = getPreviewArrow(state);
-        if (previewArrow && result.evaluation?.top_moves?.length) {
-          drawArrow(
-            ctx,
-            previewArrow,
-            boardRect, arrowScale, state.displayFlipped,
-            0, 1, false, false,
-          );
-          const idx = Math.min(state.pvPreviewLineIndex!, result.evaluation.top_moves.length - 1);
-          const move = result.evaluation.top_moves[idx];
-          const to = move.move.slice(2, 4);
-          drawPlayedMoveMarker(ctx, to, move.loss_cp, boardRect, state.displayFlipped, 1, userSizeScaleVideo, state.overlayOpacity);
+        if (arrowsActive) {
+          videoHitCache.arrows = [];
+          for (let i = drawList.length - 1; i >= 0; i--) {
+            const arrow = drawList[i].arrow;
+            const lineIdx = state.currentArrows.findIndex(a => a.from === arrow.from && a.to === arrow.to);
+            drawArrow(ctx, { ...arrow, opacity: effectiveOpacities[i] }, boardRect, arrowScale, state.displayFlipped, offsets[i], drawList[i].progress, false);
+            if (lineIdx >= 0 && drawList[i].progress >= 1) {
+              videoHitCache.arrows.push(computeArrowHitShape(arrow, boardRect, arrowScale, state.displayFlipped, offsets[i], lineIdx));
+            }
+          }
+          if (previewArrow) {
+            drawArrow(ctx, previewArrow, boardRect, arrowScale, state.displayFlipped, 0, 1, false, false);
+            drawPlayedMoveMarker(ctx, previewMoveTo, previewMoveLoss, boardRect, state.displayFlipped, 1, userSizeScaleVideo, state.overlayOpacity);
+          }
+        } else {
+          if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
+          videoHitCache.arrows = [];
         }
       }
     } else {
-      // Arrows hidden (e.g. during the brief gap between PV steps, or while
-      // arrowsVisible=false with no preview). Pause the fade timer but keep
-      // `.animated` so the same arrows resume steady when they reappear.
       if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
-        videoHitCache.arrows = [];
+      videoHitCache.arrows = [];
+      videoHitCache.animBoardRect = null;
     }
-  }
-  } else {
-    // Move hints turned off: clear hit-test cache and pause arrow fade so we
-    // don't draw anything but the eval bar.
-    if (videoArrowState.timer) { clearInterval(videoArrowState.timer); videoArrowState.timer = 0; }
-    videoHitCache.arrows = [];
-    videoHitCache.animBoardRect = null;
-  }
 
-  // Eval bar (semi-transparent when showing stale eval from previous position)
-  // Disappearance trace: log only the transition when the bar's visibility
-  // actually flips so we can see exactly why it went missing.
-  {
-    const drawable = !!(state.evalBarVisible && result.evaluation?.top_moves?.length);
-    if (!drawable) {
+    if (!evalBarDrawable) {
       const reason = !state.evalBarVisible ? 'evalBarVisible=false'
         : !result.evaluation ? 'evaluation=null'
         : `top_moves=${result.evaluation.top_moves?.length ?? 0}`;
@@ -1273,51 +1354,35 @@ export function renderVideoOverlay(state: OverlayState): void {
     } else {
       logEvalBarTransition('video', true, `stale=${!!result.stale_eval} depth=${result.eval_depth ?? '-'} status=${result.detection_status ?? '-'}`);
     }
-  }
 
-  if (state.evalBarVisible && result.evaluation?.top_moves?.length) {
-    const isStale = !!result.stale_eval;
-    ctx.save();
-    if (isStale) ctx.globalAlpha = state.evalBarStaleOpacity;
-
-    const sideScore = result.evaluation.top_moves[0].score_cp;
-    const turn = result.evaluation.fen?.split(' ')[1] || 'w';
-    const bestScore = turn === 'b' ? -sideScore : sideScore;
-    const targetWinProb = 1 / (1 + Math.pow(10, -bestScore / 400));
-    setEvalBarTarget(state, targetWinProb);
-    const winProb = evalBarAnim.current;
-
-    const barW = Math.max(8, Math.round(bw * 0.04));
-    const barX = bx > barW + 4
-      ? bx - barW
-      : bx + bw;
-
-    const whiteH = bh * winProb;
-    const blackH = bh - whiteH;
-
-    if (state.displayFlipped) {
-      ctx.fillStyle = '#eee';
-      ctx.fillRect(barX, by, barW, whiteH);
-      ctx.fillStyle = '#222';
-      ctx.fillRect(barX, by + whiteH, barW, blackH);
-    } else {
-      ctx.fillStyle = '#222';
-      ctx.fillRect(barX, by, barW, blackH);
-      ctx.fillStyle = '#eee';
-      ctx.fillRect(barX, by + blackH, barW, whiteH);
+    if (evalBarDrawable) {
+      ctx.save();
+      if (evalBarStale) ctx.globalAlpha = state.evalBarStaleOpacity;
+      const whiteH = bh * evalBarWinProb;
+      const blackH = bh - whiteH;
+      if (state.displayFlipped) {
+        ctx.fillStyle = '#eee';
+        ctx.fillRect(evalBarBarX, by, evalBarBarW, whiteH);
+        ctx.fillStyle = '#222';
+        ctx.fillRect(evalBarBarX, by + whiteH, evalBarBarW, blackH);
+      } else {
+        ctx.fillStyle = '#222';
+        ctx.fillRect(evalBarBarX, by, evalBarBarW, blackH);
+        ctx.fillStyle = '#eee';
+        ctx.fillRect(evalBarBarX, by + blackH, evalBarBarW, whiteH);
+      }
+      ctx.strokeStyle = '#555';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(evalBarBarX, by, evalBarBarW, bh);
+      ctx.restore();
     }
-    ctx.strokeStyle = '#555';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(barX, by, barW, bh);
-    ctx.restore();
-  }
 
-  // Game over on actual board — dim + subtle centered watermark.
-  if (result.game_over) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-    ctx.fillRect(bx, by, bw, bh);
-    drawGameOverPill(ctx, { x: bx, y: by, width: bw, height: bh }, result.game_over, result.turn, state.overlayOpacity);
-  }
+    if (result.game_over) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.fillRect(bx, by, bw, bh);
+      drawGameOverPill(ctx, { x: bx, y: by, width: bw, height: bh }, result.game_over, result.turn, state.overlayOpacity);
+    }
+  });
 }
 
 export function clearVideoOverlay(state: OverlayState): void {
