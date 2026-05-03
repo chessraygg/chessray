@@ -87,20 +87,6 @@ export const PANEL_HTML = `\
       <div class="r2-surface-body">
 
         <div class="r2-group">
-          <div class="r2-group-label">Animation</div>
-          <div class="pv-depth-row" id="cv-pv-depth-row">
-            <label data-tip="Number of moves to play through in the best-line piece animation. At max the slider reads 'All' — show the full principal variation.">Preview move count</label>
-            <input type="range" id="cv-pv-depth" min="1" max="11" value="11">
-            <span id="cv-pv-depth-val">All</span>
-          </div>
-          <div class="pv-depth-row">
-            <label data-tip="Seconds between each move in the best-line piece-by-piece animation.">Step interval</label>
-            <input type="range" id="cv-pv-grow-delay" min="1" max="10" value="1" step="1">
-            <span id="cv-pv-grow-delay-val">1</span><span class="pv-unit">s</span>
-          </div>
-        </div>
-
-        <div class="r2-group">
           <div class="r2-group-label">Overlay</div>
           <div class="pv-depth-row">
             <label data-tip="Size of all on-board move hints: arrows, PV move numbers, and played-move markers.">Move-hint size</label>

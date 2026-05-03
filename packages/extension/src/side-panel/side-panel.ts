@@ -14,7 +14,7 @@ import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
 // that was leaking body{overflow:hidden} into every page the content
 // script ran on.)
 import '@chessray/overlay-ui/src/panel.css';
-import './popup.css';
+import './side-panel.css';
 
 // ── Pre-resolve target tabId at popup load ──────────────────────────
 // Used by the localStorage→content-script pref relay below so the
@@ -148,7 +148,7 @@ function ensureEngineInfoEl(): HTMLElement | null {
   el = document.createElement('div');
   el.id = 'cv-engine-info';
   // Append at the BOTTOM of the diagnostics view — it's reference info,
-  // not the primary thing the user is looking at. Styled in popup.css.
+  // not the primary thing the user is looking at. Styled in side-panel.css.
   el.textContent = 'Engine info: loading…';
   debugSection.appendChild(el);
   return el;

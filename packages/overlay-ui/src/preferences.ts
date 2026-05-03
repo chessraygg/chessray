@@ -4,16 +4,11 @@ const PREFS_KEY = 'chessray-prefs';
 export interface Prefs {
   overlayVisible: boolean;
   borderVisible: boolean;
-  pvDepth: number;
   lossThreshold: number;
   multiPvMax: number;
   evalBarVisible: boolean;
   panelScale: number;
   collapsed: boolean;
-  pvGrowDelaySec: number;
-  /** Seconds the PV preview phase (single highlighted move, others hidden)
-   *  stays visible before the per-step PV animation starts. */
-  pvPreviewSec: number;
   vboardOverlayVisible: boolean;
   compactMode: boolean;
   /** @deprecated kept for migration only — superseded by fpsMin/fpsMax. */
@@ -51,13 +46,10 @@ export interface Prefs {
 export const DEFAULT_PREFS: Prefs = {
   overlayVisible: true,
   borderVisible: false,
-  pvGrowDelaySec: 1,
-  pvPreviewSec: 1,
   vboardOverlayVisible: true,
   compactMode: false,
   targetFps: 2,
   fpsMax: 5,
-  pvDepth: 999,
   lossThreshold: 100,
   multiPvMax: 5,
   evalBarVisible: true,

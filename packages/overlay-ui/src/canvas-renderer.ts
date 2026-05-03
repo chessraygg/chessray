@@ -41,7 +41,6 @@ export interface OverlayState {
   borderVisible: boolean;
   arrowsVisible: boolean;
   lineVisible: boolean;
-  pvDepth: number;
   pvDisplayDepth: number;
   evalBarVisible: boolean;
   sourceVisible: boolean;

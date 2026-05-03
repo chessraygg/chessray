@@ -104,8 +104,6 @@ function applyPrefsToHiddenPanel(prefs: Record<string, unknown>): void {
   if (typeof prefs.overlaySize === 'number') setRange('cv-overlay-size', prefs.overlaySize);
   if (typeof prefs.overlayOpacity === 'number') setRange('cv-overlay-opacity', Math.round(prefs.overlayOpacity * 100));
   if (typeof prefs.lossThreshold === 'number') setRange('cv-loss-threshold', prefs.lossThreshold);
-  if (typeof prefs.pvDepth === 'number') setRange('cv-pv-depth', prefs.pvDepth);
-  if (typeof prefs.pvGrowDelaySec === 'number') setRange('cv-pv-grow-delay', prefs.pvGrowDelaySec);
   if (typeof prefs.overlayVisible === 'boolean') {
     clickIfStateMismatch('cv-overlay-btn', prefs.overlayVisible);
   }

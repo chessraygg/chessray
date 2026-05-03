@@ -64,7 +64,6 @@ const state: OverlayState = {
   borderVisible: false,
   arrowsVisible: true,
   lineVisible: false,
-  pvDepth: 10,
   pvDisplayDepth: 2,
   evalBarVisible: true,
   sourceVisible: true,
@@ -308,7 +307,6 @@ function initOverlay(): void {
   state.borderVisible = prefs.borderVisible;
   state.arrowsVisible = true;
   state.lineVisible = false;
-  state.pvDepth = prefs.pvDepth;
   state.evalBarVisible = prefs.evalBarVisible;
   state.overlaySize = prefs.overlaySize;
   state.overlayOpacity = prefs.overlayOpacity;
@@ -704,9 +702,6 @@ function initOverlay(): void {
     }
   });
 
-  const pvDepthSlider = document.getElementById('cv-pv-depth') as HTMLInputElement | null;
-  const pvDepthVal = document.getElementById('cv-pv-depth-val');
-
   // ── Display section checkboxes ──
   const dispOverlay = document.getElementById('cv-disp-overlay') as HTMLInputElement | null;
   const dispEval = document.getElementById('cv-disp-eval') as HTMLInputElement | null;
@@ -719,29 +714,15 @@ function initOverlay(): void {
   dispOverlay?.addEventListener('change', () => document.getElementById('cv-overlay-btn')?.click());
   dispEval?.addEventListener('change', () => document.getElementById('cv-eval-btn')?.click());
 
-  if (pvDepthSlider && pvDepthVal) {
-    const PV_ALL = 999;
-    const sliderVal = state.pvDepth >= PV_ALL ? 11 : state.pvDepth;
-    pvDepthSlider.value = String(sliderVal);
-    pvDepthVal.textContent = state.pvDepth >= PV_ALL ? 'All' : String(state.pvDepth);
-    pvDepthSlider.addEventListener('input', () => {
-      const raw = parseInt(pvDepthSlider.value, 10);
-      state.pvDepth = raw >= 11 ? PV_ALL : raw;
-      pvDepthVal.textContent = state.pvDepth >= PV_ALL ? 'All' : String(state.pvDepth);
-      savePrefs({ pvDepth: state.pvDepth });
-      renderArrows(state);
-    });
-  }
-
   // ── Unified PV line cycle ──
   // In line mode, the actual board and virtual board animate in sync:
-  // - Actual board: arrows grow one by one (1, 2, 3... up to pvDepth)
+  // - Actual board: arrows grow one by one (1, 2, 3... up to PV length)
   // - Virtual board: shows position after N moves with arrow+highlight for move N
   // When the sequence completes, both reset and loop.
-  const pvGrowSlider = document.getElementById('cv-pv-grow-delay') as HTMLInputElement | null;
-  const pvGrowVal = document.getElementById('cv-pv-grow-delay-val');
-  let pvGrowDelaySec = prefs.pvGrowDelaySec;
-  const pvPreviewSec = prefs.pvPreviewSec;
+  // Step interval and preview pause are intentionally hardcoded — the user-facing
+  // animation settings were removed in favor of a single fixed cadence.
+  const PV_STEP_MS = 1000;
+  const PV_PREVIEW_MS = 1000;
   let pvCycleTimer: ReturnType<typeof setInterval> | null = null;
   let pvCycleLastPv: string[] = [];
   let pvCycleBaseFen = '';
@@ -756,7 +737,7 @@ function initOverlay(): void {
   let pvCyclePaused = false;
 
   function pvCycleStep(): void {
-    if (state.pvDisplayDepth >= state.pvDepth || state.pvDisplayDepth >= pvCyclePv.length) {
+    if (state.pvDisplayDepth >= pvCyclePv.length) {
       // End of sequence — pause at the final position. The control bar's
       // Play button restarts from depth 0; First/Prev let the user scrub.
       // Drop the playing flag so the content script's capture-pause lifts
@@ -1004,8 +985,8 @@ function initOverlay(): void {
 
       // First step immediately, then continue on interval
       pvCycleStep();
-      pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
-    }, pvPreviewSec * 1000);
+      pvCycleTimer = setInterval(pvCycleStep, PV_STEP_MS);
+    }, PV_PREVIEW_MS);
   }
 
   /** Start the unified cycle from the selected line */
@@ -1054,7 +1035,7 @@ function initOverlay(): void {
       renderBoardGrid(grid, pvCycleBaseFen.split(' ')[0], pvCycleFlipped, [], state.currentResult?.square_colors);
     }
     if (wasPlaying) {
-      state.pvDisplayDepth = state.pvDepth; // restore full depth
+      state.pvDisplayDepth = pvCyclePv.length; // restore full depth
       renderArrows(state);
       renderVideoOverlay(state);
     }
@@ -1067,7 +1048,7 @@ function initOverlay(): void {
   // the bar with a 1s idle hide.
 
   function pvEffectiveMaxDepth(): number {
-    return Math.min(state.pvDepth, pvCyclePv.length);
+    return pvCyclePv.length;
   }
 
   /** Snap the PV view to a given depth (no animation). Pauses auto-advance. */
@@ -1146,7 +1127,7 @@ function initOverlay(): void {
     (window as any).__chessrayPvPlaying = true;
     if (pvCycleTimer === null) {
       pvCycleStep();
-      pvCycleTimer = setInterval(pvCycleStep, pvGrowDelaySec * 1000);
+      pvCycleTimer = setInterval(pvCycleStep, PV_STEP_MS);
     }
     syncPvControls();
     broadcastPvIfLocal({ kind: 'resume' });
@@ -1325,17 +1306,6 @@ function initOverlay(): void {
   (window as any).__chessrayPvGrowStop = pvCycleStop;
   (window as any).__chessrayPvPlayStop = pvCycleStop;
   (window as any).__chessraySyncPvControls = syncPvControls;
-
-  if (pvGrowSlider && pvGrowVal) {
-    pvGrowSlider.value = String(pvGrowDelaySec);
-    pvGrowVal.textContent = String(pvGrowDelaySec);
-    pvGrowSlider.addEventListener('input', () => {
-      pvGrowDelaySec = parseInt(pvGrowSlider.value, 10);
-      pvGrowVal.textContent = String(pvGrowDelaySec);
-      savePrefs({ pvGrowDelaySec });
-      pvCycleStart();
-    });
-  }
 
 // ── Loss threshold slider ──
   const lossSlider = document.getElementById('cv-loss-threshold') as HTMLInputElement | null;

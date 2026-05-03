@@ -1,6 +1,6 @@
 /**
  * MV3 manifest authored as TypeScript so @crxjs/vite-plugin can resolve
- * entry-point sources (service worker, content scripts, popup, offscreen doc)
+ * entry-point sources (service worker, content scripts, side panel, offscreen doc)
  * and rewrite them to hashed bundle filenames at build time.
  */
 
@@ -17,7 +17,7 @@ export default defineManifest({
     default_title: 'Chessray',
   },
   side_panel: {
-    default_path: 'src/popup/popup.html',
+    default_path: 'src/side-panel/side-panel.html',
   },
   background: {
     service_worker: 'src/background/service-worker.ts',
