@@ -1,7 +1,7 @@
 import type { EvalResult } from '@chessray/core';
 import type { ArrowDescriptor } from '@chessray/core';
 
-export const EVAL_START_DEPTH = 16;
+export const EVAL_START_DEPTH = 20;
 export const EVAL_DEPTH_STEP = 4;
 /** Effectively unbounded — the iterative-deepening loop keeps going until the
  *  position changes (AbortController fires from frame-processor) or the engine
