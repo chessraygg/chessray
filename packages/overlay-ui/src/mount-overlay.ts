@@ -742,10 +742,17 @@ function initOverlay(): void {
       // Play button restarts from depth 0; First/Prev let the user scrub.
       // Drop the playing flag so the content script's capture-pause lifts
       // and live frames resume; pvBoardState stays so the analysis board
-      // keeps showing the final frame.
+      // keeps showing the final frame. Snap to a static frame for the
+      // last depth — without this, pvBoardState carries the in-flight
+      // anim object (no staticArrow), and the panel's renderArrows
+      // pvFrozen branch wipes the labeled step pill that tickArrow had
+      // just drawn, so the user sees the move number disappear at end
+      // of line. pvRenderFrame populates staticArrow + clears anim, so
+      // both surfaces show "this is move N" consistently.
       if (pvCycleTimer !== null) { clearInterval(pvCycleTimer); pvCycleTimer = null; }
       pvCyclePaused = true;
       (window as any).__chessrayPvPlaying = false;
+      pvRenderFrame(state.pvDisplayDepth);
       syncPvControls();
       return;
     }
