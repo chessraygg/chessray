@@ -27,7 +27,7 @@ import type { PipelineResult, ArrowDescriptor, GameOver } from '@chessray/core';
 import {
   EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH,
   EVAL_MULTI_PV_START, EVAL_MULTI_PV_MAX,
-  evalStartDepth, recordStartEvalDuration,
+  evalStartDepth, recordStartEvalDuration, FIRST_EVAL_TIMEOUT_MS,
   cacheGet, cachePut,
 } from './eval-cache.js';
 import { sampleBoardPixels, sampleFrameOutsideBbox, boardUnchanged } from './change-detect.js';
@@ -798,28 +798,8 @@ export class FrameProcessor {
         : { eval_max_depth: this.maxDepth, stale_eval: true }));
 
       const evalPositionFen = positionFen;
-      const startDepth = evalStartDepth();
       void (async () => {
-        for (let depth = startDepth; depth <= this.maxDepth; depth += EVAL_DEPTH_STEP) {
-          if (signal.aborted) break;
-          const currentEngine = this.deps.getEngine();
-          if (!currentEngine) break;
-          const isFirstDepth = (depth === startDepth);
-          const result = await currentEngine.runDepth(fullFen, depth, this.multiPvForDepth(isFirstDepth), signal);
-          if (!result || signal.aborted) break;
-          if (!result.top_moves[0]?.pv?.length) {
-            log(`Engine returned empty PV at depth ${depth} — reinitializing`);
-            await this.deps.reinitEngine();
-            break;
-          }
-          if (this.lastPositionFen !== evalPositionFen) break;
-          if (isFirstDepth) {
-            recordStartEvalDuration(result.elapsed_ms, false);
-            const nextStartDepth = evalStartDepth();
-            if (nextStartDepth !== startDepth) {
-              log(`Adaptive start depth: ${startDepth} -> ${nextStartDepth} (sample ${result.elapsed_ms}ms)`);
-            }
-          }
+        const handleResult = (result: EvalResult): void => {
           updatePlayedMoveLoss(result);
           const arrows = computeArrows(result.top_moves);
           this.lastEval = result;
@@ -833,6 +813,83 @@ export class FrameProcessor {
             eval_depth: result.depth,
             eval_max_depth: result.depth < this.maxDepth ? this.maxDepth : undefined,
           }));
+        };
+
+        // First-depth probe with a hard timeout. On timeout we abort the
+        // engine, force-drop the start depth (bypassing adapter hysteresis),
+        // and retry at the new lower depth. This guarantees we never wait
+        // longer than FIRST_EVAL_TIMEOUT_MS for the initial eval, even if a
+        // previously-fast machine just slowed down or the user opened a
+        // tactically dense position the engine can't crunch in time.
+        let firstDepth = 0;
+        retry: while (true) {
+          if (signal.aborted) return;
+          const currentEngine = this.deps.getEngine();
+          if (!currentEngine) return;
+
+          const probeDepth = evalStartDepth();
+          const timeoutCtrl = new AbortController();
+          const fwd = (): void => timeoutCtrl.abort();
+          signal.addEventListener('abort', fwd);
+          const tid = setTimeout(() => timeoutCtrl.abort(), FIRST_EVAL_TIMEOUT_MS);
+
+          let result: EvalResult | null = null;
+          try {
+            result = await currentEngine.runDepth(fullFen, probeDepth, this.multiPvForDepth(true), timeoutCtrl.signal);
+          } finally {
+            clearTimeout(tid);
+            signal.removeEventListener('abort', fwd);
+          }
+
+          if (signal.aborted) return; // real position change — abandon
+
+          const timedOut = timeoutCtrl.signal.aborted;
+          if (timedOut) {
+            const prev = evalStartDepth();
+            recordStartEvalDuration(FIRST_EVAL_TIMEOUT_MS, true, true);
+            const next = evalStartDepth();
+            if (next >= prev) {
+              log(`First eval timed out at depth ${probeDepth} (>${FIRST_EVAL_TIMEOUT_MS}ms); already at floor, abandoning eval`);
+              return;
+            }
+            log(`First eval at depth ${prev} timed out (>${FIRST_EVAL_TIMEOUT_MS}ms); dropped to ${next}, retrying`);
+            continue retry;
+          }
+
+          if (!result || !result.top_moves[0]?.pv?.length) {
+            log(`Engine returned empty PV at first depth ${probeDepth} — reinitializing`);
+            await this.deps.reinitEngine();
+            return;
+          }
+          if (this.lastPositionFen !== evalPositionFen) return;
+
+          const prev = evalStartDepth();
+          recordStartEvalDuration(result.elapsed_ms, false);
+          const next = evalStartDepth();
+          if (next !== prev) {
+            log(`Adaptive start depth: ${prev} -> ${next} (sample ${result.elapsed_ms}ms)`);
+          }
+
+          handleResult(result);
+          firstDepth = probeDepth;
+          break retry;
+        }
+
+        // Iterative deepening from firstDepth + step. No timeout here — the
+        // user has already seen the first-depth result; deeper passes refine.
+        for (let depth = firstDepth + EVAL_DEPTH_STEP; depth <= this.maxDepth; depth += EVAL_DEPTH_STEP) {
+          if (signal.aborted) break;
+          const currentEngine = this.deps.getEngine();
+          if (!currentEngine) break;
+          const result = await currentEngine.runDepth(fullFen, depth, this.multiPvForDepth(false), signal);
+          if (!result || signal.aborted) break;
+          if (!result.top_moves[0]?.pv?.length) {
+            log(`Engine returned empty PV at depth ${depth} — reinitializing`);
+            await this.deps.reinitEngine();
+            break;
+          }
+          if (this.lastPositionFen !== evalPositionFen) break;
+          handleResult(result);
         }
       })();
     } catch (err) {

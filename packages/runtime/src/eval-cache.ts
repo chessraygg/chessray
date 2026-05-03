@@ -18,13 +18,20 @@ export const EVAL_MULTI_PV_MAX = 5;
 
 /** Dynamic start-depth adapter — drifts the start depth based on observed
  *  wall time of the cold-start eval, like an adaptive frame-rate controller.
- *  Smoothed via N-sample hysteresis so a single slow tactical position doesn't
- *  bounce the depth. Cached and aborted evals are excluded by the caller. */
+ *  Smoothed via N-sample hysteresis on the bump-up side; the drop side is
+ *  also enforced by a hard timeout in the caller (FIRST_EVAL_TIMEOUT_MS), so
+ *  a slow first eval is killed at 500ms and immediately drops the depth
+ *  without waiting for hysteresis. */
 const START_TARGET_MIN_MS = 300;
-const START_TARGET_MAX_MS = 800;
+const START_TARGET_MAX_MS = 500;
 const START_DEPTH_FLOOR = 12;
 const START_DEPTH_CEILING = 30;
 const START_HYSTERESIS_N = 2;
+/** Hard cap on the cold-start eval. The frame-processor wraps the first-depth
+ *  runDepth in an AbortController that fires at this deadline; on timeout it
+ *  calls recordStartEvalDuration with hardTimeout=true to force-drop the
+ *  start depth (bypassing hysteresis) and retries at the new lower depth. */
+export const FIRST_EVAL_TIMEOUT_MS = START_TARGET_MAX_MS;
 
 let currentStartDepth = EVAL_START_DEPTH;
 let consecutiveFast = 0;
@@ -32,21 +39,43 @@ let consecutiveSlow = 0;
 
 export function evalStartDepth(): number { return currentStartDepth; }
 
-export function recordStartEvalDuration(elapsedMs: number, aborted: boolean): void {
-  if (aborted) return;
-  if (elapsedMs < START_TARGET_MIN_MS) {
-    consecutiveFast += 1;
+export function recordStartEvalDuration(
+  elapsedMs: number,
+  aborted: boolean,
+  hardTimeout = false,
+): void {
+  // hardTimeout: the search was killed by the caller's FIRST_EVAL_TIMEOUT_MS
+  // deadline. One sample is enough — bypass hysteresis and drop the start
+  // depth immediately. Without this, the retry loop at the same depth would
+  // burn another full timeout window before progress.
+  if (hardTimeout) {
+    currentStartDepth = Math.max(currentStartDepth - EVAL_DEPTH_STEP, START_DEPTH_FLOOR);
+    consecutiveFast = 0;
     consecutiveSlow = 0;
-    if (consecutiveFast >= START_HYSTERESIS_N) {
-      currentStartDepth = Math.min(currentStartDepth + EVAL_DEPTH_STEP, START_DEPTH_CEILING);
-      consecutiveFast = 0;
-    }
-  } else if (elapsedMs > START_TARGET_MAX_MS) {
+    return;
+  }
+
+  // Asymmetric exclusion: slow elapsed_ms is real evidence the depth is too
+  // costly even when aborted (engine was grinding regardless). Short / in-
+  // window samples from aborted runs are unreliable (the search may have been
+  // cut short before doing real work), so we exclude those. Mostly dormant
+  // under the hard timeout, but kept as a safety net if the timeout is raised.
+  const isSlow = elapsedMs > START_TARGET_MAX_MS;
+  if (aborted && !isSlow) return;
+
+  if (isSlow) {
     consecutiveSlow += 1;
     consecutiveFast = 0;
     if (consecutiveSlow >= START_HYSTERESIS_N) {
       currentStartDepth = Math.max(currentStartDepth - EVAL_DEPTH_STEP, START_DEPTH_FLOOR);
       consecutiveSlow = 0;
+    }
+  } else if (elapsedMs < START_TARGET_MIN_MS) {
+    consecutiveFast += 1;
+    consecutiveSlow = 0;
+    if (consecutiveFast >= START_HYSTERESIS_N) {
+      currentStartDepth = Math.min(currentStartDepth + EVAL_DEPTH_STEP, START_DEPTH_CEILING);
+      consecutiveFast = 0;
     }
   } else {
     consecutiveFast = 0;
