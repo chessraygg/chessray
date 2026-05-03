@@ -831,14 +831,13 @@ export function drawArrow(
     ctx.fill();
   }
 
-  // Step-number label — a dark pill with a colored identity ring, anchored
-  // to the move's FINAL destination square (not the interpolated tip) so it
-  // sits in place from the very first growth frame and stays put. The old
-  // gate of `t >= 1` only drew the label on the last animation frame, which
-  // was fragile: any rAF that fired after the next pvCycleStep had already
-  // reassigned pvBoardState bailed out via the `anim.step !== step` check
-  // and the label for that step was never drawn. Drawing every frame at the
-  // final destination makes the pill rAF-timing-independent.
+  // Step-number label — a dark pill with a colored identity ring that rides
+  // the moving piece. Anchored to the interpolated ribbon tip (x2,y2), which
+  // tracks the same source→destination path the piece slides along, so the
+  // pill follows the piece through the animation and lands on the
+  // destination square at progress=1. Drawn on every frame (no t-gate) so
+  // the label can't be lost when a rAF lands after the next step's
+  // pvCycleStep has already replaced pvBoardState.
   if (arrow.label) {
     const fontSize = Math.max(7, squareW * 0.22);
     const r = fontSize * 0.85;
@@ -846,10 +845,8 @@ export function drawArrow(
     const margin = 2;
     const offX = Math.min(squareW * 0.30, Math.max(0, squareW / 2 - r - margin));
     const offY = Math.min(squareH * 0.30, Math.max(0, squareH / 2 - r - margin));
-    // Anchor to fullX2/fullY2 (destination), not x2/y2 (which interpolates
-    // toward the destination as the ribbon grows).
-    const ox = fullX2 + offX;
-    const oy = fullY2 - offY;
+    const ox = x2 + offX;
+    const oy = y2 - offY;
 
     // Solid near-black pill (independent of arrow.opacity).
     ctx.globalAlpha = 0.92;
