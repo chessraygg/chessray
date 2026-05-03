@@ -7,7 +7,7 @@
  * be relayed to the captured tab's content script.
  */
 
-import { mountOverlay, createDefaultBridge, type ChessRayAPI, type DisplayInfo } from '@chessray/overlay-ui';
+import { mountOverlay, createDefaultBridge, DEFAULT_PREFS, type ChessRayAPI, type DisplayInfo } from '@chessray/overlay-ui';
 import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
 // Popup owns its document, so it can safely load panel.css's global
 // rules. (mount-overlay.ts no longer pulls panel.css automatically —
@@ -100,10 +100,19 @@ const bridge: ChessRayAPI = createDefaultBridge({
   setTargetFps: (fps) => applySetting({ key: 'target-fps', value: fps }),
 
   requestResetAllSettings: () => {
-    if (confirm('Reset all panel settings to defaults?')) {
-      try { localStorage.removeItem('chessray-prefs'); } catch { /* ignore */ }
-      location.reload();
-    }
+    if (!confirm('Reset all panel settings to defaults?')) return;
+    // Side panel and the captured tab's content script keep separate
+    // localStorage. Just removing our own copy and reloading would leave
+    // the on-page overlay running with the previous prefs (we can't reload
+    // the user's tab). Writing DEFAULT_PREFS via setItem trips the mirror
+    // below, which relays a prefs-update to the content script —
+    // applyPrefsToHiddenPanel then re-fires every panel control on that
+    // side so the visible markers (arrow size/opacity, loss threshold,
+    // eval bar, border) snap back to defaults live.
+    try {
+      localStorage.setItem('chessray-prefs', JSON.stringify(DEFAULT_PREFS));
+    } catch { /* ignore */ }
+    location.reload();
   },
 
   closeApp: () => { window.close(); },
