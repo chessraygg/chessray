@@ -831,28 +831,25 @@ export function drawArrow(
     ctx.fill();
   }
 
-  // Step-number label — a dark pill with a colored identity ring, drawn at
-  // the top-right corner of the destination square so it tags the arriving
-  // piece instead of sitting on top of the shaft. Stays fully opaque
-  // regardless of arrow alpha so it's legible under any fade/dim state.
-  if (arrow.label && t >= 1) {
-    // Scale the step-pill from SQUARE size, not from arrow lineWidth.
-    // The previous formula (lineWidth * 2) made labels enormous on the
-    // virtual board (200px → ~25px squares) — a 10-logical-unit font
-    // inside a 25-unit square fills ~67% of the square. Anchor to
-    // squareW * 0.22 with a small floor so the pill sits cleanly in
-    // the destination square's corner on both the virtual board and
-    // the actual-board overlay.
+  // Step-number label — a dark pill with a colored identity ring, anchored
+  // to the move's FINAL destination square (not the interpolated tip) so it
+  // sits in place from the very first growth frame and stays put. The old
+  // gate of `t >= 1` only drew the label on the last animation frame, which
+  // was fragile: any rAF that fired after the next pvCycleStep had already
+  // reassigned pvBoardState bailed out via the `anim.step !== step` check
+  // and the label for that step was never drawn. Drawing every frame at the
+  // final destination makes the pill rAF-timing-independent.
+  if (arrow.label) {
     const fontSize = Math.max(7, squareW * 0.22);
     const r = fontSize * 0.85;
     const strokeW = Math.max(1.5, fontSize * 0.14);
-    // Offset from destination center toward the top-right corner, clamped so
-    // the pill stays inside the square on smaller boards (e.g. vboard mini).
     const margin = 2;
     const offX = Math.min(squareW * 0.30, Math.max(0, squareW / 2 - r - margin));
     const offY = Math.min(squareH * 0.30, Math.max(0, squareH / 2 - r - margin));
-    const ox = x2 + offX;
-    const oy = y2 - offY;
+    // Anchor to fullX2/fullY2 (destination), not x2/y2 (which interpolates
+    // toward the destination as the ribbon grows).
+    const ox = fullX2 + offX;
+    const oy = fullY2 - offY;
 
     // Solid near-black pill (independent of arrow.opacity).
     ctx.globalAlpha = 0.92;
