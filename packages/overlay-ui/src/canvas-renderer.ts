@@ -96,6 +96,13 @@ export interface HitCache {
 export const videoHitCache: HitCache = { arrows: [], animBoardRect: null };
 export const vboardHitCache: HitCache = { arrows: [], animBoardRect: null };
 
+// Signature of the last frozen-PV repaint on the vboard canvas. Used to skip
+// redundant clear+redraw on every processPendingResult tick (~30 FPS) when the
+// staticArrow hasn't actually changed — the unconditional repaint caused
+// visible flicker on paused/scrubbed PV frames.
+let pvFrozenLastSig: string | null = null;
+let pvFrozenLastCanvas: HTMLCanvasElement | null = null;
+
 function distPointToSegment(
   px: number, py: number,
   x1: number, y1: number,
@@ -870,6 +877,20 @@ export function renderArrows(state: OverlayState): void {
     const dpr = window.devicePixelRatio || 1;
     const effectiveDpr = dpr * (state.panelScale || 1) * (state.boardScale || 1);
     const bufferSize = Math.ceil(size * effectiveDpr);
+    const sa = state.pvBoardState!.staticArrow;
+    // Skip the clear+redraw if nothing visible has changed since the last
+    // frozen-PV pass on this same canvas. processPendingResult fires renderArrows
+    // on every incoming pipeline frame; without this guard we repaint the same
+    // arrow ~30 times/sec, which flickers.
+    const sig = sa
+      ? `${sa.fromSq}|${sa.toSq}|${sa.step}|${sa.isWhite}|${bufferSize}|${state.displayFlipped}`
+      : `_|${bufferSize}|${state.displayFlipped}`;
+    if (pvFrozenLastCanvas === state.canvas && pvFrozenLastSig === sig
+        && state.canvas.width === bufferSize && state.canvas.height === bufferSize) {
+      vboardHitCache.arrows = [];
+      vboardHitCache.animBoardRect = { x: 0, y: 0, width: size, height: size };
+      return;
+    }
     if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
       state.canvas.width = bufferSize;
       state.canvas.height = bufferSize;
@@ -879,7 +900,6 @@ export function renderArrows(state: OverlayState): void {
     const fctx = state.canvas.getContext('2d')!;
     fctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
     fctx.clearRect(0, 0, size, size);
-    const sa = state.pvBoardState!.staticArrow;
     if (sa) {
       drawArrow(fctx, {
         from: sa.fromSq, to: sa.toSq,
@@ -888,10 +908,16 @@ export function renderArrows(state: OverlayState): void {
         label: String(sa.step),
       }, { x: 0, y: 0, width: size, height: size }, 1, state.displayFlipped, 0, 1, true);
     }
+    pvFrozenLastCanvas = state.canvas;
+    pvFrozenLastSig = sig;
     vboardHitCache.arrows = [];
     vboardHitCache.animBoardRect = { x: 0, y: 0, width: size, height: size };
     return;
   }
+  // Reset the frozen-PV cache so the next entry into the frozen branch always
+  // repaints (e.g., user resumes auto-play, then pauses again on a new step).
+  pvFrozenLastSig = null;
+  pvFrozenLastCanvas = null;
 
   const size = 200;
   const dpr = window.devicePixelRatio || 1;
