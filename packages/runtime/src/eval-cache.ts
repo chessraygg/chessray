@@ -1,6 +1,10 @@
 import type { EvalResult } from '@chessray/core';
 import type { ArrowDescriptor } from '@chessray/core';
 
+/** Initial seed for the dynamic start depth. The runtime value drifts in
+ *  evalStartDepth() based on observed cold-start eval timing. Read the
+ *  function, not this constant, when selecting the first search depth for a
+ *  fresh position. */
 export const EVAL_START_DEPTH = 20;
 export const EVAL_DEPTH_STEP = 4;
 /** Effectively unbounded — the iterative-deepening loop keeps going until the
@@ -12,16 +16,55 @@ export const EVAL_MAX_DEPTH = 99;
 export const EVAL_MULTI_PV_START = 3;
 export const EVAL_MULTI_PV_MAX = 5;
 
+/** Dynamic start-depth adapter — drifts the start depth based on observed
+ *  wall time of the cold-start eval, like an adaptive frame-rate controller.
+ *  Smoothed via N-sample hysteresis so a single slow tactical position doesn't
+ *  bounce the depth. Cached and aborted evals are excluded by the caller. */
+const START_TARGET_MIN_MS = 300;
+const START_TARGET_MAX_MS = 800;
+const START_DEPTH_FLOOR = 12;
+const START_DEPTH_CEILING = 30;
+const START_HYSTERESIS_N = 2;
+
+let currentStartDepth = EVAL_START_DEPTH;
+let consecutiveFast = 0;
+let consecutiveSlow = 0;
+
+export function evalStartDepth(): number { return currentStartDepth; }
+
+export function recordStartEvalDuration(elapsedMs: number, aborted: boolean): void {
+  if (aborted) return;
+  if (elapsedMs < START_TARGET_MIN_MS) {
+    consecutiveFast += 1;
+    consecutiveSlow = 0;
+    if (consecutiveFast >= START_HYSTERESIS_N) {
+      currentStartDepth = Math.min(currentStartDepth + EVAL_DEPTH_STEP, START_DEPTH_CEILING);
+      consecutiveFast = 0;
+    }
+  } else if (elapsedMs > START_TARGET_MAX_MS) {
+    consecutiveSlow += 1;
+    consecutiveFast = 0;
+    if (consecutiveSlow >= START_HYSTERESIS_N) {
+      currentStartDepth = Math.max(currentStartDepth - EVAL_DEPTH_STEP, START_DEPTH_FLOOR);
+      consecutiveSlow = 0;
+    }
+  } else {
+    consecutiveFast = 0;
+    consecutiveSlow = 0;
+  }
+}
+
 // Mutable runtime overrides (set via IPC from UI)
 export let multiPvMax = EVAL_MULTI_PV_MAX;
 
 export function setMultiPvMax(n: number): void { multiPvMax = n; }
 
-/** Return multiPV count for a given search depth. First pass gets a small
- *  quick-look count (EVAL_MULTI_PV_START, capped to user's max); every deeper
- *  pass gets the user's full selected max. No ramp. */
-export function multiPvForDepth(depth: number): number {
-  if (depth === EVAL_START_DEPTH) return Math.min(EVAL_MULTI_PV_START, multiPvMax);
+/** First (cold-start) depth probed for a position gets the small quick-look
+ *  multiPV count; every deeper pass gets the user's selected max. Caller
+ *  passes whether this is the first depth — start depth is dynamic, so we no
+ *  longer compare to a constant. */
+export function multiPvForDepth(isFirstDepth: boolean): number {
+  if (isFirstDepth) return Math.min(EVAL_MULTI_PV_START, multiPvMax);
   return multiPvMax;
 }
 export const EVAL_CACHE_SIZE = 32;

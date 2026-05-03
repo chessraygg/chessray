@@ -25,8 +25,9 @@ import type {
 import type { PipelineResult, ArrowDescriptor, GameOver } from '@chessray/core';
 
 import {
-  EVAL_START_DEPTH, EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH,
+  EVAL_DEPTH_STEP, EVAL_MAX_DEPTH as DEFAULT_MAX_DEPTH,
   EVAL_MULTI_PV_START, EVAL_MULTI_PV_MAX,
+  evalStartDepth, recordStartEvalDuration,
   cacheGet, cachePut,
 } from './eval-cache.js';
 import { sampleBoardPixels, sampleFrameOutsideBbox, boardUnchanged } from './change-detect.js';
@@ -164,10 +165,11 @@ export class FrameProcessor {
     this.lastRecognitionResult = null;
   }
 
-  /** First (shallowest) pass gets a small quick-look count; every deeper pass
-   *  uses the user's selected max. No ramp. */
-  private multiPvForDepth(depth: number): number {
-    if (depth === EVAL_START_DEPTH) return Math.min(EVAL_MULTI_PV_START, this.multiPvMax);
+  /** First (cold-start) pass gets a small quick-look count; every deeper pass
+   *  uses the user's selected max. No ramp. Caller passes whether this is the
+   *  first depth — start depth is dynamic, no longer a constant compare. */
+  private multiPvForDepth(isFirstDepth: boolean): number {
+    if (isFirstDepth) return Math.min(EVAL_MULTI_PV_START, this.multiPvMax);
     return this.multiPvMax;
   }
 
@@ -751,7 +753,7 @@ export class FrameProcessor {
         }));
 
         if (cachedDepth < this.maxDepth) {
-          let nextDepth = EVAL_START_DEPTH;
+          let nextDepth = evalStartDepth();
           while (nextDepth <= cachedDepth) nextDepth += EVAL_DEPTH_STEP;
           const cachedEvalPositionFen = positionFen;
           void (async () => {
@@ -759,7 +761,7 @@ export class FrameProcessor {
               if (signal.aborted) break;
               const currentEngine = this.deps.getEngine();
               if (!currentEngine) break;
-              const result = await currentEngine.runDepth(fullFen, depth, this.multiPvForDepth(depth), signal);
+              const result = await currentEngine.runDepth(fullFen, depth, this.multiPvForDepth(false), signal);
               if (!result || signal.aborted) break;
               if (!result.top_moves[0]?.pv?.length) {
                 log(`Engine returned empty PV at depth ${depth} — reinitializing`);
@@ -796,12 +798,14 @@ export class FrameProcessor {
         : { eval_max_depth: this.maxDepth, stale_eval: true }));
 
       const evalPositionFen = positionFen;
+      const startDepth = evalStartDepth();
       void (async () => {
-        for (let depth = EVAL_START_DEPTH; depth <= this.maxDepth; depth += EVAL_DEPTH_STEP) {
+        for (let depth = startDepth; depth <= this.maxDepth; depth += EVAL_DEPTH_STEP) {
           if (signal.aborted) break;
           const currentEngine = this.deps.getEngine();
           if (!currentEngine) break;
-          const result = await currentEngine.runDepth(fullFen, depth, this.multiPvForDepth(depth), signal);
+          const isFirstDepth = (depth === startDepth);
+          const result = await currentEngine.runDepth(fullFen, depth, this.multiPvForDepth(isFirstDepth), signal);
           if (!result || signal.aborted) break;
           if (!result.top_moves[0]?.pv?.length) {
             log(`Engine returned empty PV at depth ${depth} — reinitializing`);
@@ -809,6 +813,13 @@ export class FrameProcessor {
             break;
           }
           if (this.lastPositionFen !== evalPositionFen) break;
+          if (isFirstDepth) {
+            recordStartEvalDuration(result.elapsed_ms, false);
+            const nextStartDepth = evalStartDepth();
+            if (nextStartDepth !== startDepth) {
+              log(`Adaptive start depth: ${startDepth} -> ${nextStartDepth} (sample ${result.elapsed_ms}ms)`);
+            }
+          }
           updatePlayedMoveLoss(result);
           const arrows = computeArrows(result.top_moves);
           this.lastEval = result;
