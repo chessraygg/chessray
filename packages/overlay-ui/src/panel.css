@@ -14,7 +14,9 @@
   --radius: 8px;
   --radius-sm: 4px;
   --panel-w: 300px;
-  --accent: #22c55e;
+  /* Default accent — overridable from Settings → Theme. mount-overlay
+     binds the saved pref to this var on :root via element.style at init. */
+  --accent: #f2b6b6;
   --accent-hover: #4ade80;
   --danger: #f87171;
   --danger-hover: #fca5a5;
@@ -547,9 +549,17 @@ canvas#video-overlay {
   color: var(--text-faint);
 }
 
+.pv-depth-row > label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .pv-depth-row input[type="range"] {
   flex: 1;
-  height: 4px;
   accent-color: var(--text-muted);
 }
 
@@ -558,6 +568,47 @@ canvas#video-overlay {
   text-align: center;
   font: 9px/1 var(--mono);
   color: var(--text-faint);
+}
+
+/* ── Unified slider styling (V4: hairline + dot thumb) ──
+ * Applies to every range input inside the panel (Analysis, Settings,
+ * Debug). The bicolor track uses the runtime `--p` CSS var (0-100%) set
+ * by mount-overlay's slider-fill helper on every input event. */
+.panel input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  background: transparent;
+  margin: 0;
+  cursor: pointer;
+}
+.panel input[type="range"]::-webkit-slider-runnable-track {
+  height: 1px;
+  background: linear-gradient(to right,
+    var(--accent) 0%, var(--accent) var(--p, 50%),
+    #3a3a3a var(--p, 50%), #3a3a3a 100%);
+  border: 0;
+}
+.panel input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border: 0;
+  border-radius: 50%;
+  margin-top: -3.5px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
+  transition: box-shadow 0.15s, transform 0.12s;
+}
+.panel input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.panel input[type="range"]:focus { outline: none; }
+.panel input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 
@@ -1236,9 +1287,11 @@ canvas#video-overlay {
   font-size: 11px;
 }
 .r2-controls label {
-  color: var(--text-dim);
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
   white-space: nowrap;
   cursor: help;
 }
@@ -1589,7 +1642,13 @@ canvas#video-overlay {
   padding: 3px 0;
   font-size: 11px;
 }
-.r2-group .pv-depth-row label { color: var(--text-dim); }
+.r2-group .pv-depth-row label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
 .r2-group .pv-depth-row input[type=range] { width: 100%; accent-color: var(--accent); }
 .r2-group .pv-depth-row input[type=checkbox] { accent-color: var(--accent); justify-self: start; margin: 0; }
 .r2-group .pv-depth-row > span { font: 10.5px var(--mono); color: var(--text); text-align: right; }
@@ -1607,6 +1666,70 @@ canvas#video-overlay {
 }
 .r2-group .display-toggle input { accent-color: var(--accent); margin: 0; }
 .r2-group .display-toggle span { flex: 1; }
+
+/* ── Theme group — accent color picker (Settings → Theme) ──
+ * Native color input (28px square swatch) + 6-digit hex text field that
+ * mirror each other. The reset button resets to DEFAULT_PREFS.accentColor.
+ * mount-overlay's applyAccent() is the single source of truth — both
+ * inputs feed it, and it writes the CSS var + persists via savePrefs. */
+.r2-theme-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 2px;
+  font-size: 11px;
+}
+.r2-theme-row > label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: help;
+  white-space: nowrap;
+}
+.r2-theme-row input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+.r2-theme-row input[type="color"]:hover { border-color: var(--accent); }
+.r2-theme-row input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+.r2-theme-row input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 2px; }
+.r2-theme-row input[type="text"] {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 7px;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.r2-theme-row input[type="text"]:focus { border-color: var(--accent); }
+.r2-theme-row .r2-accent-reset {
+  width: 24px; height: 24px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.r2-theme-row .r2-accent-reset:hover { border-color: var(--accent); color: var(--accent); }
 
 /* Tools group */
 .r2-group .lichess-controls {
