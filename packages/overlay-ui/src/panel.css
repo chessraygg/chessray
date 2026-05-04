@@ -1484,22 +1484,22 @@ canvas#video-overlay {
   gap: 6px;
   padding: 7px 12px;
   border-radius: var(--radius-sm);
-  background: rgba(34, 197, 94, 0.10);
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  color: var(--accent);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
 .r2-bottom-bar .r2-lichess-btn:hover {
-  background: rgba(34, 197, 94, 0.18);
-  border-color: rgba(34, 197, 94, 0.45);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .r2-bottom-bar .r2-lichess-btn.active {
-  background: rgba(34, 197, 94, 0.25);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 /* Re-style the existing .move-line markup emitted by debug-panel.renderBestMoves
    so the rest of the codebase doesn't need to change. */
@@ -1604,6 +1604,8 @@ canvas#video-overlay {
   transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
 .r2-tab:hover { color: var(--text-dim); }
+.r2-tab:focus { outline: none; }
+.r2-tab:focus-visible { outline: none; }
 .r2-tab.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
@@ -1635,13 +1637,16 @@ canvas#video-overlay {
   margin-bottom: 6px;
 }
 .r2-group .pv-depth-row {
-  display: grid;
-  grid-template-columns: 76px 1fr auto;
+  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 3px 0;
   font-size: 11px;
 }
+.r2-group .pv-depth-row > label { flex: 0 0 auto; }
+.r2-group .pv-depth-row input[type="range"] { flex: 1 1 auto; min-width: 60px; }
+.r2-group .pv-depth-row > span { flex: 0 0 auto; margin-left: auto; }
+.r2-group .pv-depth-row > span + .pv-unit { margin-left: 1px; }
 .r2-group .pv-depth-row label {
   font-size: 9.5px;
   font-weight: 600;

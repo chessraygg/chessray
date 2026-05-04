@@ -29,6 +29,9 @@ export default defineConfig({
   // Force IPv4 binding so CRXJS's dev-mode loader (which fetches
   // http://localhost:5173 from the page) connects on macOS where Chrome
   // resolves localhost→::1 first and Vite's default would only bind IPv6.
+  // strictPort: true so vite fails loudly if 5173 is held by anything
+  // else — extension-dev.sh and app.sh free their ports before starting,
+  // so a port collision here means a script bug, not a fallback opportunity.
   server: {
     host: '127.0.0.1',
     port: 5173,
