@@ -668,24 +668,6 @@ function initOverlay(): void {
     });
   }
 
-  // Debug board-preview image scale slider — applies to the cropped preview only.
-  const debugImgScale = document.getElementById('cv-debug-img-scale') as HTMLInputElement | null;
-  const debugImgScaleVal = document.getElementById('cv-debug-img-scale-val');
-  const debugImgEl = document.getElementById('cv-debug-img') as HTMLImageElement | null;
-  if (debugImgScale && debugImgScaleVal && debugImgEl) {
-    const apply = (pct: number): void => {
-      debugImgEl.style.width = `${pct}%`;
-      debugImgScaleVal.textContent = String(pct);
-    };
-    apply(prefs.debugImgScale);
-    debugImgScale.value = String(prefs.debugImgScale);
-    debugImgScale.addEventListener('input', () => {
-      const pct = parseInt(debugImgScale.value, 10);
-      apply(pct);
-      savePrefs({ debugImgScale: pct });
-    });
-  }
-
   // Record toggle — start/stop dumping raw captured frames to disk
   const recordBtn = document.getElementById('cv-record-btn');
   let recordingActive = false;

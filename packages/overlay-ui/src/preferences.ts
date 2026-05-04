@@ -23,8 +23,6 @@ export interface Prefs {
   panelHeight: number | null;
   sectionLayout: unknown | null;
   gravityUp: boolean;
-  /** Debug section's board-preview image scale, percent of panel width (25..200). */
-  debugImgScale: number;
   /** Scales every on-board decoration: best-move arrow width (rank 0), PV step
    *  label circle, and played-move markers. Other arrow ranks keep the 5:4:3
    *  ratio. Value is the target best-move arrow width in px at the canonical
@@ -68,7 +66,6 @@ export const DEFAULT_PREFS: Prefs = {
   panelHeight: null,
   sectionLayout: null,
   gravityUp: true,
-  debugImgScale: 100,
   overlaySize: 5,
   overlayOpacity: 0.50,
   evalBarStaleOpacity: 0.90,

@@ -135,11 +135,6 @@ export const PANEL_HTML = `\
         <div class="debug-img-wrap" id="cv-debug-img-wrap">
           <img id="cv-debug-img" src="" alt="Board capture" data-tip="JPEG preview of the cropped board pixels actually fed into the recognition pipeline. Useful for verifying the bbox is on the board and not on adjacent UI." data-tip-pos="below">
         </div>
-        <div class="pv-depth-row">
-          <label data-tip="Resize the board preview image (percent of panel width). Doesn't affect detection — preview only.">Preview size</label>
-          <input type="range" id="cv-debug-img-scale" min="25" max="200" value="100" step="5">
-          <span id="cv-debug-img-scale-val">100</span><span class="pv-unit">%</span>
-        </div>
         <div class="fen" id="cv-debug-fen" data-tip="Full FEN of the recognized position (with side to move, castling rights, en passant, halfmove clock and fullmove number) once eval has run; otherwise position-only.">Waiting...</div>
         <div class="debug-orient" id="cv-orientation-info" data-tip="Detected board orientation (white at top vs bottom) and the signal that decided it: coord labels (OCR), pawn move direction, or piece-count heuristic."></div>
         <div class="meta" id="cv-debug-info"></div>
