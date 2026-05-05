@@ -56,6 +56,17 @@ canvas#video-overlay {
   display: none !important;
 }
 
+/* The Electron overlay's "minimize" button (cv-hide-btn) hides the
+   floating panel while keeping the on-screen overlay running. In the
+   extension the side panel is a Chrome-managed surface that the user
+   already closes via Chrome's own close affordance, so a separate
+   minimize button is redundant — same outcome, two places to look.
+   Hidden via display:none rather than removing from the template so
+   the Electron build keeps its window control. */
+#cv-hide-btn {
+  display: none !important;
+}
+
 /* Engine-info diagnostics row at the bottom of the panel's debug section.
    Reference info — muted styling so it doesn't compete with primary
    diagnostics. */
