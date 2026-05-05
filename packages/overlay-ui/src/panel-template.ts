@@ -126,12 +126,23 @@ export const PANEL_HTML = `\
           </div>
         </div>
 
+        <!-- Screen selection — only renders when the system has more than
+             one display (refreshDisplaySwitcher in mount-overlay.ts hides
+             the whole group on single-display setups). Lifted out of the
+             System group so it has its own labeled section header instead
+             of sitting orphaned beneath the reset button. The wrapper
+             group is hidden by default to match the inner switcher's
+             hidden state; refreshDisplaySwitcher toggles both. -->
+        <div class="r2-group" id="cv-display-group" hidden>
+          <div class="r2-group-label">Screen</div>
+          <div class="r2-display-switcher" id="cv-display-switcher" hidden></div>
+        </div>
+
         <div class="r2-group" id="cv-system-group">
           <div class="r2-group-label">System</div>
           <div class="r2-system-actions">
             <button class="toggle-btn" id="cv-reset-all-btn" data-tip="Wipe every saved preference (including panel position and size) and reload with defaults. Display capture choice is preserved.">Restore default settings…</button>
           </div>
-          <div class="r2-display-switcher" id="cv-display-switcher" hidden></div>
         </div>
 
       </div>

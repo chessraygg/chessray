@@ -1653,15 +1653,18 @@ function initOverlay(): void {
   });
 
   const displaySwitcher = document.getElementById('cv-display-switcher');
+  const displayGroup = document.getElementById('cv-display-group');
   async function refreshDisplaySwitcher(): Promise<void> {
     if (!displaySwitcher) return;
     const displays = await chessRay.getDisplays();
     if (displays.length < 2) {
       displaySwitcher.hidden = true;
       displaySwitcher.innerHTML = '';
+      if (displayGroup) displayGroup.hidden = true;
       return;
     }
     displaySwitcher.hidden = false;
+    if (displayGroup) displayGroup.hidden = false;
     const activeId = displays[0]?.activeId ?? null;
     displaySwitcher.innerHTML = displays.map(d => {
       const label = `${d.primary ? 'Built-in' : 'Display'} (${d.width}\u00d7${d.height})`;
