@@ -466,9 +466,11 @@ function initOverlay(): void {
   // Electron). Default-shown so users who land on the panel pre-capture
   // see the call-to-action immediately.
   startCaptureBtn = document.getElementById('cv-start-capture-btn') as HTMLButtonElement | null;
+  console.log('[chessray mount-overlay] start-capture btn lookup', startCaptureBtn ? 'FOUND' : 'NOT FOUND');
   if (startCaptureBtn) {
     setStartCaptureVisible(true);
     startCaptureBtn.addEventListener('click', () => {
+      console.log('[chessray mount-overlay] start-capture btn CLICKED → calling chessRay.requestStartCapture');
       chessRay.requestStartCapture();
     });
   }
