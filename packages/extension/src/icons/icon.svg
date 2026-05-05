@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45" width="45" height="45">
-  <rect width="45" height="45" rx="6" fill="#000"/>
-  <g fill="#ffadad" stroke="#ffadad" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
-    <path stroke-linejoin="miter" d="M22.5 11.63V6"/>
-    <path stroke-linejoin="miter" d="M20 8h5"/>
-    <path stroke-linecap="butt" stroke-linejoin="miter" d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5"/>
-    <path d="M11.5 37a22.3 22.3 0 0 0 21 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-3.5-7.5-13-10.5-16-4-3 6 5 10 5 10z"/>
+  <g fill="#ffadad" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+    <path stroke-linecap="butt" d="M9 39h27v-3H9zm3-3v-4h21v4zm-1-22V9h4v2h5V9h5v2h5V9h4v5"/>
+    <path d="m34 14-3 3H14l-3-3"/>
+    <path stroke-linecap="butt" stroke-linejoin="miter" d="M31 17v12.5H14V17"/>
+    <path d="m31 29.5 1.5 2.5h-20l1.5-2.5"/>
+    <path fill="none" stroke-linejoin="miter" d="M11 14h23"/>
   </g>
 </svg>
