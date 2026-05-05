@@ -639,15 +639,7 @@ canvas#video-overlay {
   width: 200px;
   height: 200px;
   flex-shrink: 0;
-  /* Counter-scale by --panel-scale-board (set on .user-panel by
-     applyScale in mount-overlay.ts) so the virtual board stays a fixed
-     visual size when the user zooms the panel. --board-scale still
-     auto-fits the 200px-base board into whatever box .board-fit gives
-     it; dividing by the panel-scale neutralizes the parent's transform
-     for the board only — every other panel element keeps the parent's
-     scale. Defaults to 1 when the var isn't set so the rule no-ops on
-     hosts that don't drive panel zoom. */
-  transform: scale(calc(var(--board-scale, 1) / var(--panel-scale-board, 1)));
+  transform: scale(var(--board-scale, 1));
   transform-origin: center;
 }
 

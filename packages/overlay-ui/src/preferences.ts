@@ -7,7 +7,6 @@ export interface Prefs {
   lossThreshold: number;
   multiPvMax: number;
   evalBarVisible: boolean;
-  panelScale: number;
   collapsed: boolean;
   vboardOverlayVisible: boolean;
   compactMode: boolean;
@@ -56,7 +55,6 @@ export const DEFAULT_PREFS: Prefs = {
   lossThreshold: 100,
   multiPvMax: 5,
   evalBarVisible: true,
-  panelScale: 1,
   collapsed: false,
   collapsedSections: ['debug'],
   hiddenSections: [],
