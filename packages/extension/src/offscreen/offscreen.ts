@@ -154,17 +154,16 @@ async function startLoop(streamId: string, tabId: number, viewport?: { width: nu
   stopLoop();
   activeTabId = tabId;
 
-  // chromeMediaSource: 'tab' for tabCapture streamIds AND for
-  // chooseDesktopMedia streamIds where the picker was restricted to tabs.
-  // Both incoming paths (toolbar-icon → tabCapture, side-panel → desktopCapture
-  // restricted to ['tab']) produce tab-class streamIds. The 'desktop' branch
-  // would be needed if we ever expand the picker to screen/window sources,
-  // but for now both paths agree on 'tab'. Restricting the picker upstream
-  // is necessary because chooseDesktopMedia streamIds are single-use —
-  // a try-and-fallback consumes the streamId whether it succeeds or not.
-  // Source kind is therefore informational at this point; left in place
-  // so the trace logs (offscreen: startLoop ENTER sourceKind=...) still
-  // tell us which entry point produced this capture.
+  // chromeMediaSource: always 'tab'. Both incoming paths (toolbar-icon
+  // → tabCapture, side-panel → desktopCapture restricted to ['tab'])
+  // produce tab-class streamIds. The 'desktop' sourceKind value is a
+  // path discriminator (NOT a chromeMediaSource hint) — it tells us the
+  // picker was used, which means the user may have picked a tab other
+  // than the one whose viewport the SW measured, so we MUST skip the
+  // min/max pinning. Pinning to a wrong viewport makes Chrome reject
+  // with the misleading "AbortError: Error starting tab capture" — the
+  // exact error we kept hitting before this fix. Toolbar path keeps the
+  // pinning since cachedTabId == captured tab, so the dimensions match.
   const mandatory: Record<string, unknown> = {
     chromeMediaSource: 'tab',
     chromeMediaSourceId: streamId,
@@ -175,6 +174,8 @@ async function startLoop(streamId: string, tabId: number, viewport?: { width: nu
     mandatory.minHeight = viewport.height;
     mandatory.maxHeight = viewport.height;
     debugLog(`getUserMedia pinned to ${viewport.width}x${viewport.height}`);
+  } else if (sourceKind === 'desktop') {
+    debugLog(`getUserMedia unpinned (picker path — captured tab may differ from cachedTabId)`);
   }
   // Consume the streamId IMMEDIATELY before any other awaits.
   // chooseDesktopMedia streamIds expire "after a few seconds when not

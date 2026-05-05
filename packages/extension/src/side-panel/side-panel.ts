@@ -137,6 +137,13 @@ const bridge: ChessRayAPI = createDefaultBridge({
       // getUserMedia call consumes them whether it succeeds or fails.
       // Restricting the picker is the only way to guarantee the right
       // source kind on the first attempt.
+      //
+      // sourceKind:'desktop' here is a path discriminator (NOT a
+      // chromeMediaSource hint) — the user might have picked a tab
+      // different from cachedTabId, so the SW must skip readTabViewport
+      // and offscreen must skip viewport pinning. Offscreen still
+      // consumes the streamId with chromeMediaSource:'tab' because the
+      // picker was restricted to tabs.
       chrome.desktopCapture.chooseDesktopMedia(['tab'], (desktopStreamId) => {
         const dcErr = chrome.runtime.lastError?.message;
         console.log('[chessray side-panel] chooseDesktopMedia result streamId=', desktopStreamId ? `${desktopStreamId.slice(0, 12)}…` : '(none)', 'err=', dcErr);
@@ -144,11 +151,8 @@ const bridge: ChessRayAPI = createDefaultBridge({
           // User cancelled the picker — valid choice, no error.
           return;
         }
-        // sourceKind:'tab' so offscreen consumes with chromeMediaSource:'tab'.
-        // Even though the streamId came from desktopCapture, the picker was
-        // restricted to tabs so this is the matching consumption pair.
         chrome.runtime.sendMessage({
-          type: 'start-capture', tabId, streamId: desktopStreamId, sourceKind: 'tab',
+          type: 'start-capture', tabId, streamId: desktopStreamId, sourceKind: 'desktop',
         } satisfies ExtensionMessage).then(
           (resp) => console.log('[chessray side-panel] start-capture response', resp),
           (err) => console.error('[chessray side-panel] start-capture sendMessage failed', err),
