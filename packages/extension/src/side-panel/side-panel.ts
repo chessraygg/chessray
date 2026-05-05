@@ -209,7 +209,7 @@ const bridge: ChessRayAPI = createDefaultBridge({
   },
 });
 
-mountOverlay(bridge, { hideCloseButton: true });
+mountOverlay(bridge, { hideWindowControls: true });
 // Ensure the Start-capture button label reflects the current tabWasInvoked
 // state. preloadTabId fires before mountOverlay; if it took the override
 // path (synchronous, no await), syncStartCaptureLabel ran before the

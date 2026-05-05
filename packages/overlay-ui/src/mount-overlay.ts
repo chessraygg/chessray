@@ -1807,7 +1807,7 @@ function processPendingResult(): void {
  * (legacy contract used throughout this file), injects the panel HTML +
  * CSS, and runs initOverlay + IPC listener registration.
  */
-export function mountOverlay(api: ChessRayAPI, options?: { hidePanel?: boolean; hideCloseButton?: boolean }): void {
+export function mountOverlay(api: ChessRayAPI, options?: { hidePanel?: boolean; hideWindowControls?: boolean }): void {
   // 1. Capture the host bridge for module-scoped use. We deliberately don't
   //    reassign window.chessRay — Electron's contextBridge.exposeInMainWorld
   //    makes it read-only and the assignment throws. Hosts that haven't
@@ -1830,14 +1830,19 @@ export function mountOverlay(api: ChessRayAPI, options?: { hidePanel?: boolean; 
     if (userPanel) userPanel.style.display = 'none';
   }
 
-  // Hosts that wrap the panel in their own UI surface with its own close
-  // affordance (Chrome's side-panel chrome, future tab or popup hosts) can
-  // ask us to suppress the in-panel hide button. Without this, clicking it
-  // would display:none the panel inside the side-panel container, leaving
-  // the user with an empty wrapper and no in-panel way to bring it back.
-  if (options?.hideCloseButton) {
+  // Hosts that wrap the panel in their own UI surface with its own window
+  // chrome (Chrome's side-panel container, future tab or popup hosts) can
+  // ask us to suppress the panel-internal window controls — cv-hide-btn (—,
+  // dismisses panel) and cv-close-btn (×, calls closeApp). Both only make
+  // sense in Electron where they pair with the global Cmd/Ctrl+Shift+H
+  // hotkey and the main-process quit handler. Inside the Chrome side panel
+  // there's no inverse affordance: clicking — display:nones the panel and
+  // the user is stuck; clicking × invokes a noop closeApp() bridge stub.
+  if (options?.hideWindowControls) {
     const hideBtn = document.getElementById('cv-hide-btn');
     if (hideBtn) hideBtn.style.display = 'none';
+    const closeBtn = document.getElementById('cv-close-btn');
+    if (closeBtn) closeBtn.style.display = 'none';
   }
 
   // 3. Wire DOM event listeners + restore prefs.
