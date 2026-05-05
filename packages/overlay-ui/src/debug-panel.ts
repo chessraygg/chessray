@@ -35,8 +35,8 @@ export function clearDebugPanel(
   if (statusOrientText) statusOrientText.textContent = '—';
   if (statusOrientSuffix) statusOrientSuffix.textContent = 'auto';
   document.getElementById('cv-status-orient')?.classList.remove('manual');
-  const statusDepthText = document.querySelector('#cv-status-depth .r2-status-text') as HTMLElement | null;
-  if (statusDepthText) statusDepthText.textContent = 'Depth —';
+  const statusDepthSuffix = document.querySelector('#cv-status-depth .r2-status-suffix') as HTMLElement | null;
+  if (statusDepthSuffix) statusDepthSuffix.textContent = '—';
 
   const hlDebug = document.getElementById('cv-highlight-debug');
   if (hlDebug) hlDebug.innerHTML = '';
@@ -297,8 +297,8 @@ export function updateDebugPanel(
   }
   const statusDepth = document.getElementById('cv-status-depth');
   if (statusDepth) {
-    const txt = statusDepth.querySelector('.r2-status-text') as HTMLElement | null;
-    if (txt) txt.textContent = result.eval_depth ? `Depth ${result.eval_depth}` : 'Depth —';
+    const suf = statusDepth.querySelector('.r2-status-suffix') as HTMLElement | null;
+    if (suf) suf.textContent = result.eval_depth ? String(result.eval_depth) : '—';
   }
 
   // Debug orientation info

@@ -75,7 +75,7 @@ export const PANEL_HTML = `\
           <span class="r2-status-text">—</span><span class="r2-status-suffix">auto</span>
         </span>
         <span class="r2-status-cell" id="cv-status-depth" data-tip="Engine search depth completed for the current position." data-tip-pos="below">
-          <span class="r2-status-text">Depth —</span>
+          <span class="r2-status-text">Depth</span><span class="r2-status-suffix">—</span>
         </span>
       </div>
       <div class="r2-controls" id="cv-analysis-controls">
