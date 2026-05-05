@@ -92,6 +92,31 @@ const bridge: ChessRayAPI = createDefaultBridge({
 
   onStopTracking: (cb) => { stopTrackingListeners.push(cb); },
 
+  /** Click handler for the in-panel "Start capture" CTA. Mirrors the
+   *  toolbar-icon path (action.onClicked in service-worker.ts:295) but
+   *  initiated from the side panel: getMediaStreamId MUST run synchronously
+   *  in the click's user-gesture context — putting an `await` before it
+   *  consumes the gesture and Chrome refuses the request, exactly the same
+   *  failure mode the toolbar-icon code documents. We then send the
+   *  resulting streamId to the SW's start-capture handler, which already
+   *  knows how to spin up the offscreen recorder and pipe frame-results
+   *  back. cachedTabId is preloaded at popup load (preloadTabId, line 26)
+   *  so it's available without an awaited query. Errors throw — the user
+   *  pressed the button and deserves a loud failure rather than a silent
+   *  no-op (matches the project's no-fallback rule). */
+  requestStartCapture: () => {
+    if (cachedTabId == null) {
+      throw new Error('chessray: requestStartCapture called before target tab id was resolved');
+    }
+    const tabId = cachedTabId;
+    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
+      if (chrome.runtime.lastError || !streamId) {
+        throw new Error(`chessray: tabCapture.getMediaStreamId failed: ${chrome.runtime.lastError?.message ?? 'no stream id'}`);
+      }
+      chrome.runtime.sendMessage({ type: 'start-capture', tabId, streamId } satisfies ExtensionMessage);
+    });
+  },
+
   onDisplayInfo: (cb) => {
     displayInfoListeners.push(cb);
     cb({

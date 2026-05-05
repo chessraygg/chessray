@@ -41,6 +41,16 @@ export const PANEL_HTML = `\
           <div class="board-container">
             <div class="piece-grid" id="cv-debug-grid"></div>
             <canvas id="cv-arrow-canvas" width="200" height="200"></canvas>
+            <!-- "Start capture" affordance shown when no capture is running.
+                 Toggled by mount-overlay based on capture lifecycle events;
+                 sits on top of the board so it occupies the empty space the
+                 user is already looking at. Hidden by default; mount-overlay
+                 reveals it on initial load (no frame received yet) and after
+                 onStopTracking, hides it on the first frame-result. -->
+            <button class="board-start-btn" id="cv-start-capture-btn" type="button" hidden>
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>
+              <span>Start capture</span>
+            </button>
             <!-- PV playback controls — virtual board variant. -->
             <div class="pv-controls" id="cv-pv-controls-virtual">
               <div class="pv-controls__progress"></div>

@@ -52,6 +52,15 @@ let userPanel: HTMLDivElement | null = null;
 let debugImg: HTMLImageElement | null = null;
 let debugFen: HTMLDivElement | null = null;
 let debugInfo: HTMLDivElement | null = null;
+/** Empty-state CTA inside the panel's board area. Toggled by
+ *  setStartCaptureVisible from processPendingResult (hide on first
+ *  frame) and onStopTracking (show on capture stop). Module-scope so
+ *  those handlers can reach it — initOverlay queries the DOM and
+ *  assigns the reference. */
+let startCaptureBtn: HTMLButtonElement | null = null;
+function setStartCaptureVisible(visible: boolean): void {
+  if (startCaptureBtn) startCaptureBtn.hidden = !visible;
+}
 const useSan = true;
 
 const state: OverlayState = {
@@ -447,6 +456,21 @@ function initOverlay(): void {
       }
       const hovered = hitTestArrows(vboardHitCache, x, y);
       if (hovered !== null) triggerLine(hovered);
+    });
+  }
+
+  // "Start capture" button — overlays the empty board until the first
+  // frame-result arrives (handled in processPendingResult / onStopTracking,
+  // which call setStartCaptureVisible). Click delegates to the host bridge,
+  // which is responsible for the user-gesture-bound start path
+  // (chrome.tabCapture.getMediaStreamId in the extension; source picker in
+  // Electron). Default-shown so users who land on the panel pre-capture
+  // see the call-to-action immediately.
+  startCaptureBtn = document.getElementById('cv-start-capture-btn') as HTMLButtonElement | null;
+  if (startCaptureBtn) {
+    setStartCaptureVisible(true);
+    startCaptureBtn.addEventListener('click', () => {
+      chessRay.requestStartCapture();
     });
   }
 
@@ -1735,6 +1759,12 @@ function processPendingResult(): void {
   pendingResult = null;
   const tRender = Date.now();
 
+  // Capture is producing frames — hide the empty-state CTA. We hide on
+  // *any* frame-result (board found or not) because at this point capture
+  // is definitely running, and the "no board detected" state is a real
+  // diagnostic we don't want to mask with a "click to start" prompt.
+  setStartCaptureVisible(false);
+
   // While the user has the PV view paused or parked at end-of-sequence,
   // the analysis-board frame is a deliberate freeze the user is studying.
   // A transient YOLO miss or a single noisy recognition shouldn't clobber
@@ -1929,5 +1959,8 @@ export function mountOverlay(api: ChessRayAPI, options?: { hidePanel?: boolean }
     // the panel. Without this the user sees the last detected position
     // frozen in the panel after stopping capture, which feels broken.
     clearDebugPanel(debugImg, debugFen, debugInfo);
+    // Surface the start-capture CTA so the user has an obvious next step
+    // after a stop without having to find the toolbar icon.
+    setStartCaptureVisible(true);
   });
 }

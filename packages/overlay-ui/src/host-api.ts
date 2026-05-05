@@ -91,6 +91,16 @@ export interface ChessRayAPI {
   // can leave both as no-ops since both surfaces share one document.
   broadcastPvAction: (action: PvAction) => void;
   onPvAction: (cb: (action: PvAction) => void) => void;
+
+  /** User clicked the "Start capture" affordance inside the empty panel.
+   *  Each host wires this to its native start-capture flow:
+   *    - Extension side panel: sync chrome.tabCapture.getMediaStreamId
+   *      (must run from the click's user-gesture context) then send the
+   *      streamId to the SW so it can spin up the offscreen recorder.
+   *    - Electron: open the source picker / re-fire selectSource.
+   *  Default is a no-op so hosts that don't expose this affordance don't
+   *  break the bridge. */
+  requestStartCapture: () => void;
 }
 
 /**
@@ -155,6 +165,8 @@ export function createDefaultBridge(overrides: Partial<ChessRayAPI> = {}): Chess
 
     broadcastPvAction: noop,
     onPvAction: noop,
+
+    requestStartCapture: noop,
   };
   return { ...defaults, ...overrides };
 }

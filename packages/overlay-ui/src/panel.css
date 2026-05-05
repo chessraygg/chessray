@@ -656,6 +656,41 @@ canvas#video-overlay {
   pointer-events: auto;
 }
 
+/* "Start capture" affordance — overlays the empty board so the user has a
+   visible call-to-action when nothing is being captured yet. Sits above
+   cv-arrow-canvas (canvas is z-auto, button is positioned absolute later
+   in source order, so it naturally stacks on top). The .board-container
+   already has position: relative so absolute positioning anchors here. */
+.board-container .board-start-btn {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(20, 20, 20, 0.55);
+  border: 1px dashed color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: 4px;
+  color: var(--text);
+  font: 600 11px/1.2 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+.board-container .board-start-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, rgba(20, 20, 20, 0.55));
+  border-style: solid;
+  border-color: var(--accent);
+}
+.board-container .board-start-btn svg {
+  color: var(--accent);
+}
+.board-container .board-start-btn[hidden] {
+  display: none;
+}
+
 /* ── Piece grid with SVG pieces ── */
 
 .piece-grid {
