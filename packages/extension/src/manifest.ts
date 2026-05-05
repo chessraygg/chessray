@@ -13,8 +13,20 @@ export default defineManifest({
   version: pkg.version,
   description: pkg.description,
   minimum_chrome_version: '116',
+  icons: {
+    16: 'src/icons/icon-16.png',
+    32: 'src/icons/icon-32.png',
+    48: 'src/icons/icon-48.png',
+    128: 'src/icons/icon-128.png',
+  },
   action: {
     default_title: 'Chessray',
+    default_icon: {
+      16: 'src/icons/icon-16.png',
+      32: 'src/icons/icon-32.png',
+      48: 'src/icons/icon-48.png',
+      128: 'src/icons/icon-128.png',
+    },
   },
   side_panel: {
     default_path: 'src/side-panel/side-panel.html',
