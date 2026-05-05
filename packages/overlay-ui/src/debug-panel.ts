@@ -146,9 +146,19 @@ export function renderBoardGrid(
  *  filled black Unicode chess glyph. Pawn moves (no leading piece letter),
  *  castling (O-O / O-O-O), and the trailing promotion suffix (=Q, =R …)
  *  are passed through unchanged. The black-filled set reads better than
- *  the outline-white set at the panel's small font sizes. */
+ *  the outline-white set at the panel's small font sizes.
+ *
+ *  Why: Charter/Georgia (the .r2-san font) lack U+265A–U+265E, so the
+ *  browser pulls those glyphs from a system symbol font whose metrics
+ *  don't match — the painted body comes out visibly shorter than the
+ *  adjacent letters. Wrapping each glyph in `.r2-piece` lets CSS
+ *  rescale just the piece without touching surrounding text. */
 const SAN_PIECE_GLYPHS: Record<string, string> = {
-  K: '\u265A', Q: '\u265B', R: '\u265C', B: '\u265D', N: '\u265E',
+  K: '<span class="r2-piece">\u265A</span>',
+  Q: '<span class="r2-piece">\u265B</span>',
+  R: '<span class="r2-piece">\u265C</span>',
+  B: '<span class="r2-piece">\u265D</span>',
+  N: '<span class="r2-piece">\u265E</span>',
 };
 function sanToUnicode(san: string): string {
   if (!san) return san;

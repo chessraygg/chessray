@@ -1548,6 +1548,21 @@ canvas#video-overlay {
   margin-left: 8px;
   letter-spacing: 0;
 }
+/* Compensate for the metrics mismatch between Charter/Georgia (the .r2-san
+   font, which lacks chess glyphs) and the system symbol-font fallback that
+   actually paints U+265A–U+265E. The fallback's chess glyph body is shorter
+   than Charter's cap-height, so the piece looks small next to "f3" / "xe5".
+   Bump just the glyph and nudge it down so the optical center lines up. */
+.r2-moves .move-line .r2-san .r2-piece {
+  font-size: 1.15em;
+  vertical-align: -0.05em;
+  letter-spacing: 0;
+}
+.r2-moves .move-line .r2-san em .r2-piece {
+  /* In the dim continuation (mono font, 10px) the same fallback applies; rescale
+     here too so the piece matches the continuation letters' visual size. */
+  font-size: 1.2em;
+}
 .r2-moves .move-line .r2-score {
   font: 12px var(--mono);
   color: var(--text-dim);
