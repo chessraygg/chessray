@@ -1554,14 +1554,19 @@ canvas#video-overlay {
    than Charter's cap-height, so the piece looks small next to "f3" / "xe5".
    Bump just the glyph and nudge it down so the optical center lines up. */
 .r2-moves .move-line .r2-san .r2-piece {
-  font-size: 1.15em;
-  vertical-align: -0.05em;
+  /* The symbol-font fallback paints the chess glyph at roughly em-square,
+     so its visible body is only ~70% of Charter's 14px cap-height. Bumping
+     to 1.4em gives the body about the same on-screen height as 'c4' / 'd1+'. */
+  font-size: 1.4em;
+  line-height: 1;
+  vertical-align: -0.08em;
   letter-spacing: 0;
 }
 .r2-moves .move-line .r2-san em .r2-piece {
-  /* In the dim continuation (mono font, 10px) the same fallback applies; rescale
-     here too so the piece matches the continuation letters' visual size. */
-  font-size: 1.2em;
+  /* Continuation parent is 10px mono — same metrics gap, so the relative
+     bump needs to be a bit larger to match the denser mono letters. */
+  font-size: 1.5em;
+  vertical-align: -0.1em;
 }
 .r2-moves .move-line .r2-score {
   font: 12px var(--mono);
