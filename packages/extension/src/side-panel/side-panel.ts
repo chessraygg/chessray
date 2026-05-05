@@ -7,12 +7,6 @@
  * be relayed to the captured tab's content script.
  */
 
-// Sanity log at module import time — fires before any other side-panel
-// code runs. If this doesn't appear in the side-panel DevTools console,
-// the user is inspecting the wrong target (e.g. the SW or offscreen
-// inspector instead of the side panel itself).
-console.log('[chessray side-panel] module loaded at', new Date().toISOString());
-
 import { mountOverlay, createDefaultBridge, DEFAULT_PREFS, type ChessRayAPI, type DisplayInfo } from '@chessray/overlay-ui';
 import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
 // Popup owns its document, so it can safely load panel.css's global
@@ -98,50 +92,28 @@ const bridge: ChessRayAPI = createDefaultBridge({
 
   onStopTracking: (cb) => { stopTrackingListeners.push(cb); },
 
-  /** Click handler for the in-panel "Start capture" CTA. Two-step flow:
-   *  first try chrome.tabCapture.getMediaStreamId (the fast, no-dialog
-   *  path that works only when activeTab was granted via toolbar click /
-   *  command / context-menu invocation); on failure fall back to
-   *  chrome.desktopCapture.chooseDesktopMedia which pops a system picker
-   *  for screens/windows/tabs and works regardless of how the side panel
-   *  was opened. The picker is the cost of the right-click-open path the
-   *  user wants supported.
-   *
-   *  getMediaStreamId MUST run synchronously inside the click handler
-   *  (no awaits before the call) — Chrome consumes the user gesture on
-   *  any await and the call rejects. chooseDesktopMedia doesn't have the
-   *  same gesture requirement, so we can call it from the failure
-   *  callback. cachedTabId is preloaded at popup load via preloadTabId
-   *  so it's available without an awaited query. */
+  /** Click handler for the in-panel "Start capture" CTA. Mirrors the
+   *  toolbar-icon path (action.onClicked in service-worker.ts:295) but
+   *  initiated from the side panel: getMediaStreamId MUST run synchronously
+   *  in the click's user-gesture context — putting an `await` before it
+   *  consumes the gesture and Chrome refuses the request, exactly the same
+   *  failure mode the toolbar-icon code documents. We then send the
+   *  resulting streamId to the SW's start-capture handler, which already
+   *  knows how to spin up the offscreen recorder and pipe frame-results
+   *  back. cachedTabId is preloaded at popup load (preloadTabId, line 26)
+   *  so it's available without an awaited query. Errors throw — the user
+   *  pressed the button and deserves a loud failure rather than a silent
+   *  no-op (matches the project's no-fallback rule). */
   requestStartCapture: () => {
     if (cachedTabId == null) {
       throw new Error('chessray: requestStartCapture called before target tab id was resolved');
     }
     const tabId = cachedTabId;
-    console.log('[chessray side-panel] requestStartCapture tabId=', tabId);
-    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (tabStreamId) => {
-      const tabErr = chrome.runtime.lastError?.message;
-      console.log('[chessray side-panel] tabCapture result streamId=', tabStreamId ? `${tabStreamId.slice(0, 12)}…` : '(none)', 'err=', tabErr);
-      if (!tabErr && tabStreamId) {
-        // Fast path — activeTab was granted, no picker needed.
-        chrome.runtime.sendMessage({
-          type: 'start-capture', tabId, streamId: tabStreamId, sourceKind: 'tab',
-        } satisfies ExtensionMessage);
-        return;
+    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
+      if (chrome.runtime.lastError || !streamId) {
+        throw new Error(`chessray: tabCapture.getMediaStreamId failed: ${chrome.runtime.lastError?.message ?? 'no stream id'}`);
       }
-      // Fallback — no activeTab grant. Delegate to the SW: it invokes
-      // chrome.desktopCapture.chooseDesktopMedia in its own context and
-      // pipes the streamId into the regular start-capture flow. Doing
-      // it here in the side panel produces a streamId that can't be
-      // consumed by the offscreen document (the streamId is tied to the
-      // calling document; cross-document consumption silently fails with
-      // a misleading 'Error starting tab capture' AbortError we kept
-      // hitting). Chrome's own MV3 screen-recording sample calls
-      // chooseDesktopMedia from the SW for the same reason.
-      chrome.runtime.sendMessage({ type: 'request-picker-capture', tabId } satisfies ExtensionMessage).then(
-        (resp) => console.log('[chessray side-panel] request-picker-capture response', resp),
-        (err) => console.error('[chessray side-panel] request-picker-capture sendMessage failed', err),
-      );
+      chrome.runtime.sendMessage({ type: 'start-capture', tabId, streamId } satisfies ExtensionMessage);
     });
   },
 
@@ -256,47 +228,6 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
 // Belt-and-braces: also poll every 3s in case a broadcast was missed
 // (e.g. side panel opened mid-flight before the YOLO load fired).
 setInterval(refreshEngineInfo, 3000);
-
-// ── Trace tail in Diagnostics ─────────────────────────────────────────
-// Mirrors the SW's note() ring buffer into the debug view so the user
-// sees what the SW is doing (start-capture flow, capture-stopped, etc.)
-// without opening DevTools. The user explicitly asked for this — pure
-// console.log / debugLog isn't visible to them in the side panel UI.
-function ensureTraceEl(): HTMLElement | null {
-  let el = document.getElementById('cv-trace-tail') as HTMLElement | null;
-  if (el) return el;
-  const debugSection = document.getElementById('debug-section');
-  if (!debugSection) return null;
-  el = document.createElement('div');
-  el.id = 'cv-trace-tail';
-  // Inline style so we don't have to ship CSS for a debug-only surface.
-  el.style.font = '10px ui-monospace, SFMono-Regular, monospace';
-  el.style.whiteSpace = 'pre-wrap';
-  el.style.padding = '6px 10px';
-  el.style.borderTop = '1px solid var(--border)';
-  el.style.color = 'var(--text-muted)';
-  el.style.maxHeight = '240px';
-  el.style.overflowY = 'auto';
-  el.textContent = 'SW trace: loading…';
-  debugSection.appendChild(el);
-  return el;
-}
-
-async function refreshTrace(): Promise<void> {
-  const el = ensureTraceEl();
-  if (!el) return;
-  try {
-    const resp = await chrome.runtime.sendMessage({ type: 'get-trace' } satisfies ExtensionMessage);
-    const lines = (resp?.trace as string[] | undefined) ?? [];
-    el.textContent = lines.length ? lines.join('\n') : 'SW trace: empty';
-    // Keep scrolled to the bottom — newest entries are at the end.
-    el.scrollTop = el.scrollHeight;
-  } catch {
-    el.textContent = 'SW trace: SW unreachable';
-  }
-}
-void refreshTrace();
-setInterval(refreshTrace, 1500);
 
 // Relay pref changes to the captured tab's content script so the on-page
 // overlay (border/box, arrow opacity/size, eval-bar opacity, etc.) keeps

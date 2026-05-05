@@ -146,57 +146,39 @@ const processor = new FrameProcessor({
   encodePreviewUrl,
 });
 
-async function startLoop(streamId: string, tabId: number, viewport?: { width: number; height: number }, sourceKind: 'tab' | 'desktop' = 'tab'): Promise<void> {
-  debugLog(`startLoop ENTER sourceKind=${sourceKind} tabId=${tabId} viewport=${viewport ? `${viewport.width}x${viewport.height}` : 'null'} streamId=${streamId.slice(0, 12)}…`);
+async function startLoop(streamId: string, tabId: number, viewport?: { width: number; height: number }): Promise<void> {
   // Tear down any previous capture state — otherwise getUserMedia for the
   // new streamId can leak a second video track and the next stop won't
   // reach the original one.
   stopLoop();
   activeTabId = tabId;
+  await Promise.all([initEngine(), initRecognizer()]);
 
-  // chromeMediaSource: always 'tab'. Both incoming paths (toolbar-icon
-  // → tabCapture, side-panel → desktopCapture restricted to ['tab'])
-  // produce tab-class streamIds. The 'desktop' sourceKind value is a
-  // path discriminator (NOT a chromeMediaSource hint) — it tells us the
-  // picker was used, which means the user may have picked a tab other
-  // than the one whose viewport the SW measured, so we MUST skip the
-  // min/max pinning. Pinning to a wrong viewport makes Chrome reject
-  // with the misleading "AbortError: Error starting tab capture" — the
-  // exact error we kept hitting before this fix. Toolbar path keeps the
-  // pinning since cachedTabId == captured tab, so the dimensions match.
+  // Pin min=max to the tab's content area in physical pixels. Without this
+  // Chrome applies a default size cap and produces a letterboxed frame
+  // whose aspect ratio doesn't match the viewport — the bbox→CSS mapping
+  // then carries a ~10-50 px error per axis. With min=max the captured
+  // frame is the viewport scaled by DPR exactly, so frame coords ÷ DPR =
+  // CSS coords. Trade-off: window resize after start invalidates this and
+  // alignment drifts until the user restarts capture (acceptable per spec).
   const mandatory: Record<string, unknown> = {
     chromeMediaSource: 'tab',
     chromeMediaSourceId: streamId,
   };
-  if (sourceKind === 'tab' && viewport && viewport.width > 0 && viewport.height > 0) {
+  if (viewport && viewport.width > 0 && viewport.height > 0) {
     mandatory.minWidth = viewport.width;
     mandatory.maxWidth = viewport.width;
     mandatory.minHeight = viewport.height;
     mandatory.maxHeight = viewport.height;
     debugLog(`getUserMedia pinned to ${viewport.width}x${viewport.height}`);
-  } else if (sourceKind === 'desktop') {
-    debugLog(`getUserMedia unpinned (picker path — captured tab may differ from cachedTabId)`);
   }
-  // Consume the streamId IMMEDIATELY before any other awaits.
-  // chooseDesktopMedia streamIds expire "after a few seconds when not
-  // used" (per Chrome docs), and initEngine + initRecognizer can run
-  // longer than that on first capture (Stockfish WASM + ONNX session).
-  // Init runs in parallel below; the capture loop doesn't start until
-  // both promises resolve.
-  let stream: MediaStream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        // @ts-expect-error Chrome-specific mandatory constraints for tab capture
-        mandatory,
-      },
-    });
-  } catch (err) {
-    debugLog(`getUserMedia FAILED (sourceKind=${sourceKind}): ${String(err)}`);
-    throw err;
-  }
-  await Promise.all([initEngine(), initRecognizer()]);
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: {
+      // @ts-expect-error Chrome-specific mandatory constraints for tab capture
+      mandatory,
+    },
+  });
   mediaStream = stream;
   // Log what Chrome actually allocated so we can see if the pinned
   // constraints took effect. If actual ≠ pinned, Chrome silently
@@ -274,7 +256,7 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
   }
   if (msg.type === 'capture-started') {
     // tabId is supplied by the service worker (offscreen has no chrome.tabs).
-    startLoop(msg.streamId, msg.tabId, msg.viewport, msg.sourceKind ?? 'tab').then(
+    startLoop(msg.streamId, msg.tabId, msg.viewport).then(
       () => sendResponse({ ok: true }),
       (err) => sendResponse({ ok: false, error: String(err) }),
     );

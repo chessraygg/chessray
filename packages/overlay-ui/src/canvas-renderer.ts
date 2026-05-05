@@ -63,6 +63,7 @@ export interface OverlayState {
   /** User-supplied orientation override (null = auto). Display-only in the
    *  renderer — the pipeline enforces it via IPC; here it's used for UI state. */
   manualOrientationFlip: boolean | null;
+  panelScale: number;
   boardScale: number;
   displayInfo: {
     size?: { width: number; height: number };
@@ -899,7 +900,7 @@ export function renderArrows(state: OverlayState): void {
     const canvas = state.canvas;
     const size = 200;
     const dpr = window.devicePixelRatio || 1;
-    const effectiveDpr = dpr * (state.boardScale || 1);
+    const effectiveDpr = dpr * (state.panelScale || 1) * (state.boardScale || 1);
     const bufferSize = Math.ceil(size * effectiveDpr);
     const sa = state.pvBoardState!.staticArrow;
     const sig = `${bufferSize}|${state.displayFlipped}|${sa ? `${sa.fromSq}-${sa.toSq}-${sa.step}-${sa.isWhite}` : '_'}|${canvas.width}x${canvas.height}`;
@@ -933,10 +934,11 @@ export function renderArrows(state: OverlayState): void {
 
   const size = 200;
   const dpr = window.devicePixelRatio || 1;
-  // Match the buffer to the inner .board-container's --board-scale so the
-  // canvas isn't upscaled as a bitmap when the board leaf is larger than
-  // 200px (which would pixelate arrows/circles).
-  const effectiveDpr = dpr * (state.boardScale || 1);
+  // Compensate for both CSS transforms stacking on this canvas: the outer
+  // panel's panelScale and the inner .board-container's --board-scale.
+  // Without boardScale the canvas upscales as a bitmap when the board leaf
+  // is larger than 200px, pixelating arrows/circles.
+  const effectiveDpr = dpr * (state.panelScale || 1) * (state.boardScale || 1);
   const bufferSize = Math.ceil(size * effectiveDpr);
   const virtualBoard = { x: 0, y: 0, width: size, height: size };
 

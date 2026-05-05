@@ -126,6 +126,21 @@ export const PANEL_HTML = `\
           </div>
         </div>
 
+        <!-- Zoom — drives panelScale (0.5x to 2x). Wired to the existing
+             setZoom path (also reachable via Cmd/Ctrl+wheel on the panel),
+             so all three input methods (slider, hotkey, prefs reload)
+             feed one source of truth. The board counter-scales via
+             --panel-scale-board so it stays a fixed visual size while the
+             rest of the panel grows. -->
+        <div class="r2-group" id="cv-zoom-group">
+          <div class="r2-group-label">Zoom</div>
+          <div class="pv-depth-row">
+            <label data-tip="Scales every panel control (header, tabs, move list, sliders, settings, debug) — but not the virtual board, which stays a fixed size for legibility. Cmd/Ctrl+scroll on the panel does the same thing.">Panel zoom</label>
+            <input type="range" id="cv-zoom-slider" min="50" max="200" value="100" step="5">
+            <span id="cv-zoom-label">100%</span>
+          </div>
+        </div>
+
         <!-- Screen selection — only renders when the system has more than
              one display (refreshDisplaySwitcher in mount-overlay.ts hides
              the whole group on single-display setups). Lifted out of the

@@ -86,6 +86,7 @@ const state: OverlayState = {
   overlayOpacity: 0.85,
   evalBarStaleOpacity: 0.9,
   manualOrientationFlip: null,
+  panelScale: 1,
   boardScale: 1,
   displayInfo: null,
 };
@@ -466,11 +467,9 @@ function initOverlay(): void {
   // Electron). Default-shown so users who land on the panel pre-capture
   // see the call-to-action immediately.
   startCaptureBtn = document.getElementById('cv-start-capture-btn') as HTMLButtonElement | null;
-  console.log('[chessray mount-overlay] start-capture btn lookup', startCaptureBtn ? 'FOUND' : 'NOT FOUND');
   if (startCaptureBtn) {
     setStartCaptureVisible(true);
     startCaptureBtn.addEventListener('click', () => {
-      console.log('[chessray mount-overlay] start-capture btn CLICKED → calling chessRay.requestStartCapture');
       chessRay.requestStartCapture();
     });
   }
@@ -489,6 +488,42 @@ function initOverlay(): void {
   if (userPanel) {
     if (prefs.panelWidth != null) userPanel.style.width = `${prefs.panelWidth}px`;
     if (prefs.panelHeight != null) userPanel.style.height = `${prefs.panelHeight}px`;
+  }
+
+  // ── Panel zoom (Cmd+scroll) ──
+  let panelScale = prefs.panelScale;
+  state.panelScale = panelScale;
+  function applyScale(): void {
+    if (!userPanel) return;
+    userPanel.style.transform = `scale(${panelScale})`;
+    userPanel.style.transformOrigin = 'top left';
+    // Counter-scale the virtual board so it stays a fixed visual size
+    // while the rest of the panel zooms. The CSS rule on .board-container
+    // multiplies its existing --board-scale (auto-fit driven by the
+    // ResizeObserver) by --panel-scale-board^-1 so the parent userPanel
+    // transform cancels out for the board only. Setting the var here
+    // (not the inverse) so a single source of truth lives at the panel
+    // level; CSS does the math.
+    userPanel.style.setProperty('--panel-scale-board', String(panelScale));
+    state.panelScale = panelScale;
+    // Update zoom UI if it exists (called before zoom controls are wired)
+    const lbl = document.getElementById('cv-zoom-label');
+    const sld = document.getElementById('cv-zoom-slider') as HTMLInputElement | null;
+    const pct = Math.round(panelScale * 100);
+    if (lbl) lbl.textContent = `${pct}%`;
+    if (sld) sld.value = String(pct);
+  }
+  applyScale();
+
+  if (userPanel) {
+    userPanel.addEventListener('wheel', (e: WheelEvent) => {
+      if (!e.metaKey && !e.ctrlKey) return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.05 : 0.05;
+      panelScale = Math.min(4, Math.max(0.5, panelScale + delta));
+      applyScale();
+      savePrefs({ panelScale });
+    }, { passive: false });
   }
 
   // ── Fit the fixed-200px virtual board to whatever size its leaf gets ──
@@ -590,6 +625,29 @@ function initOverlay(): void {
   setupResizeGrip('cv-resize-grip-bl', true, false);
   setupResizeGrip('cv-resize-grip-tr', false, true);
   setupResizeGrip('cv-resize-grip-tl', true, true);
+
+  // ── Zoom controls ──
+  function setZoom(scale: number): void {
+    panelScale = Math.min(4, Math.max(0.5, scale));
+    applyScale(); savePrefs({ panelScale });
+  }
+
+  document.getElementById('cv-zoom-in')?.addEventListener('click', () => setZoom(panelScale + 0.1));
+  document.getElementById('cv-zoom-out')?.addEventListener('click', () => setZoom(panelScale - 0.1));
+
+  // Settings → Zoom slider. Reads panelScale * 100 (Settings view shows
+  // percent), feeds back through setZoom which updates the slider/label
+  // via applyScale's UI-sync pass. Range matches the slider's min/max
+  // (50%–200%) — narrower than the 50%–400% that Cmd/scroll allows so
+  // the slider's track stays usable; users who want extreme zoom keep
+  // the hotkey path.
+  const zoomSlider = document.getElementById('cv-zoom-slider') as HTMLInputElement | null;
+  if (zoomSlider) {
+    zoomSlider.addEventListener('input', () => {
+      const pct = parseInt(zoomSlider.value, 10);
+      setZoom(pct / 100);
+    });
+  }
 
   // The on-screen overlay canvas is always shown; the Move-hints toggle is
   // applied inside renderVideoOverlay (canvas-renderer.ts) so the eval bar
@@ -918,7 +976,7 @@ function initOverlay(): void {
 
         const size = 200;
         const dpr = window.devicePixelRatio || 1;
-        const effectiveDpr = dpr * (state.boardScale || 1);
+        const effectiveDpr = dpr * (state.panelScale || 1) * (state.boardScale || 1);
         const bufferSize = Math.ceil(size * effectiveDpr);
         if (state.canvas.width !== bufferSize || state.canvas.height !== bufferSize) {
           state.canvas.width = bufferSize;

@@ -95,24 +95,14 @@ function setRecBadge(on: boolean): void {
   }
 }
 
-async function startCapture(tabId: number, streamId: string, sourceKind: 'tab' | 'desktop' = 'tab'): Promise<void> {
-  note(`startCapture: ensureOffscreen begin sourceKind=${sourceKind}`);
+async function startCapture(tabId: number, streamId: string): Promise<void> {
   await ensureOffscreen();
-  note(`startCapture: ensureOffscreen done`);
-  // Viewport pinning only makes sense for tab capture — for desktop /
-  // window / screen captures the user picked an arbitrary surface and
-  // we have no way to know its target dimensions. Skip the readTabViewport
-  // call for desktop sources so getUserMedia uses Chrome's defaults.
-  const viewport = sourceKind === 'tab' ? await readTabViewport(tabId) : null;
+  const viewport = await readTabViewport(tabId);
   if (viewport) note(`viewport tab=${tabId} ${viewport.width}x${viewport.height}`);
-  const msg: ExtensionMessage = {
-    type: 'capture-started', streamId, tabId,
-    viewport: viewport ?? undefined,
-    sourceKind,
-  };
-  note(`startCapture: forwarding capture-started to offscreen`);
+  // Forward to offscreen. tabId rides along because offscreen documents
+  // have no chrome.tabs access and need it to address the content script.
+  const msg: ExtensionMessage = { type: 'capture-started', streamId, tabId, viewport: viewport ?? undefined };
   await chrome.runtime.sendMessage(msg);
-  note(`startCapture: capture-started ack received`);
   await setCaptureState({ running: true, tabId });
   currentlyCapturing = true;
   setRecBadge(true);
@@ -138,38 +128,11 @@ async function stopCapture(): Promise<void> {
 
 chrome.runtime.onMessage.addListener((msg: ExtensionMessage, sender, sendResponse) => {
   if (msg.type === 'start-capture') {
-    note(`start-capture received sourceKind=${msg.sourceKind ?? 'tab'} tabId=${msg.tabId} streamId=${msg.streamId.slice(0, 12)}…`);
-    startCapture(msg.tabId, msg.streamId, msg.sourceKind ?? 'tab').then(
-      () => { note(`start-capture ok sourceKind=${msg.sourceKind ?? 'tab'}`); sendResponse({ ok: true }); },
-      (err) => { note(`start-capture FAILED sourceKind=${msg.sourceKind ?? 'tab'}: ${String(err)}`); sendResponse({ ok: false, error: String(err) }); },
+    startCapture(msg.tabId, msg.streamId).then(
+      () => sendResponse({ ok: true }),
+      (err) => sendResponse({ ok: false, error: String(err) }),
     );
     return true; // async response
-  }
-  if (msg.type === 'request-picker-capture') {
-    note(`request-picker-capture received tabId=${msg.tabId}`);
-    // chooseDesktopMedia from the SW context — streamId will be
-    // consumable in the offscreen document (cross-document streamIds
-    // work when the producer is the SW; they don't when the producer
-    // is another extension page like the side panel). Picker scoped to
-    // tabs since the chess use case is always a captured webpage; if
-    // the user cancels we get an empty streamId and bail without
-    // calling startCapture.
-    chrome.desktopCapture.chooseDesktopMedia(['tab'], (streamId) => {
-      const err = chrome.runtime.lastError?.message;
-      note(`chooseDesktopMedia callback streamId=${streamId ? streamId.slice(0, 12) + '…' : '(none)'} err=${err ?? '-'}`);
-      if (!streamId) {
-        sendResponse({ ok: false, error: err ?? 'user cancelled' });
-        return;
-      }
-      // sourceKind:'desktop' so offscreen skips viewport pinning (the
-      // user-picked tab may differ from the side panel's cachedTabId
-      // and pinning the wrong dimensions makes Chrome reject).
-      startCapture(msg.tabId, streamId, 'desktop').then(
-        () => { note(`request-picker-capture: startCapture ok`); sendResponse({ ok: true }); },
-        (e) => { note(`request-picker-capture: startCapture FAILED: ${String(e)}`); sendResponse({ ok: false, error: String(e) }); },
-      );
-    });
-    return true; // async response — keep the message channel open until the picker callback fires
   }
   if (msg.type === 'stop-capture') {
     stopCapture().then(() => sendResponse({ ok: true }));

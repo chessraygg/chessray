@@ -21,35 +21,16 @@ export type ExtensionSetting =
 export type ExtensionMessage =
   /** Popup → SW. The popup runs `chrome.tabCapture.getMediaStreamId` inside
    *  its click handler so the user-gesture activeTab grant comes from the
-   *  real popup invocation; the SW just opens offscreen and forwards.
-   *  sourceKind tells offscreen how to feed the streamId into getUserMedia:
-   *    - 'tab': chromeMediaSource:'tab' (tabCapture path; needs activeTab)
-   *    - 'desktop': chromeMediaSource:'desktop' (chooseDesktopMedia path;
-   *      works without activeTab, picker shown to user). Defaults to
-   *      'tab' on the toolbar-icon path so older calls without the field
-   *      stay correct. */
-  | { type: 'start-capture'; tabId: number; streamId: string; sourceKind?: 'tab' | 'desktop' }
+   *  real popup invocation; the SW just opens offscreen and forwards. */
+  | { type: 'start-capture'; tabId: number; streamId: string }
   | { type: 'stop-capture' }
-  /** Side panel → SW. The side panel's "Start capture" button uses this
-   *  when tabCapture.getMediaStreamId rejects (no activeTab grant — the
-   *  user opened the side panel via right-click rather than the toolbar
-   *  icon). The SW invokes chrome.desktopCapture.chooseDesktopMedia
-   *  itself and pipes the resulting streamId into the regular capture
-   *  flow. Why SW-initiated rather than side-panel-initiated:
-   *  chooseDesktopMedia streamIds are tied to the calling document, and
-   *  cross-document consumption (side panel → offscreen) silently fails
-   *  with the misleading "AbortError: Error starting tab capture" we
-   *  spent commits chasing. Chrome's own MV3 screen-recording sample
-   *  calls chooseDesktopMedia from the SW for the same reason. */
-  | { type: 'request-picker-capture'; tabId: number }
   /** SW → offscreen. `viewport` is the target tab's content area in
    *  *physical pixels* (CSS px × devicePixelRatio) at capture-start time.
    *  Offscreen pins getUserMedia min=max to these values so Chrome
    *  doesn't downscale-with-letterboxing — the captured frame then maps
    *  cleanly to the viewport. Optional because some entry points (the
-   *  test harness) don't measure it. sourceKind decides chromeMediaSource;
-   *  see the start-capture variant above for semantics. */
-  | { type: 'capture-started'; streamId: string; tabId: number; viewport?: { width: number; height: number }; sourceKind?: 'tab' | 'desktop' }
+   *  test harness) don't measure it. */
+  | { type: 'capture-started'; streamId: string; tabId: number; viewport?: { width: number; height: number } }
   /** Test-only: SW grabs a single frame via chrome.tabs.captureVisibleTab
    *  (works without activeTab thanks to <all_urls> host_permissions) and
    *  hands the dataURL to offscreen. Used by scripts/local/test-extension
