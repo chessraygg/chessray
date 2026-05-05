@@ -110,6 +110,11 @@ const api: ChessRayAPI = {
   // same overlay window's DOM and share state, so no broadcast needed.
   broadcastPvAction: () => { /* same-document host: state sync is direct */ },
   onPvAction: () => { /* same-document host: state sync is direct */ },
+
+  // Side-panel CTA wired into the extension uses chrome.tabCapture; Electron
+  // has no source-picker bridge yet so the in-board "Start capture" button is
+  // a no-op here. Lands properly when the desktopCapture flow is plumbed.
+  requestStartCapture: () => { /* TODO: wire to source picker */ },
 };
 
 contextBridge.exposeInMainWorld('chessRay', api);
