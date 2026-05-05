@@ -7,6 +7,12 @@
  * be relayed to the captured tab's content script.
  */
 
+// Sanity log at module import time — fires before any other side-panel
+// code runs. If this doesn't appear in the side-panel DevTools console,
+// the user is inspecting the wrong target (e.g. the SW or offscreen
+// inspector instead of the side panel itself).
+console.log('[chessray side-panel] module loaded at', new Date().toISOString());
+
 import { mountOverlay, createDefaultBridge, DEFAULT_PREFS, type ChessRayAPI, type DisplayInfo } from '@chessray/overlay-ui';
 import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
 // Popup owns its document, so it can safely load panel.css's global
