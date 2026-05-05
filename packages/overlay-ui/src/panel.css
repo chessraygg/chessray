@@ -1548,25 +1548,19 @@ canvas#video-overlay {
   margin-left: 8px;
   letter-spacing: 0;
 }
-/* Compensate for the metrics mismatch between Charter/Georgia (the .r2-san
-   font, which lacks chess glyphs) and the system symbol-font fallback that
-   actually paints U+265A–U+265E. The fallback's chess glyph body sits low
-   on the em-box (anchored near baseline, with empty space above), so even
-   after sizing it up the glyph looks "dropped" relative to letters whose
-   optical center sits on x-height. translateY pushes it up by a fixed
-   pixel amount that's stable across font-size changes (unlike em-based
-   vertical-align, which scales with the bumped font-size and overcorrects). */
-.r2-moves .move-line .r2-san .r2-piece {
-  font-size: 1.4em;
-  line-height: 1;
-  letter-spacing: 0;
-  display: inline-block;
-  transform: translateY(-1px);
+/* Inline SVG figurine pieces emitted by sanToUnicode (debug-panel.ts). The
+   SVGs have a fixed 45×45 viewBox with the piece body roughly filling
+   y=6..39 (≈73% of viewBox height), so on-screen height is deterministic
+   and we can target cap-height alignment without per-OS guesswork. */
+.r2-moves .move-line .r2-san svg.r2-piece {
+  width: 1.3em;
+  height: 1.3em;
+  vertical-align: -0.35em;
 }
-.r2-moves .move-line .r2-san em .r2-piece {
-  font-size: 1.5em;
-  display: inline-block;
-  transform: translateY(-0.5px);
+.r2-moves .move-line .r2-san em svg.r2-piece {
+  width: 1.4em;
+  height: 1.4em;
+  vertical-align: -0.4em;
 }
 .r2-moves .move-line .r2-score {
   font: 12px var(--mono);

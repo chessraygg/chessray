@@ -142,23 +142,32 @@ export function renderBoardGrid(
   grid.innerHTML = html;
 }
 
-/** Replace the leading piece letter in a SAN move with the corresponding
- *  filled black Unicode chess glyph. Pawn moves (no leading piece letter),
- *  castling (O-O / O-O-O), and the trailing promotion suffix (=Q, =R …)
- *  are passed through unchanged. The black-filled set reads better than
- *  the outline-white set at the panel's small font sizes.
+/** Inline SVG figurine glyphs for SAN move list. Replaces the leading piece
+ *  letter (K/Q/R/B/N) and the promotion suffix (=Q etc.) with a chess piece
+ *  silhouette. Pawn moves and castling pass through unchanged.
  *
- *  Why: Charter/Georgia (the .r2-san font) lack U+265A–U+265E, so the
- *  browser pulls those glyphs from a system symbol font whose metrics
- *  don't match — the painted body comes out visibly shorter than the
- *  adjacent letters. Wrapping each glyph in `.r2-piece` lets CSS
- *  rescale just the piece without touching surrounding text. */
+ *  Source: cburnett piece set by Colin M.L. Burnett (CC-BY-SA 3.0), as
+ *  shipped by Lichess at lichess-org/lila/public/piece/cburnett/. The
+ *  black variants (bK/bQ/bR/bB/bN) are used for both colors — figurine
+ *  notation is always rendered in a single color regardless of side to
+ *  move, since the SAN itself disambiguates whose move it is.
+ *
+ *  Stripped from the source: every path with stroke="#ececec" or
+ *  fill="#ececec" — those are decorative highlight lines designed for
+ *  ~80px on-board rendering, and they turn into mud at SAN sizes
+ *  (~14-20px tall). What's left is a clean silhouette.
+ *
+ *  Color: every fill="#000" / stroke="#000" was rewritten to currentColor
+ *  so the SVG inherits its parent's CSS color. That's how the dim
+ *  continuation (parent .r2-san em is var(--text-faint)) and the bright
+ *  primary (.r2-san is var(--text)) both work without per-state SVG
+ *  rules — the existing color cascade just flows through. */
 const SAN_PIECE_GLYPHS: Record<string, string> = {
-  K: '<span class="r2-piece">\u265A</span>',
-  Q: '<span class="r2-piece">\u265B</span>',
-  R: '<span class="r2-piece">\u265C</span>',
-  B: '<span class="r2-piece">\u265D</span>',
-  N: '<span class="r2-piece">\u265E</span>',
+  K: '<svg class="r2-piece" viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path stroke-linejoin="miter" d="M22.5 11.6V6"/><path fill="currentColor" stroke-linecap="butt" stroke-linejoin="miter" d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5"/><path fill="currentColor" d="M11.5 37a22.3 22.3 0 0 0 21 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-3.5-7.5-13-10.5-16-4-3 6 5 10 5 10z"/><path stroke-linejoin="miter" d="M20 8h5"/></g></svg>',
+  Q: '<svg class="r2-piece" viewBox="0 0 45 45"><g fill="currentColor" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><g stroke="none"><circle cx="6" cy="12" r="2.75"/><circle cx="14" cy="9" r="2.75"/><circle cx="22.5" cy="8" r="2.75"/><circle cx="31" cy="9" r="2.75"/><circle cx="39" cy="12" r="2.75"/></g><path stroke-linecap="butt" d="M9 26c8.5-1.5 21-1.5 27 0l2.5-12.5L31 25l-.3-14.1-5.2 13.6-3-14.5-3 14.5-5.2-13.6L14 25 6.5 13.5z"/><path stroke-linecap="butt" d="M9 26c0 2 1.5 2 2.5 4 1 1.5 1 1 .5 3.5-1.5 1-1.5 2.5-1.5 2.5-1.5 1.5.5 2.5.5 2.5 6.5 1 16.5 1 23 0 0 0 1.5-1 0-2.5 0 0 .5-1.5-1-2.5-.5-2.5-.5-2 .5-3.5 1-2 2.5-2 2.5-4-8.5-1.5-18.5-1.5-27 0z"/><path fill="none" stroke-linecap="butt" d="M11 38.5a35 35 1 0 0 23 0"/></g></svg>',
+  R: '<svg class="r2-piece" viewBox="0 0 45 45"><g fill="currentColor" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path stroke-linecap="butt" d="M9 39h27v-3H9zm3.5-7 1.5-2.5h17l1.5 2.5zm-.5 4v-4h21v4z"/><path stroke-linecap="butt" stroke-linejoin="miter" d="M14 29.5v-13h17v13z"/><path stroke-linecap="butt" d="M14 16.5 11 14h23l-3 2.5zM11 14V9h4v2h5V9h5v2h5V9h4v5z"/></g></svg>',
+  B: '<svg class="r2-piece" viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><g fill="currentColor" stroke-linecap="butt"><path d="M9 36c3.4-1 10.1.4 13.5-2 3.4 2.4 10.1 1 13.5 2 0 0 1.6.5 3 2-.7 1-1.6 1-3 .5-3.4-1-10.1.5-13.5-1-3.4 1.5-10.1 0-13.5 1-1.4.5-2.3.5-3-.5 1.4-2 3-2 3-2z"/><path d="M15 32c2.5 2.5 12.5 2.5 15 0 .5-1.5 0-2 0-2 0-2.5-2.5-4-2.5-4 5.5-1.5 6-11.5-5-15.5-11 4-10.5 14-5 15.5 0 0-2.5 1.5-2.5 4 0 0-.5.5 0 2z"/><path d="M25 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0z"/></g></g></svg>',
+  N: '<svg class="r2-piece" viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path fill="currentColor" d="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21"/><path fill="currentColor" d="M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.04-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-1-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-2 2.5-3c1 0 1 3 1 3"/></g></svg>',
 };
 function sanToUnicode(san: string): string {
   if (!san) return san;
