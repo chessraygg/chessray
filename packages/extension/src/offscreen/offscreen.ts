@@ -154,51 +154,71 @@ async function startLoop(streamId: string, tabId: number, viewport?: { width: nu
   stopLoop();
   activeTabId = tabId;
 
-  // Pin min=max to the tab's content area in physical pixels. Without this
-  // Chrome applies a default size cap and produces a letterboxed frame
-  // whose aspect ratio doesn't match the viewport — the bbox→CSS mapping
-  // then carries a ~10-50 px error per axis. With min=max the captured
-  // frame is the viewport scaled by DPR exactly, so frame coords ÷ DPR =
-  // CSS coords. Trade-off: window resize after start invalidates this and
-  // alignment drifts until the user restarts capture (acceptable per spec).
-  // chromeMediaSource: 'tab' for tabCapture streamIds, 'desktop' for
-  // chooseDesktopMedia streamIds (the side panel's right-click-open
-  // fallback path). The two source kinds are not interchangeable —
-  // passing a desktop streamId with chromeMediaSource:'tab' rejects
-  // with NotReadableError.
-  const mandatory: Record<string, unknown> = {
-    chromeMediaSource: sourceKind === 'desktop' ? 'desktop' : 'tab',
-    chromeMediaSourceId: streamId,
-  };
-  if (viewport && viewport.width > 0 && viewport.height > 0) {
-    mandatory.minWidth = viewport.width;
-    mandatory.maxWidth = viewport.width;
-    mandatory.minHeight = viewport.height;
-    mandatory.maxHeight = viewport.height;
-    debugLog(`getUserMedia pinned to ${viewport.width}x${viewport.height}`);
+  // chromeMediaSource semantics turn out to be more nuanced than the
+  // sourceKind parameter suggests. tabCapture.getMediaStreamId always
+  // produces a streamId consumed with 'tab'. desktopCapture.chooseDesktopMedia
+  // produces a streamId whose required chromeMediaSource depends on what
+  // the user PICKED in the picker: tab → 'tab', screen/window → 'desktop'.
+  // The callback gives us the streamId but doesn't tell us which kind the
+  // user picked, so we have to try one and fall back. For sourceKind:
+  //   'tab'    : always 'tab' (tabCapture path, single attempt).
+  //   'desktop': 'desktop' first (works for screen/window — the more
+  //              common picker selections), 'tab' on AbortError (the
+  //              "Error starting tab capture" Chrome surfaces when it
+  //              recognizes the streamId as a tab source).
+  // The constraint-builder also drops viewport pinning for desktop sources
+  // — for an arbitrary screen/window surface we don't know the target
+  // dimensions, and pinning to a wrong size makes Chrome reject.
+  function buildMandatory(source: 'tab' | 'desktop'): Record<string, unknown> {
+    const m: Record<string, unknown> = {
+      chromeMediaSource: source,
+      chromeMediaSourceId: streamId,
+    };
+    if (source === 'tab' && viewport && viewport.width > 0 && viewport.height > 0) {
+      m.minWidth = viewport.width;
+      m.maxWidth = viewport.width;
+      m.minHeight = viewport.height;
+      m.maxHeight = viewport.height;
+    }
+    return m;
+  }
+  async function tryGetUserMedia(source: 'tab' | 'desktop'): Promise<MediaStream> {
+    return navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        // @ts-expect-error Chrome-specific mandatory constraints for tab/desktop capture
+        mandatory: buildMandatory(source),
+      },
+    });
   }
   // Consume the streamId IMMEDIATELY before any other awaits.
   // chooseDesktopMedia streamIds expire "after a few seconds when not
   // used" (per Chrome docs), and initEngine + initRecognizer can run
   // longer than that on first capture (Stockfish WASM + ONNX session).
-  // With the previous order (init → getUserMedia) the desktop path
-  // silently failed because the streamId was already invalid by the
-  // time getUserMedia ran, but the picker had already closed so the
-  // user just saw "nothing happens". Init in parallel — the loop below
-  // doesn't run until both promises resolve. tabCapture streamIds don't
-  // have the same expiry, so this reordering is harmless for that path.
+  // Init runs in parallel below; the capture loop doesn't start until
+  // both promises resolve.
   let stream: MediaStream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        // @ts-expect-error Chrome-specific mandatory constraints for tab capture
-        mandatory,
-      },
-    });
-  } catch (err) {
-    debugLog(`getUserMedia FAILED (sourceKind=${sourceKind}): ${String(err)}`);
-    throw err;
+  if (sourceKind === 'tab') {
+    try {
+      stream = await tryGetUserMedia('tab');
+    } catch (err) {
+      debugLog(`getUserMedia FAILED (tab path): ${String(err)}`);
+      throw err;
+    }
+  } else {
+    // desktop path — try 'desktop' first, then 'tab' if Chrome says the
+    // streamId is actually a tab source.
+    try {
+      stream = await tryGetUserMedia('desktop');
+    } catch (err1) {
+      debugLog(`getUserMedia 'desktop' attempt failed: ${String(err1)}; retrying as 'tab'`);
+      try {
+        stream = await tryGetUserMedia('tab');
+      } catch (err2) {
+        debugLog(`getUserMedia 'tab' fallback also FAILED: ${String(err2)}`);
+        throw err2;
+      }
+    }
   }
   await Promise.all([initEngine(), initRecognizer()]);
   mediaStream = stream;
