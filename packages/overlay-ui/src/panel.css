@@ -1259,18 +1259,27 @@ canvas#video-overlay {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
+/* Board + eval bar both fill the panel content width. The ResizeObserver
+   in mount-overlay.ts reads .board-fit's contentRect and rewrites
+   --board-scale so the fixed-200px .board-container scales to fit; the
+   eval bar uses aspect-ratio for a Lichess-style 30:1 sliver that grows
+   in both axes with the panel. Matches across Electron + extension —
+   side-panel.css used to override this for the extension only because
+   panel.css previously pinned the board to 168×168 for the Electron
+   floating panel; the panel-width-driven layout works in both hosts now. */
 .r2-board-block .board-fit {
   flex: 0 0 auto;
-  width: 168px;
-  height: 168px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .r2-board-block .eval-bar {
   width: 100%;
-  max-width: 240px;
-  height: 12px;
+  height: auto;
+  aspect-ratio: 30 / 1;
 }
 
 /* Header */
