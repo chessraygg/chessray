@@ -1550,23 +1550,23 @@ canvas#video-overlay {
 }
 /* Compensate for the metrics mismatch between Charter/Georgia (the .r2-san
    font, which lacks chess glyphs) and the system symbol-font fallback that
-   actually paints U+265A–U+265E. The fallback's chess glyph body is shorter
-   than Charter's cap-height, so the piece looks small next to "f3" / "xe5".
-   Bump just the glyph and nudge it down so the optical center lines up. */
+   actually paints U+265A–U+265E. The fallback's chess glyph body sits low
+   on the em-box (anchored near baseline, with empty space above), so even
+   after sizing it up the glyph looks "dropped" relative to letters whose
+   optical center sits on x-height. translateY pushes it up by a fixed
+   pixel amount that's stable across font-size changes (unlike em-based
+   vertical-align, which scales with the bumped font-size and overcorrects). */
 .r2-moves .move-line .r2-san .r2-piece {
-  /* The symbol-font fallback paints the chess glyph at roughly em-square,
-     so its visible body is only ~70% of Charter's 14px cap-height. Bumping
-     to 1.4em gives the body about the same on-screen height as 'c4' / 'd1+'. */
   font-size: 1.4em;
   line-height: 1;
-  vertical-align: -0.08em;
   letter-spacing: 0;
+  display: inline-block;
+  transform: translateY(-2px);
 }
 .r2-moves .move-line .r2-san em .r2-piece {
-  /* Continuation parent is 10px mono — same metrics gap, so the relative
-     bump needs to be a bit larger to match the denser mono letters. */
   font-size: 1.5em;
-  vertical-align: -0.1em;
+  display: inline-block;
+  transform: translateY(-1.5px);
 }
 .r2-moves .move-line .r2-score {
   font: 12px var(--mono);
