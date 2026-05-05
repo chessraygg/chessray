@@ -68,10 +68,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // ── Frame-result + display-info plumbing ───────────────────────────────
 const frameResultListeners: Array<(r: unknown) => void> = [];
 const displayInfoListeners: Array<(info: DisplayInfo) => void> = [];
+const stopTrackingListeners: Array<() => void> = [];
 
 chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
   if (msg.type === 'frame-result') {
     for (const cb of frameResultListeners) cb(msg.result);
+  }
+  if (msg.type === 'capture-stopped') {
+    for (const cb of stopTrackingListeners) cb();
   }
 });
 
@@ -85,6 +89,8 @@ const bridge: ChessRayAPI = createDefaultBridge({
   sendDebugLog: (msg: string) => { console.log('[chessray]', msg); },
 
   onFrameResult: (cb) => { frameResultListeners.push(cb); },
+
+  onStopTracking: (cb) => { stopTrackingListeners.push(cb); },
 
   onDisplayInfo: (cb) => {
     displayInfoListeners.push(cb);
