@@ -145,6 +145,32 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, sender, sendRespons
     );
     return true; // async response
   }
+  if (msg.type === 'request-picker-capture') {
+    note(`request-picker-capture received tabId=${msg.tabId}`);
+    // chooseDesktopMedia from the SW context — streamId will be
+    // consumable in the offscreen document (cross-document streamIds
+    // work when the producer is the SW; they don't when the producer
+    // is another extension page like the side panel). Picker scoped to
+    // tabs since the chess use case is always a captured webpage; if
+    // the user cancels we get an empty streamId and bail without
+    // calling startCapture.
+    chrome.desktopCapture.chooseDesktopMedia(['tab'], (streamId) => {
+      const err = chrome.runtime.lastError?.message;
+      note(`chooseDesktopMedia callback streamId=${streamId ? streamId.slice(0, 12) + '…' : '(none)'} err=${err ?? '-'}`);
+      if (!streamId) {
+        sendResponse({ ok: false, error: err ?? 'user cancelled' });
+        return;
+      }
+      // sourceKind:'desktop' so offscreen skips viewport pinning (the
+      // user-picked tab may differ from the side panel's cachedTabId
+      // and pinning the wrong dimensions makes Chrome reject).
+      startCapture(msg.tabId, streamId, 'desktop').then(
+        () => { note(`request-picker-capture: startCapture ok`); sendResponse({ ok: true }); },
+        (e) => { note(`request-picker-capture: startCapture FAILED: ${String(e)}`); sendResponse({ ok: false, error: String(e) }); },
+      );
+    });
+    return true; // async response — keep the message channel open until the picker callback fires
+  }
   if (msg.type === 'stop-capture') {
     stopCapture().then(() => sendResponse({ ok: true }));
     return true;

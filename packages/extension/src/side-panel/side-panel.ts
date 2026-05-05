@@ -129,35 +129,19 @@ const bridge: ChessRayAPI = createDefaultBridge({
         } satisfies ExtensionMessage);
         return;
       }
-      // Fallback — no activeTab grant. Show the system picker scoped to
-      // tabs only so the streamId Chrome returns is unambiguously a tab
-      // streamId, consumed in offscreen with chromeMediaSource:'tab'.
-      // We can't try 'desktop' first and fall back to 'tab' because
-      // chooseDesktopMedia streamIds are single-use — the first
-      // getUserMedia call consumes them whether it succeeds or fails.
-      // Restricting the picker is the only way to guarantee the right
-      // source kind on the first attempt.
-      //
-      // sourceKind:'desktop' here is a path discriminator (NOT a
-      // chromeMediaSource hint) — the user might have picked a tab
-      // different from cachedTabId, so the SW must skip readTabViewport
-      // and offscreen must skip viewport pinning. Offscreen still
-      // consumes the streamId with chromeMediaSource:'tab' because the
-      // picker was restricted to tabs.
-      chrome.desktopCapture.chooseDesktopMedia(['tab'], (desktopStreamId) => {
-        const dcErr = chrome.runtime.lastError?.message;
-        console.log('[chessray side-panel] chooseDesktopMedia result streamId=', desktopStreamId ? `${desktopStreamId.slice(0, 12)}…` : '(none)', 'err=', dcErr);
-        if (!desktopStreamId) {
-          // User cancelled the picker — valid choice, no error.
-          return;
-        }
-        chrome.runtime.sendMessage({
-          type: 'start-capture', tabId, streamId: desktopStreamId, sourceKind: 'desktop',
-        } satisfies ExtensionMessage).then(
-          (resp) => console.log('[chessray side-panel] start-capture response', resp),
-          (err) => console.error('[chessray side-panel] start-capture sendMessage failed', err),
-        );
-      });
+      // Fallback — no activeTab grant. Delegate to the SW: it invokes
+      // chrome.desktopCapture.chooseDesktopMedia in its own context and
+      // pipes the streamId into the regular start-capture flow. Doing
+      // it here in the side panel produces a streamId that can't be
+      // consumed by the offscreen document (the streamId is tied to the
+      // calling document; cross-document consumption silently fails with
+      // a misleading 'Error starting tab capture' AbortError we kept
+      // hitting). Chrome's own MV3 screen-recording sample calls
+      // chooseDesktopMedia from the SW for the same reason.
+      chrome.runtime.sendMessage({ type: 'request-picker-capture', tabId } satisfies ExtensionMessage).then(
+        (resp) => console.log('[chessray side-panel] request-picker-capture response', resp),
+        (err) => console.error('[chessray side-panel] request-picker-capture sendMessage failed', err),
+      );
     });
   },
 

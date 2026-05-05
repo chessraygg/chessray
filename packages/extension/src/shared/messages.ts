@@ -30,6 +30,18 @@ export type ExtensionMessage =
    *      stay correct. */
   | { type: 'start-capture'; tabId: number; streamId: string; sourceKind?: 'tab' | 'desktop' }
   | { type: 'stop-capture' }
+  /** Side panel → SW. The side panel's "Start capture" button uses this
+   *  when tabCapture.getMediaStreamId rejects (no activeTab grant — the
+   *  user opened the side panel via right-click rather than the toolbar
+   *  icon). The SW invokes chrome.desktopCapture.chooseDesktopMedia
+   *  itself and pipes the resulting streamId into the regular capture
+   *  flow. Why SW-initiated rather than side-panel-initiated:
+   *  chooseDesktopMedia streamIds are tied to the calling document, and
+   *  cross-document consumption (side panel → offscreen) silently fails
+   *  with the misleading "AbortError: Error starting tab capture" we
+   *  spent commits chasing. Chrome's own MV3 screen-recording sample
+   *  calls chooseDesktopMedia from the SW for the same reason. */
+  | { type: 'request-picker-capture'; tabId: number }
   /** SW → offscreen. `viewport` is the target tab's content area in
    *  *physical pixels* (CSS px × devicePixelRatio) at capture-start time.
    *  Offscreen pins getUserMedia min=max to these values so Chrome
