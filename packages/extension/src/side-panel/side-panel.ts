@@ -23,17 +23,31 @@ import './side-panel.css';
 // → any so the relay works even when the popup is opened in odd ways
 // (test harness paths, side-panel re-open after capture stopped).
 let cachedTabId: number | null = null;
+/** True iff cachedTabId came from the SW's lastInvokedTabId (i.e. the
+ *  user clicked the toolbar icon at least once for this tab — Chrome
+ *  granted activeTab and tabCapture.getMediaStreamId will succeed).
+ *  False when we fell back to chrome.tabs.query because the SW had no
+ *  invocation record — that path produces a tabId, but tabCapture will
+ *  reject with "Extension has not been invoked". The Start-capture
+ *  button uses this to render a clearer hint to the user. */
+let tabWasInvoked = false;
 async function preloadTabId(): Promise<void> {
   const params = new URLSearchParams(location.search);
   const override = params.get('tabId');
   if (override) {
     cachedTabId = Number(override);
+    // Treat ?tabId=N as test-harness instrumentation; assume the harness
+    // already arranged for the tab to be invokable.
+    tabWasInvoked = true;
+    syncStartCaptureLabel();
     return;
   }
   try {
     const resp = await chrome.runtime.sendMessage({ type: 'get-target-tab' } satisfies ExtensionMessage);
     if (resp?.tabId != null) {
       cachedTabId = resp.tabId;
+      tabWasInvoked = true;
+      syncStartCaptureLabel();
       return;
     }
   } catch { /* SW unreachable; fall through */ }
@@ -50,10 +64,32 @@ async function preloadTabId(): Promise<void> {
     const t = tabs.find(isContent);
     if (t) {
       cachedTabId = t.id ?? null;
+      // Fell through from get-target-tab — no toolbar invocation, so
+      // tabCapture won't grant. Surface the "click the icon" hint.
+      tabWasInvoked = false;
+      syncStartCaptureLabel();
       return;
     }
   }
   cachedTabId = null;
+  tabWasInvoked = false;
+  syncStartCaptureLabel();
+}
+/** Update the in-panel Start-capture button to reflect whether the tab
+ *  has been invoked. The button is owned by mount-overlay (panel-template
+ *  emits it, mount-overlay attaches the click handler), but the label
+ *  text is host-specific — only the extension's right-click-open path
+ *  needs the "click the icon" wording — so we toggle it from here.
+ *
+ *  preloadTabId fires before mountOverlay (the latter runs synchronously
+ *  at module load; this runs after the SW response). The button is
+ *  guaranteed to exist by the time we resolve, so a single getElementById
+ *  is enough — no DOM polling needed. */
+function syncStartCaptureLabel(): void {
+  const btn = document.getElementById('cv-start-capture-btn');
+  const span = btn?.querySelector('span');
+  if (!span) return;
+  span.textContent = tabWasInvoked ? 'Start capture' : 'Click the toolbar icon to start';
 }
 void preloadTabId();
 
@@ -172,6 +208,14 @@ const bridge: ChessRayAPI = createDefaultBridge({
 });
 
 mountOverlay(bridge);
+// Ensure the Start-capture button label reflects the current tabWasInvoked
+// state. preloadTabId fires before mountOverlay; if it took the override
+// path (synchronous, no await), syncStartCaptureLabel ran before the
+// button existed and was a no-op. Calling it again after mountOverlay
+// covers that case. The async paths in preloadTabId resolve later and
+// also call syncStartCaptureLabel — by then the button exists, so they
+// update normally. This call is the one-shot belt-and-suspenders.
+syncStartCaptureLabel();
 
 // ── Engine info in Diagnostics ────────────────────────────────────────
 // Inject a small "Engine" line at the top of the diagnostics view
