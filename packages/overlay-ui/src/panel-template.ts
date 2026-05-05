@@ -72,7 +72,7 @@ export const PANEL_HTML = `\
           <span class="r2-status-dot turn-dot"></span><span class="r2-status-text">—</span>
         </span>
         <span class="r2-status-cell r2-status-orient" id="cv-status-orient" data-tip="Detected board orientation. Click to override; click again to return to auto-detection." data-tip-pos="below">
-          <span class="r2-status-text">—</span><span class="r2-status-suffix">auto</span>
+          <span class="r2-status-text">—</span>
         </span>
         <span class="r2-status-cell" id="cv-status-depth" data-tip="Engine search depth completed for the current position." data-tip-pos="below">
           <span class="r2-status-text">Depth —</span>

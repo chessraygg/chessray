@@ -1487,19 +1487,6 @@ canvas#video-overlay {
   color: var(--text);
 }
 .r2-status-orient.manual { color: var(--accent); }
-.r2-status-suffix {
-  font-size: 8.5px;
-  font-weight: 500;
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.r2-status-orient .r2-status-suffix::before {
-  content: '· ';
-  color: var(--text-faint);
-}
-.r2-status-orient.manual .r2-status-suffix { color: var(--accent); }
-.r2-status-orient.manual .r2-status-suffix::before { color: var(--accent); }
 .r2-status-dot {
   flex: 0 0 auto;
 }

@@ -31,9 +31,7 @@ export function clearDebugPanel(
   if (statusTurnDot) statusTurnDot.className = 'r2-status-dot turn-dot';
   if (statusTurnText) statusTurnText.textContent = '—';
   const statusOrientText = document.querySelector('#cv-status-orient .r2-status-text') as HTMLElement | null;
-  const statusOrientSuffix = document.querySelector('#cv-status-orient .r2-status-suffix') as HTMLElement | null;
   if (statusOrientText) statusOrientText.textContent = '—';
-  if (statusOrientSuffix) statusOrientSuffix.textContent = 'auto';
   document.getElementById('cv-status-orient')?.classList.remove('manual');
   const statusDepthText = document.querySelector('#cv-status-depth .r2-status-text') as HTMLElement | null;
   if (statusDepthText) statusDepthText.textContent = 'Depth —';
@@ -289,11 +287,8 @@ export function updateDebugPanel(
   const statusOrient = document.getElementById('cv-status-orient');
   if (statusOrient) {
     const txt = statusOrient.querySelector('.r2-status-text') as HTMLElement | null;
-    const suf = statusOrient.querySelector('.r2-status-suffix') as HTMLElement | null;
     if (txt) txt.textContent = result.flipped ? 'White at top' : 'White at bottom';
-    const isManual = result.orientation_source === 'manual';
-    statusOrient.classList.toggle('manual', isManual);
-    if (suf) suf.textContent = isManual ? 'manual' : 'auto';
+    statusOrient.classList.toggle('manual', result.orientation_source === 'manual');
   }
   const statusDepth = document.getElementById('cv-status-depth');
   if (statusDepth) {
