@@ -31,6 +31,12 @@ export default defineManifest({
     'activeTab',
     'sidePanel',
     'contextMenus',
+    // Fallback path when the side panel was opened without firing
+    // chrome.action.onClicked (e.g. user right-clicks the toolbar icon
+    // and picks "Open side panel"). tabCapture requires activeTab,
+    // which only that gesture grants; desktopCapture.chooseDesktopMedia
+    // works without it but pops a system picker.
+    'desktopCapture',
   ],
   commands: {
     'toggle-capture': {

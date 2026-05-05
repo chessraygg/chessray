@@ -92,28 +92,46 @@ const bridge: ChessRayAPI = createDefaultBridge({
 
   onStopTracking: (cb) => { stopTrackingListeners.push(cb); },
 
-  /** Click handler for the in-panel "Start capture" CTA. Mirrors the
-   *  toolbar-icon path (action.onClicked in service-worker.ts:295) but
-   *  initiated from the side panel: getMediaStreamId MUST run synchronously
-   *  in the click's user-gesture context — putting an `await` before it
-   *  consumes the gesture and Chrome refuses the request, exactly the same
-   *  failure mode the toolbar-icon code documents. We then send the
-   *  resulting streamId to the SW's start-capture handler, which already
-   *  knows how to spin up the offscreen recorder and pipe frame-results
-   *  back. cachedTabId is preloaded at popup load (preloadTabId, line 26)
-   *  so it's available without an awaited query. Errors throw — the user
-   *  pressed the button and deserves a loud failure rather than a silent
-   *  no-op (matches the project's no-fallback rule). */
+  /** Click handler for the in-panel "Start capture" CTA. Two-step flow:
+   *  first try chrome.tabCapture.getMediaStreamId (the fast, no-dialog
+   *  path that works only when activeTab was granted via toolbar click /
+   *  command / context-menu invocation); on failure fall back to
+   *  chrome.desktopCapture.chooseDesktopMedia which pops a system picker
+   *  for screens/windows/tabs and works regardless of how the side panel
+   *  was opened. The picker is the cost of the right-click-open path the
+   *  user wants supported.
+   *
+   *  getMediaStreamId MUST run synchronously inside the click handler
+   *  (no awaits before the call) — Chrome consumes the user gesture on
+   *  any await and the call rejects. chooseDesktopMedia doesn't have the
+   *  same gesture requirement, so we can call it from the failure
+   *  callback. cachedTabId is preloaded at popup load via preloadTabId
+   *  so it's available without an awaited query. */
   requestStartCapture: () => {
     if (cachedTabId == null) {
       throw new Error('chessray: requestStartCapture called before target tab id was resolved');
     }
     const tabId = cachedTabId;
-    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
-      if (chrome.runtime.lastError || !streamId) {
-        throw new Error(`chessray: tabCapture.getMediaStreamId failed: ${chrome.runtime.lastError?.message ?? 'no stream id'}`);
+    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (tabStreamId) => {
+      if (!chrome.runtime.lastError && tabStreamId) {
+        // Fast path — activeTab was granted, no picker needed.
+        chrome.runtime.sendMessage({
+          type: 'start-capture', tabId, streamId: tabStreamId, sourceKind: 'tab',
+        } satisfies ExtensionMessage);
+        return;
       }
-      chrome.runtime.sendMessage({ type: 'start-capture', tabId, streamId } satisfies ExtensionMessage);
+      // Fallback — no activeTab grant. Show the system picker so the
+      // user can choose what to capture. The result is consumable as a
+      // chromeMediaSource: 'desktop' streamId in the offscreen document.
+      chrome.desktopCapture.chooseDesktopMedia(['tab', 'window', 'screen'], (desktopStreamId) => {
+        if (!desktopStreamId) {
+          // User cancelled the picker — valid choice, no error.
+          return;
+        }
+        chrome.runtime.sendMessage({
+          type: 'start-capture', tabId, streamId: desktopStreamId, sourceKind: 'desktop',
+        } satisfies ExtensionMessage);
+      });
     });
   },
 

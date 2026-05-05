@@ -95,13 +95,19 @@ function setRecBadge(on: boolean): void {
   }
 }
 
-async function startCapture(tabId: number, streamId: string): Promise<void> {
+async function startCapture(tabId: number, streamId: string, sourceKind: 'tab' | 'desktop' = 'tab'): Promise<void> {
   await ensureOffscreen();
-  const viewport = await readTabViewport(tabId);
+  // Viewport pinning only makes sense for tab capture — for desktop /
+  // window / screen captures the user picked an arbitrary surface and
+  // we have no way to know its target dimensions. Skip the readTabViewport
+  // call for desktop sources so getUserMedia uses Chrome's defaults.
+  const viewport = sourceKind === 'tab' ? await readTabViewport(tabId) : null;
   if (viewport) note(`viewport tab=${tabId} ${viewport.width}x${viewport.height}`);
-  // Forward to offscreen. tabId rides along because offscreen documents
-  // have no chrome.tabs access and need it to address the content script.
-  const msg: ExtensionMessage = { type: 'capture-started', streamId, tabId, viewport: viewport ?? undefined };
+  const msg: ExtensionMessage = {
+    type: 'capture-started', streamId, tabId,
+    viewport: viewport ?? undefined,
+    sourceKind,
+  };
   await chrome.runtime.sendMessage(msg);
   await setCaptureState({ running: true, tabId });
   currentlyCapturing = true;
@@ -128,7 +134,7 @@ async function stopCapture(): Promise<void> {
 
 chrome.runtime.onMessage.addListener((msg: ExtensionMessage, sender, sendResponse) => {
   if (msg.type === 'start-capture') {
-    startCapture(msg.tabId, msg.streamId).then(
+    startCapture(msg.tabId, msg.streamId, msg.sourceKind ?? 'tab').then(
       () => sendResponse({ ok: true }),
       (err) => sendResponse({ ok: false, error: String(err) }),
     );

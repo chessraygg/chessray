@@ -146,7 +146,7 @@ const processor = new FrameProcessor({
   encodePreviewUrl,
 });
 
-async function startLoop(streamId: string, tabId: number, viewport?: { width: number; height: number }): Promise<void> {
+async function startLoop(streamId: string, tabId: number, viewport?: { width: number; height: number }, sourceKind: 'tab' | 'desktop' = 'tab'): Promise<void> {
   // Tear down any previous capture state — otherwise getUserMedia for the
   // new streamId can leak a second video track and the next stop won't
   // reach the original one.
@@ -161,8 +161,13 @@ async function startLoop(streamId: string, tabId: number, viewport?: { width: nu
   // frame is the viewport scaled by DPR exactly, so frame coords ÷ DPR =
   // CSS coords. Trade-off: window resize after start invalidates this and
   // alignment drifts until the user restarts capture (acceptable per spec).
+  // chromeMediaSource: 'tab' for tabCapture streamIds, 'desktop' for
+  // chooseDesktopMedia streamIds (the side panel's right-click-open
+  // fallback path). The two source kinds are not interchangeable —
+  // passing a desktop streamId with chromeMediaSource:'tab' rejects
+  // with NotReadableError.
   const mandatory: Record<string, unknown> = {
-    chromeMediaSource: 'tab',
+    chromeMediaSource: sourceKind === 'desktop' ? 'desktop' : 'tab',
     chromeMediaSourceId: streamId,
   };
   if (viewport && viewport.width > 0 && viewport.height > 0) {
@@ -256,7 +261,7 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
   }
   if (msg.type === 'capture-started') {
     // tabId is supplied by the service worker (offscreen has no chrome.tabs).
-    startLoop(msg.streamId, msg.tabId, msg.viewport).then(
+    startLoop(msg.streamId, msg.tabId, msg.viewport, msg.sourceKind ?? 'tab').then(
       () => sendResponse({ ok: true }),
       (err) => sendResponse({ ok: false, error: String(err) }),
     );
