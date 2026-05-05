@@ -147,6 +147,7 @@ const processor = new FrameProcessor({
 });
 
 async function startLoop(streamId: string, tabId: number, viewport?: { width: number; height: number }, sourceKind: 'tab' | 'desktop' = 'tab'): Promise<void> {
+  debugLog(`startLoop ENTER sourceKind=${sourceKind} tabId=${tabId} viewport=${viewport ? `${viewport.width}x${viewport.height}` : 'null'} streamId=${streamId.slice(0, 12)}…`);
   // Tear down any previous capture state — otherwise getUserMedia for the
   // new streamId can leak a second video track and the next stop won't
   // reach the original one.

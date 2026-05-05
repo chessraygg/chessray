@@ -96,7 +96,9 @@ function setRecBadge(on: boolean): void {
 }
 
 async function startCapture(tabId: number, streamId: string, sourceKind: 'tab' | 'desktop' = 'tab'): Promise<void> {
+  note(`startCapture: ensureOffscreen begin sourceKind=${sourceKind}`);
   await ensureOffscreen();
+  note(`startCapture: ensureOffscreen done`);
   // Viewport pinning only makes sense for tab capture — for desktop /
   // window / screen captures the user picked an arbitrary surface and
   // we have no way to know its target dimensions. Skip the readTabViewport
@@ -108,7 +110,9 @@ async function startCapture(tabId: number, streamId: string, sourceKind: 'tab' |
     viewport: viewport ?? undefined,
     sourceKind,
   };
+  note(`startCapture: forwarding capture-started to offscreen`);
   await chrome.runtime.sendMessage(msg);
+  note(`startCapture: capture-started ack received`);
   await setCaptureState({ running: true, tabId });
   currentlyCapturing = true;
   setRecBadge(true);
@@ -134,9 +138,10 @@ async function stopCapture(): Promise<void> {
 
 chrome.runtime.onMessage.addListener((msg: ExtensionMessage, sender, sendResponse) => {
   if (msg.type === 'start-capture') {
+    note(`start-capture received sourceKind=${msg.sourceKind ?? 'tab'} tabId=${msg.tabId} streamId=${msg.streamId.slice(0, 12)}…`);
     startCapture(msg.tabId, msg.streamId, msg.sourceKind ?? 'tab').then(
-      () => sendResponse({ ok: true }),
-      (err) => sendResponse({ ok: false, error: String(err) }),
+      () => { note(`start-capture ok sourceKind=${msg.sourceKind ?? 'tab'}`); sendResponse({ ok: true }); },
+      (err) => { note(`start-capture FAILED sourceKind=${msg.sourceKind ?? 'tab'}: ${String(err)}`); sendResponse({ ok: false, error: String(err) }); },
     );
     return true; // async response
   }

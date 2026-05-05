@@ -112,8 +112,11 @@ const bridge: ChessRayAPI = createDefaultBridge({
       throw new Error('chessray: requestStartCapture called before target tab id was resolved');
     }
     const tabId = cachedTabId;
+    console.log('[chessray side-panel] requestStartCapture tabId=', tabId);
     chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (tabStreamId) => {
-      if (!chrome.runtime.lastError && tabStreamId) {
+      const tabErr = chrome.runtime.lastError?.message;
+      console.log('[chessray side-panel] tabCapture result streamId=', tabStreamId ? `${tabStreamId.slice(0, 12)}…` : '(none)', 'err=', tabErr);
+      if (!tabErr && tabStreamId) {
         // Fast path — activeTab was granted, no picker needed.
         chrome.runtime.sendMessage({
           type: 'start-capture', tabId, streamId: tabStreamId, sourceKind: 'tab',
@@ -124,13 +127,18 @@ const bridge: ChessRayAPI = createDefaultBridge({
       // user can choose what to capture. The result is consumable as a
       // chromeMediaSource: 'desktop' streamId in the offscreen document.
       chrome.desktopCapture.chooseDesktopMedia(['tab', 'window', 'screen'], (desktopStreamId) => {
+        const dcErr = chrome.runtime.lastError?.message;
+        console.log('[chessray side-panel] chooseDesktopMedia result streamId=', desktopStreamId ? `${desktopStreamId.slice(0, 12)}…` : '(none)', 'err=', dcErr);
         if (!desktopStreamId) {
           // User cancelled the picker — valid choice, no error.
           return;
         }
         chrome.runtime.sendMessage({
           type: 'start-capture', tabId, streamId: desktopStreamId, sourceKind: 'desktop',
-        } satisfies ExtensionMessage);
+        } satisfies ExtensionMessage).then(
+          (resp) => console.log('[chessray side-panel] start-capture response', resp),
+          (err) => console.error('[chessray side-panel] start-capture sendMessage failed', err),
+        );
       });
     });
   },
