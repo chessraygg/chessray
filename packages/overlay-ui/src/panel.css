@@ -1561,12 +1561,12 @@ canvas#video-overlay {
   line-height: 1;
   letter-spacing: 0;
   display: inline-block;
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 .r2-moves .move-line .r2-san em .r2-piece {
   font-size: 1.5em;
   display: inline-block;
-  transform: translateY(-1.5px);
+  transform: translateY(-0.5px);
 }
 .r2-moves .move-line .r2-score {
   font: 12px var(--mono);
