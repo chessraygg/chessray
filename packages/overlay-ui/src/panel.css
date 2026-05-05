@@ -14,8 +14,6 @@
   --radius: 8px;
   --radius-sm: 4px;
   --panel-w: 300px;
-  /* Default accent — overridable from Settings → Theme. mount-overlay
-     binds the saved pref to this var on :root via element.style at init. */
   --accent: #f2b6b6;
   --accent-hover: #4ade80;
   --danger: #f87171;
@@ -1729,70 +1727,6 @@ canvas#video-overlay {
 }
 .r2-group .display-toggle input { accent-color: var(--accent); margin: 0; }
 .r2-group .display-toggle span { flex: 1; }
-
-/* ── Theme group — accent color picker (Settings → Theme) ──
- * Native color input (28px square swatch) + 6-digit hex text field that
- * mirror each other. The reset button resets to DEFAULT_PREFS.accentColor.
- * mount-overlay's applyAccent() is the single source of truth — both
- * inputs feed it, and it writes the CSS var + persists via savePrefs. */
-.r2-theme-row {
-  display: grid;
-  grid-template-columns: auto auto 1fr auto;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0 2px;
-  font-size: 11px;
-}
-.r2-theme-row > label {
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  cursor: help;
-  white-space: nowrap;
-}
-.r2-theme-row input[type="color"] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-  transition: border-color 0.12s;
-}
-.r2-theme-row input[type="color"]:hover { border-color: var(--accent); }
-.r2-theme-row input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
-.r2-theme-row input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 2px; }
-.r2-theme-row input[type="text"] {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 11px;
-  padding: 4px 7px;
-  outline: none;
-  transition: border-color 0.12s;
-}
-.r2-theme-row input[type="text"]:focus { border-color: var(--accent); }
-.r2-theme-row .r2-accent-reset {
-  width: 24px; height: 24px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-dim);
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
-}
-.r2-theme-row .r2-accent-reset:hover { border-color: var(--accent); color: var(--accent); }
 
 /* Tools group */
 .r2-group .lichess-controls {

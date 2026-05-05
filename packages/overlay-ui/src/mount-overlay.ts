@@ -10,7 +10,7 @@
 
 import type { PipelineResult } from '@chessray/core';
 import { applyUciMoves, uciToSan, fenSimilarity, lossToColor } from '@chessray/core';
-import { loadPrefs, savePrefs, DEFAULT_PREFS } from './preferences.js';
+import { loadPrefs, savePrefs } from './preferences.js';
 import { type OverlayState, type PvBoardState, renderArrows, renderVideoOverlay, clearVideoOverlay, resetVideoArrowAnimation, drawArrow, videoHitCache, vboardHitCache, hitTestArrows, hitTestAnimBoard } from './canvas-renderer.js';
 import { preloadPieceImages, pieceSvg } from './piece-svg.js';
 import { setupDrag, updateDebugPanel, clearDebugPanel, renderBoardGrid, setFpsBudgetMs, setActiveFpsDisplay, renderDebugHistoryNav, formatDebugReport, type DebugHistoryNavState } from './debug-panel.js';
@@ -320,12 +320,6 @@ function initOverlay(): void {
   state.overlayOpacity = prefs.overlayOpacity;
   state.evalBarStaleOpacity = prefs.evalBarStaleOpacity;
   state.manualOrientationFlip = prefs.manualOrientationFlip;
-  // Bind the accent CSS var on :root before the panel paints so the first
-  // frame already has the user's color. Theme picker handlers below mutate
-  // this var live (and persist via savePrefs).
-  if (/^#[0-9a-f]{6}$/i.test(prefs.accentColor)) {
-    document.documentElement.style.setProperty('--accent', prefs.accentColor.toLowerCase());
-  }
   // Push the stored override to the analysis pipeline on startup so the
   // first frame renders at the right orientation.
   chessRay.setManualFlip(state.manualOrientationFlip);
@@ -1365,33 +1359,6 @@ function initOverlay(): void {
       renderVideoOverlay(state);
     });
   }
-  // ── Theme: accent color picker ──
-  // Settings → Theme group: native color input + 6-digit hex text + reset.
-  // Both inputs are kept in sync; either one drives the CSS `--accent` var
-  // on :root and persists through savePrefs. Hex parser is strict
-  // (lowercase #RRGGBB) — we ignore intermediate keystrokes that don't
-  // form a valid hex so the panel doesn't flicker.
-  const accentColorInput = document.getElementById('cv-accent-color') as HTMLInputElement | null;
-  const accentHexInput = document.getElementById('cv-accent-hex') as HTMLInputElement | null;
-  const accentResetBtn = document.getElementById('cv-accent-reset') as HTMLButtonElement | null;
-  if (accentColorInput && accentHexInput) {
-    const applyAccent = (raw: string): void => {
-      if (!/^#[0-9a-f]{6}$/i.test(raw)) return;
-      const norm = raw.toLowerCase();
-      document.documentElement.style.setProperty('--accent', norm);
-      accentColorInput.value = norm;
-      accentHexInput.value = norm;
-      savePrefs({ accentColor: norm });
-    };
-    accentColorInput.value = prefs.accentColor;
-    accentHexInput.value = prefs.accentColor;
-    accentColorInput.addEventListener('input', () => applyAccent(accentColorInput.value));
-    accentHexInput.addEventListener('input', () => applyAccent(accentHexInput.value));
-    if (accentResetBtn) {
-      accentResetBtn.addEventListener('click', () => applyAccent(DEFAULT_PREFS.accentColor));
-    }
-  }
-
   // ── Slider track fill ──
   // Every range input gets a `--p` CSS var (0-100%) updated on input, used
   // by panel.css to paint the bicolor track (filled portion = accent, rest

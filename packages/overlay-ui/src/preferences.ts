@@ -38,11 +38,6 @@ export interface Prefs {
    *  top (flipped). false = white at bottom. Auto-reset to null when the
    *  position changes significantly (new game). */
   manualOrientationFlip: boolean | null;
-  /** Panel-chrome accent color (tabs, sliders, "best move" border, Lichess
-   *  button, hover states). Lowercase 6-digit hex including the leading #.
-   *  Bound to the CSS `--accent` custom property at :root by mount-overlay
-   *  on init and on every change from the Settings → Theme picker. */
-  accentColor: string;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -68,7 +63,6 @@ export const DEFAULT_PREFS: Prefs = {
   overlayOpacity: 0.50,
   evalBarStaleOpacity: 0.90,
   manualOrientationFlip: null,
-  accentColor: '#f2b6b6',
 };
 
 export function loadPrefs(): Prefs {

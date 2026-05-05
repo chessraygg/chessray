@@ -116,16 +116,6 @@ export const PANEL_HTML = `\
           <label class="display-toggle" data-tip="Vertical evaluation bar drawn next to the detected board on screen."><input type="checkbox" id="cv-disp-eval" checked><span>Eval bar</span></label>
         </div>
 
-        <div class="r2-group" id="cv-theme-group">
-          <div class="r2-group-label">Theme</div>
-          <div class="r2-theme-row">
-            <label data-tip="Drives the panel's accent color (tabs, sliders, &quot;best move&quot; border, Lichess button, hover states). Pick a hex or use the swatch; on-screen arrow colors are unaffected.">Accent color</label>
-            <input type="color" id="cv-accent-color" value="#f2b6b6">
-            <input type="text" id="cv-accent-hex" maxlength="7" spellcheck="false" value="#f2b6b6">
-            <button class="r2-accent-reset" id="cv-accent-reset" data-tip="Restore the default accent color." data-tip-pos="below">&#x21BA;</button>
-          </div>
-        </div>
-
         <!-- Screen selection — only renders when the system has more than
              one display (refreshDisplaySwitcher in mount-overlay.ts hides
              the whole group on single-display setups). Lifted out of the
