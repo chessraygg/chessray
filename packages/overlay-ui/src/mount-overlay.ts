@@ -497,6 +497,14 @@ function initOverlay(): void {
     if (!userPanel) return;
     userPanel.style.transform = `scale(${panelScale})`;
     userPanel.style.transformOrigin = 'top left';
+    // Counter-scale the virtual board so it stays a fixed visual size
+    // while the rest of the panel zooms. The CSS rule on .board-container
+    // multiplies its existing --board-scale (auto-fit driven by the
+    // ResizeObserver) by --panel-scale-board^-1 so the parent userPanel
+    // transform cancels out for the board only. Setting the var here
+    // (not the inverse) so a single source of truth lives at the panel
+    // level; CSS does the math.
+    userPanel.style.setProperty('--panel-scale-board', String(panelScale));
     state.panelScale = panelScale;
     // Update zoom UI if it exists (called before zoom controls are wired)
     const lbl = document.getElementById('cv-zoom-label');
@@ -626,6 +634,20 @@ function initOverlay(): void {
 
   document.getElementById('cv-zoom-in')?.addEventListener('click', () => setZoom(panelScale + 0.1));
   document.getElementById('cv-zoom-out')?.addEventListener('click', () => setZoom(panelScale - 0.1));
+
+  // Settings → Zoom slider. Reads panelScale * 100 (Settings view shows
+  // percent), feeds back through setZoom which updates the slider/label
+  // via applyScale's UI-sync pass. Range matches the slider's min/max
+  // (50%–200%) — narrower than the 50%–400% that Cmd/scroll allows so
+  // the slider's track stays usable; users who want extreme zoom keep
+  // the hotkey path.
+  const zoomSlider = document.getElementById('cv-zoom-slider') as HTMLInputElement | null;
+  if (zoomSlider) {
+    zoomSlider.addEventListener('input', () => {
+      const pct = parseInt(zoomSlider.value, 10);
+      setZoom(pct / 100);
+    });
+  }
 
   // The on-screen overlay canvas is always shown; the Move-hints toggle is
   // applied inside renderVideoOverlay (canvas-renderer.ts) so the eval bar
@@ -1778,13 +1800,26 @@ function processPendingResult(): void {
   // destructive branches (no-board / recogFen-changed) for those frames.
   const pvFrozen = state.pvBoardState !== null && !(window as any).__chessrayPvPlaying;
 
-  // No board detected — clear everything
+  // No board detected — clear everything (overlay + position).
+  // Previously gated on !pvFrozen so a transient YOLO miss wouldn't wipe
+  // a deliberately paused PV frame. The user wants no-board to be a hard
+  // reset on the virtual board — both the on-board overlay and the piece
+  // position should clear when the pipeline can't see a board, regardless
+  // of PV state. The pvCycleStop call below handles the PV teardown so
+  // there's no orphaned frozen state left behind.
   if (!result.board_detection?.found) {
-    if (pvFrozen) return; // keep the paused frame; transient miss
     state.currentResult = null;
     state.currentArrows = [];
+    state.pvBoardState = null;
     lastEvalFen = null;
     (window as any).__chessrayPvPlayStop?.();
+    // Force-clear the grid even if __chessrayPvPlaying somehow lingered
+    // — clearDebugPanel gates the grid clear on !__chessrayPvPlaying for
+    // the in-PV repaint path, but on a no-board frame the position is
+    // gone and the cached pieces are misleading. Belt-and-suspenders
+    // alongside clearDebugPanel below.
+    const grid = document.getElementById('cv-debug-grid');
+    if (grid) grid.innerHTML = '';
     renderArrows(state);
     clearVideoOverlay(state);
     clearDebugPanel(debugImg, debugFen, debugInfo);

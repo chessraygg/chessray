@@ -79,10 +79,10 @@ export const PANEL_HTML = `\
         </span>
       </div>
       <div class="r2-controls" id="cv-analysis-controls">
-        <label data-tip="Number of engine variations the panel shows. Each row is the engine's best continuation given that first move. Higher = more options at the cost of search time per line.">Top lines</label>
+        <label data-tip="Number of engine variations the panel shows. Each row is the engine's best continuation given that first move. Higher = more options at the cost of search time per line.">Max moves</label>
         <input type="range" id="cv-multi-pv-max" min="1" max="8" value="5" step="1">
         <span id="cv-multi-pv-max-val">5</span>
-        <label data-tip="Maximum centipawn loss vs the best move for an alternative line to be shown. 0 = only the best line. 100 = show moves up to 1.0 pawn worse. (100 cp = 1 pawn of evaluation.)">Loss cap (cp)</label>
+        <label data-tip="Maximum centipawn loss vs the best move for an alternative line to be shown. 0 = only the best line. 100 = show moves up to 1.0 pawn worse. (100 cp = 1 pawn of evaluation.)">Max centipawn loss</label>
         <input type="range" id="cv-loss-threshold" min="0" max="500" value="100" step="10">
         <span id="cv-loss-threshold-val">100</span>
       </div>
@@ -123,6 +123,21 @@ export const PANEL_HTML = `\
             <input type="color" id="cv-accent-color" value="#f2b6b6">
             <input type="text" id="cv-accent-hex" maxlength="7" spellcheck="false" value="#f2b6b6">
             <button class="r2-accent-reset" id="cv-accent-reset" data-tip="Restore the default accent color." data-tip-pos="below">&#x21BA;</button>
+          </div>
+        </div>
+
+        <!-- Zoom — drives panelScale (0.5x to 2x). Wired to the existing
+             setZoom path (also reachable via Cmd/Ctrl+wheel on the panel),
+             so all three input methods (slider, hotkey, prefs reload)
+             feed one source of truth. The board counter-scales via
+             --panel-scale-board so it stays a fixed visual size while the
+             rest of the panel grows. -->
+        <div class="r2-group" id="cv-zoom-group">
+          <div class="r2-group-label">Zoom</div>
+          <div class="pv-depth-row">
+            <label data-tip="Scales every panel control (header, tabs, move list, sliders, settings, debug) — but not the virtual board, which stays a fixed size for legibility. Cmd/Ctrl+scroll on the panel does the same thing.">Panel zoom</label>
+            <input type="range" id="cv-zoom-slider" min="50" max="200" value="100" step="5">
+            <span id="cv-zoom-label">100%</span>
           </div>
         </div>
 
