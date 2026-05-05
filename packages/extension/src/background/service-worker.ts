@@ -85,9 +85,16 @@ let currentlyCapturing = false;
  *  into screen recordings while still being always-visible feedback. */
 function setRecBadge(on: boolean): void {
   if (on) {
+    // Classic record-light look: red dot on a transparent background,
+    // not a red square. The previous styling (white ● on red fill) read
+    // as a stop button — opposite of the intent. Setting the badge
+    // background alpha to 0 removes the colored square; the text color
+    // becomes the visible mark. Most browsers render the bullet glyph
+    // U+25CF with enough body to look like a recording indicator at
+    // toolbar-badge size.
     chrome.action.setBadgeText({ text: '\u25CF' }); // ●
-    chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
-    chrome.action.setBadgeTextColor?.({ color: '#ffffff' });
+    chrome.action.setBadgeTextColor?.({ color: '#ef4444' });
+    chrome.action.setBadgeBackgroundColor({ color: [0, 0, 0, 0] });
     chrome.action.setTitle({ title: 'Chessray — capturing (click to stop)' });
   } else {
     chrome.action.setBadgeText({ text: '' });
