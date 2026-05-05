@@ -213,7 +213,7 @@ function rerenderForHistoryChange(): void {
   refreshHistoryNav(navEl);
   if (!state.currentResult) return;
   const snap = historyIndex !== null ? snapshotToResult(debugHistory[historyIndex]) : null;
-  updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine, snap);
+  updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, onLineRowClick, snap);
 }
 
 // ── Tooltip controller ──
@@ -393,8 +393,13 @@ function initOverlay(): void {
     state.videoCanvas.addEventListener('click', (e) => {
       const px = e.clientX;
       const py = e.clientY;
-      if (state.pvBoardState !== null) {
-        if (hitTestAnimBoard(videoHitCache, px, py)) stopPvLine();
+      // While any PV view is mounted (preview lead-in, animating, or the
+      // frozen end-of-line / paused frame), a click anywhere on the actual
+      // board surface dismisses it back to the top-line arrows. Match the
+      // virtual board so both surfaces behave identically — user expects
+      // either board to be a single "tap to dismiss" target.
+      if (state.lineVisible) {
+        stopPvLine();
         return;
       }
       const hovered = hitTestArrows(videoHitCache, px, py);
@@ -436,8 +441,8 @@ function initOverlay(): void {
     });
     vboard.addEventListener('click', (e) => {
       const { x, y } = clientToCanvas(e);
-      if ((window as any).__chessrayPvPlaying) {
-        if (hitTestAnimBoard(vboardHitCache, x, y)) stopPvLine();
+      if (state.lineVisible) {
+        stopPvLine();
         return;
       }
       const hovered = hitTestArrows(vboardHitCache, x, y);
@@ -1679,9 +1684,23 @@ function selectLine(index: number): void {
     state.lineVisible = true;
     (window as any).__chessrayPvGrowStart?.();
     const snap = historyIndex !== null ? snapshotToResult(debugHistory[historyIndex]) : null;
-    updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine, snap);
+    updateDebugPanel(state.currentResult, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, onLineRowClick, snap);
     renderArrows(state);
     renderVideoOverlay(state);
+  }
+}
+
+/** Click handler for a row in the SAN move list. Routes through triggerLine
+ *  so the action broadcasts on the PvAction bus — without this the
+ *  extension's content-script overlay (the actual on-screen board) never
+ *  hears about line selection and keeps showing the static top-line arrows.
+ *  Same-line re-click stops playback so the user can dismiss the animation
+ *  by clicking the line they just started. Different line switches to it. */
+function onLineRowClick(index: number): void {
+  if (state.lineVisible && state.selectedLineIndex === index) {
+    stopPvLine();
+  } else {
+    triggerLine(index);
   }
 }
 
@@ -1797,7 +1816,7 @@ function processPendingResult(): void {
   }
 
   const snap = historyIndex !== null ? snapshotToResult(debugHistory[historyIndex]) : null;
-  updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, selectLine, snap);
+  updateDebugPanel(result, state.displayFlipped, debugImg, debugFen, debugInfo, useSan, state.selectedLineIndex, state.lineVisible, state.lossThreshold, onLineRowClick, snap);
   (window as any).__chessrayUpdateCompactMoves?.();
   state.currentArrows = result.arrows?.length > 0 ? result.arrows : [];
   renderArrows(state);
