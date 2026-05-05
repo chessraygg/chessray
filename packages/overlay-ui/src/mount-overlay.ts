@@ -1911,11 +1911,23 @@ export function mountOverlay(api: ChessRayAPI, options?: { hidePanel?: boolean }
     pendingResult = null;
     state.currentArrows = [];
     state.currentResult = null;
+    // Reset PV state to defaults — without this, state.lineVisible can
+    // stay true from a pre-stop line selection and the very next eval
+    // after the user re-starts capture auto-fires pvCycleStartCurrentLine.
+    state.lineVisible = false;
+    state.arrowsVisible = true;
+    state.selectedLineIndex = 0;
+    state.hoveredArrowIndex = null;
+    userLockedLine = -1;
     (window as any).__chessrayPvGrowStop?.();
     (window as any).__chessrayPvPlayStop?.();
     // Stop the arrow fade interval so it can't tick a render after the clear.
     resetVideoArrowAnimation();
     renderArrows(state);
     clearVideoOverlay(state);
+    // Wipe the virtual board grid + best moves + eval bar + status bar in
+    // the panel. Without this the user sees the last detected position
+    // frozen in the panel after stopping capture, which feels broken.
+    clearDebugPanel(debugImg, debugFen, debugInfo);
   });
 }
