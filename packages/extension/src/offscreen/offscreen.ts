@@ -152,7 +152,6 @@ async function startLoop(streamId: string, tabId: number, viewport?: { width: nu
   // reach the original one.
   stopLoop();
   activeTabId = tabId;
-  await Promise.all([initEngine(), initRecognizer()]);
 
   // Pin min=max to the tab's content area in physical pixels. Without this
   // Chrome applies a default size cap and produces a letterboxed frame
@@ -177,13 +176,30 @@ async function startLoop(streamId: string, tabId: number, viewport?: { width: nu
     mandatory.maxHeight = viewport.height;
     debugLog(`getUserMedia pinned to ${viewport.width}x${viewport.height}`);
   }
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: {
-      // @ts-expect-error Chrome-specific mandatory constraints for tab capture
-      mandatory,
-    },
-  });
+  // Consume the streamId IMMEDIATELY before any other awaits.
+  // chooseDesktopMedia streamIds expire "after a few seconds when not
+  // used" (per Chrome docs), and initEngine + initRecognizer can run
+  // longer than that on first capture (Stockfish WASM + ONNX session).
+  // With the previous order (init → getUserMedia) the desktop path
+  // silently failed because the streamId was already invalid by the
+  // time getUserMedia ran, but the picker had already closed so the
+  // user just saw "nothing happens". Init in parallel — the loop below
+  // doesn't run until both promises resolve. tabCapture streamIds don't
+  // have the same expiry, so this reordering is harmless for that path.
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        // @ts-expect-error Chrome-specific mandatory constraints for tab capture
+        mandatory,
+      },
+    });
+  } catch (err) {
+    debugLog(`getUserMedia FAILED (sourceKind=${sourceKind}): ${String(err)}`);
+    throw err;
+  }
+  await Promise.all([initEngine(), initRecognizer()]);
   mediaStream = stream;
   // Log what Chrome actually allocated so we can see if the pinned
   // constraints took effect. If actual ≠ pinned, Chrome silently
