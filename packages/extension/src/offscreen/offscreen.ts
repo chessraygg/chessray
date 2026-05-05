@@ -154,42 +154,27 @@ async function startLoop(streamId: string, tabId: number, viewport?: { width: nu
   stopLoop();
   activeTabId = tabId;
 
-  // chromeMediaSource semantics turn out to be more nuanced than the
-  // sourceKind parameter suggests. tabCapture.getMediaStreamId always
-  // produces a streamId consumed with 'tab'. desktopCapture.chooseDesktopMedia
-  // produces a streamId whose required chromeMediaSource depends on what
-  // the user PICKED in the picker: tab → 'tab', screen/window → 'desktop'.
-  // The callback gives us the streamId but doesn't tell us which kind the
-  // user picked, so we have to try one and fall back. For sourceKind:
-  //   'tab'    : always 'tab' (tabCapture path, single attempt).
-  //   'desktop': 'desktop' first (works for screen/window — the more
-  //              common picker selections), 'tab' on AbortError (the
-  //              "Error starting tab capture" Chrome surfaces when it
-  //              recognizes the streamId as a tab source).
-  // The constraint-builder also drops viewport pinning for desktop sources
-  // — for an arbitrary screen/window surface we don't know the target
-  // dimensions, and pinning to a wrong size makes Chrome reject.
-  function buildMandatory(source: 'tab' | 'desktop'): Record<string, unknown> {
-    const m: Record<string, unknown> = {
-      chromeMediaSource: source,
-      chromeMediaSourceId: streamId,
-    };
-    if (source === 'tab' && viewport && viewport.width > 0 && viewport.height > 0) {
-      m.minWidth = viewport.width;
-      m.maxWidth = viewport.width;
-      m.minHeight = viewport.height;
-      m.maxHeight = viewport.height;
-    }
-    return m;
-  }
-  async function tryGetUserMedia(source: 'tab' | 'desktop'): Promise<MediaStream> {
-    return navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        // @ts-expect-error Chrome-specific mandatory constraints for tab/desktop capture
-        mandatory: buildMandatory(source),
-      },
-    });
+  // chromeMediaSource: 'tab' for tabCapture streamIds AND for
+  // chooseDesktopMedia streamIds where the picker was restricted to tabs.
+  // Both incoming paths (toolbar-icon → tabCapture, side-panel → desktopCapture
+  // restricted to ['tab']) produce tab-class streamIds. The 'desktop' branch
+  // would be needed if we ever expand the picker to screen/window sources,
+  // but for now both paths agree on 'tab'. Restricting the picker upstream
+  // is necessary because chooseDesktopMedia streamIds are single-use —
+  // a try-and-fallback consumes the streamId whether it succeeds or not.
+  // Source kind is therefore informational at this point; left in place
+  // so the trace logs (offscreen: startLoop ENTER sourceKind=...) still
+  // tell us which entry point produced this capture.
+  const mandatory: Record<string, unknown> = {
+    chromeMediaSource: 'tab',
+    chromeMediaSourceId: streamId,
+  };
+  if (sourceKind === 'tab' && viewport && viewport.width > 0 && viewport.height > 0) {
+    mandatory.minWidth = viewport.width;
+    mandatory.maxWidth = viewport.width;
+    mandatory.minHeight = viewport.height;
+    mandatory.maxHeight = viewport.height;
+    debugLog(`getUserMedia pinned to ${viewport.width}x${viewport.height}`);
   }
   // Consume the streamId IMMEDIATELY before any other awaits.
   // chooseDesktopMedia streamIds expire "after a few seconds when not
@@ -198,27 +183,17 @@ async function startLoop(streamId: string, tabId: number, viewport?: { width: nu
   // Init runs in parallel below; the capture loop doesn't start until
   // both promises resolve.
   let stream: MediaStream;
-  if (sourceKind === 'tab') {
-    try {
-      stream = await tryGetUserMedia('tab');
-    } catch (err) {
-      debugLog(`getUserMedia FAILED (tab path): ${String(err)}`);
-      throw err;
-    }
-  } else {
-    // desktop path — try 'desktop' first, then 'tab' if Chrome says the
-    // streamId is actually a tab source.
-    try {
-      stream = await tryGetUserMedia('desktop');
-    } catch (err1) {
-      debugLog(`getUserMedia 'desktop' attempt failed: ${String(err1)}; retrying as 'tab'`);
-      try {
-        stream = await tryGetUserMedia('tab');
-      } catch (err2) {
-        debugLog(`getUserMedia 'tab' fallback also FAILED: ${String(err2)}`);
-        throw err2;
-      }
-    }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        // @ts-expect-error Chrome-specific mandatory constraints for tab capture
+        mandatory,
+      },
+    });
+  } catch (err) {
+    debugLog(`getUserMedia FAILED (sourceKind=${sourceKind}): ${String(err)}`);
+    throw err;
   }
   await Promise.all([initEngine(), initRecognizer()]);
   mediaStream = stream;
