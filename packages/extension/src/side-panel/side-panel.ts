@@ -261,6 +261,47 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
 // (e.g. side panel opened mid-flight before the YOLO load fired).
 setInterval(refreshEngineInfo, 3000);
 
+// ── Trace tail in Diagnostics ─────────────────────────────────────────
+// Mirrors the SW's note() ring buffer into the debug view so the user
+// sees what the SW is doing (start-capture flow, capture-stopped, etc.)
+// without opening DevTools. The user explicitly asked for this — pure
+// console.log / debugLog isn't visible to them in the side panel UI.
+function ensureTraceEl(): HTMLElement | null {
+  let el = document.getElementById('cv-trace-tail') as HTMLElement | null;
+  if (el) return el;
+  const debugSection = document.getElementById('debug-section');
+  if (!debugSection) return null;
+  el = document.createElement('div');
+  el.id = 'cv-trace-tail';
+  // Inline style so we don't have to ship CSS for a debug-only surface.
+  el.style.font = '10px ui-monospace, SFMono-Regular, monospace';
+  el.style.whiteSpace = 'pre-wrap';
+  el.style.padding = '6px 10px';
+  el.style.borderTop = '1px solid var(--border)';
+  el.style.color = 'var(--text-muted)';
+  el.style.maxHeight = '240px';
+  el.style.overflowY = 'auto';
+  el.textContent = 'SW trace: loading…';
+  debugSection.appendChild(el);
+  return el;
+}
+
+async function refreshTrace(): Promise<void> {
+  const el = ensureTraceEl();
+  if (!el) return;
+  try {
+    const resp = await chrome.runtime.sendMessage({ type: 'get-trace' } satisfies ExtensionMessage);
+    const lines = (resp?.trace as string[] | undefined) ?? [];
+    el.textContent = lines.length ? lines.join('\n') : 'SW trace: empty';
+    // Keep scrolled to the bottom — newest entries are at the end.
+    el.scrollTop = el.scrollHeight;
+  } catch {
+    el.textContent = 'SW trace: SW unreachable';
+  }
+}
+void refreshTrace();
+setInterval(refreshTrace, 1500);
+
 // Relay pref changes to the captured tab's content script so the on-page
 // overlay (border/box, arrow opacity/size, eval-bar opacity, etc.) keeps
 // up with what the user just toggled in the side panel. Side panel and
