@@ -89,7 +89,9 @@ function syncStartCaptureLabel(): void {
   const btn = document.getElementById('cv-start-capture-btn');
   const span = btn?.querySelector('span');
   if (!span) return;
-  span.textContent = tabWasInvoked ? 'Start capture' : 'Click icon \u2197';
+  span.textContent = tabWasInvoked
+    ? 'Start capture'
+    : 'Click the Chessray icon\nin your Chrome toolbar \u2197';
 }
 void preloadTabId();
 

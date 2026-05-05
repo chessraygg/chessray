@@ -684,6 +684,16 @@ canvas#video-overlay {
 }
 .board-container .board-start-btn svg {
   color: var(--accent);
+  flex: 0 0 auto;
+}
+/* Honor explicit '\n' in the textContent so the side-panel can render a
+   two-line instructional label when the tab hasn't been invoked yet
+   ('Click the Chessray icon\nin your Chrome toolbar ↗'). The 'Start
+   capture' single-line label has no '\n' and is unaffected. */
+.board-container .board-start-btn span {
+  white-space: pre-line;
+  text-align: center;
+  line-height: 1.3;
 }
 .board-container .board-start-btn[hidden] {
   display: none;
