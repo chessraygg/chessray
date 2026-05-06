@@ -1752,7 +1752,13 @@ function processPendingResult(): void {
     setNoBoardMsgVisible(true);
     return;
   }
-  setNoBoardMsgVisible(false);
+  // Bbox found, but recognition can still be missing (piece detector hasn't
+  // produced a FEN yet, low confidence, or transient YOLO false-positive).
+  // From the user's POV there's no usable board until both bbox AND pieces
+  // are recognized — keep the 'Looking for a chessboard…' message visible
+  // through that gap so it doesn't flash off on the bbox-only frames that
+  // would otherwise hide it.
+  setNoBoardMsgVisible(!result.recognition?.fen);
 
   state.displayFlipped = !!result.flipped;
   state.currentResult = result;
