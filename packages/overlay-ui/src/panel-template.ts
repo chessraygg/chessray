@@ -97,6 +97,12 @@ export const PANEL_HTML = `\
       <div class="r2-surface-body">
 
         <div class="r2-group">
+          <div class="r2-group-label">Show on screen</div>
+          <label class="display-toggle" data-tip="Best-move arrows, PV step labels, and played-move markers drawn directly over the detected board on screen. Turn off for a clean board; the eval bar stays visible."><input type="checkbox" id="cv-disp-overlay" checked><span>Move hints</span></label>
+          <label class="display-toggle" data-tip="Vertical evaluation bar drawn next to the detected board on screen."><input type="checkbox" id="cv-disp-eval" checked><span>Eval bar</span></label>
+        </div>
+
+        <div class="r2-group">
           <div class="r2-group-label">Overlay</div>
           <div class="pv-depth-row">
             <label data-tip="Size of all on-board move hints: arrows, PV move numbers, and played-move markers.">Move-hint size</label>
@@ -108,12 +114,6 @@ export const PANEL_HTML = `\
             <input type="range" id="cv-overlay-opacity" min="20" max="100" value="50" step="5">
             <span id="cv-overlay-opacity-val">50</span><span class="pv-unit">%</span>
           </div>
-        </div>
-
-        <div class="r2-group">
-          <div class="r2-group-label">Show on screen</div>
-          <label class="display-toggle" data-tip="Best-move arrows, PV step labels, and played-move markers drawn directly over the detected board on screen. Turn off for a clean board; the eval bar stays visible."><input type="checkbox" id="cv-disp-overlay" checked><span>Move hints</span></label>
-          <label class="display-toggle" data-tip="Vertical evaluation bar drawn next to the detected board on screen."><input type="checkbox" id="cv-disp-eval" checked><span>Eval bar</span></label>
         </div>
 
         <!-- Screen selection — only renders when the system has more than
