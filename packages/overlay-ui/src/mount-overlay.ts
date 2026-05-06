@@ -61,6 +61,15 @@ let startCaptureBtn: HTMLButtonElement | null = null;
 function setStartCaptureVisible(visible: boolean): void {
   if (startCaptureBtn) startCaptureBtn.hidden = !visible;
 }
+
+/** Informational "Looking for a chessboard…" overlay. Shown only while
+ *  capture is running but board_detection.found is false; hidden on the
+ *  first board-found frame and on onStopTracking (start-capture takes
+ *  the slot on stop). Module-scope for the same reason as startCaptureBtn. */
+let noBoardMsg: HTMLDivElement | null = null;
+function setNoBoardMsgVisible(visible: boolean): void {
+  if (noBoardMsg) noBoardMsg.hidden = !visible;
+}
 const useSan = true;
 
 const state: OverlayState = {
@@ -466,6 +475,7 @@ function initOverlay(): void {
       chessRay.requestStartCapture();
     });
   }
+  noBoardMsg = document.getElementById('cv-no-board-msg') as HTMLDivElement | null;
 
   // Panel is draggable on any background (setupDrag skips buttons, inputs, and anything
   // inside the split layout — section headers and splitters handle their own drags).
@@ -1727,11 +1737,22 @@ function processPendingResult(): void {
     // alongside clearDebugPanel below.
     const grid = document.getElementById('cv-debug-grid');
     if (grid) grid.innerHTML = '';
+    // Force-clear the arrow canvas regardless of state.vboardOverlayVisible.
+    // renderArrows early-returns at canvas-renderer.ts:885 when the user has
+    // toggled the virtual-board overlay off, leaving stale arrows from the
+    // last board-detected frame visible across no-board frames. Direct
+    // clearRect bypasses the gate so no-board is a hard visual reset.
+    if (state.canvas) {
+      const ctx = state.canvas.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+    }
     renderArrows(state);
     clearVideoOverlay(state);
     clearDebugPanel(debugImg, debugFen, debugInfo);
+    setNoBoardMsgVisible(true);
     return;
   }
+  setNoBoardMsgVisible(false);
 
   state.displayFlipped = !!result.flipped;
   state.currentResult = result;
@@ -1922,5 +1943,9 @@ export function mountOverlay(api: ChessRayAPI, options?: { hidePanel?: boolean; 
     // Surface the start-capture CTA so the user has an obvious next step
     // after a stop without having to find the toolbar icon.
     setStartCaptureVisible(true);
+    // The "Looking for a chessboard…" message is mutually exclusive with
+    // start-capture (both occupy the board-area overlay slot). On stop,
+    // start-capture takes over.
+    setNoBoardMsgVisible(false);
   });
 }

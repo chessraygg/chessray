@@ -699,6 +699,38 @@ canvas#video-overlay {
   display: none;
 }
 
+/* Non-interactive informational overlay shown while capture is running but
+   no chessboard has been detected. Same dashed-border ghost style as the
+   start-capture button so the slot reads consistently, but no hover
+   affordance and no cursor: pointer (this is informational, not a CTA). */
+.board-container .board-status-msg {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(20, 20, 20, 0.55);
+  border: 1px dashed color-mix(in srgb, var(--text-muted) 60%, transparent);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font: 600 11px/1.2 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.board-container .board-status-msg svg {
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+.board-container .board-status-msg span {
+  text-align: center;
+}
+.board-container .board-status-msg[hidden] {
+  display: none;
+}
+
 /* ── Piece grid with SVG pieces ── */
 
 .piece-grid {

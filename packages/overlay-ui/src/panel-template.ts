@@ -51,6 +51,15 @@ export const PANEL_HTML = `\
               <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>
               <span>Start capture</span>
             </button>
+            <!-- Informational overlay shown while capture is running but the
+                 vision pipeline can't find a chessboard. Non-interactive — it
+                 just tells the user what's happening so the empty board area
+                 doesn't look like a frozen / broken state. Toggled by
+                 mount-overlay alongside the no-board reset path. -->
+            <div class="board-status-msg" id="cv-no-board-msg" hidden>
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5 L20 20"/></svg>
+              <span>Looking for a chessboard…</span>
+            </div>
             <!-- PV playback controls — virtual board variant. -->
             <div class="pv-controls" id="cv-pv-controls-virtual">
               <div class="pv-controls__progress"></div>
