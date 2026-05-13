@@ -107,6 +107,13 @@ export class FrameProcessor {
   private static readonly DETECT_REFRESH_FRAMES = 30;
   private frameCount = 0;
   private evalAbortController: AbortController | null = null;
+  /** Counts newGame() invocations since process start so we can confirm the
+   *  per-new-position hash flush is actually firing under live load. Read
+   *  from the offscreen perf logger. */
+  private newGameCount = 0;
+
+  getFrameCount(): number { return this.frameCount; }
+  getNewGameCount(): number { return this.newGameCount; }
 
   // ── Tunables (overridable at runtime) ──
   /** Search ceiling for iterative deepening. The loop almost always terminates
@@ -734,6 +741,7 @@ export class FrameProcessor {
       // following runDepth waits for it to complete.
       const engineForNewGame = this.deps.getEngine();
       if (engineForNewGame?.newGame) {
+        this.newGameCount++;
         void engineForNewGame.newGame().catch(() => { /* logged elsewhere */ });
       }
 

@@ -19,6 +19,22 @@ import { FrameProcessor, type ImageDataLike, type FrameMeta } from '@chessray/ru
 import type { ExtensionMessage } from '../shared/messages.js';
 
 const TARGET_FPS = 2;
+/** Periodic perf log cadence. At 2 fps, 20 frames = 10s. */
+const PERF_LOG_EVERY_N_FRAMES = 20;
+let perfLogFrameCounter = 0;
+let perfLogStartTs = 0;
+
+interface PerfMemory { usedJSHeapSize?: number; totalJSHeapSize?: number; jsHeapSizeLimit?: number; }
+function logPerfTick(processor: FrameProcessor): void {
+  perfLogFrameCounter++;
+  if (perfLogFrameCounter < PERF_LOG_EVERY_N_FRAMES) return;
+  perfLogFrameCounter = 0;
+  const mem = (performance as Performance & { memory?: PerfMemory }).memory;
+  const heapMB = mem?.usedJSHeapSize ? (mem.usedJSHeapSize / 1024 / 1024).toFixed(1) : '?';
+  const totalMB = mem?.totalJSHeapSize ? (mem.totalJSHeapSize / 1024 / 1024).toFixed(1) : '?';
+  const elapsedS = perfLogStartTs > 0 ? ((Date.now() - perfLogStartTs) / 1000).toFixed(0) : '?';
+  debugLog(`PERF[offscreen] t=${elapsedS}s frames=${processor.getFrameCount()} newGame=${processor.getNewGameCount()} heap=${heapMB}/${totalMB}MB`);
+}
 
 // ── ORT global wire-up ──
 // Core's YoloPieceRecognizer reads `globalThis.ort` because the Electron host
@@ -206,6 +222,8 @@ async function startLoop(streamId: string, tabId: number, viewport?: { width: nu
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 
   processor.resetFrameCount();
+  perfLogFrameCounter = 0;
+  perfLogStartTs = Date.now();
 
   captureInterval = setInterval(async () => {
     if (processing || !videoEl) return;
@@ -222,6 +240,7 @@ async function startLoop(streamId: string, tabId: number, viewport?: { width: nu
       const captured_at = Date.now();
       const meta: FrameMeta = { capture_ms: captured_at - tCap, captured_at };
       await processor.processFrame(imageData, meta);
+      logPerfTick(processor);
     } catch (err) {
       console.error('[chessray] frame processing error', err);
     } finally {
@@ -389,6 +408,7 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
           const captured_at = Date.now();
           const meta: FrameMeta = { capture_ms: captured_at - tCap, captured_at };
           await processor.processFrame(imageData, meta);
+          logPerfTick(processor);
         } catch (err) {
           console.error('[chessray] frame processing error', err);
         } finally {

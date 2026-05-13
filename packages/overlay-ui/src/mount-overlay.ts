@@ -1694,12 +1694,29 @@ function stopPvLine(): void {
   broadcastPvIfLocal({ kind: 'stop' });
 }
 
+let perfRenderCounter = 0;
+let perfRenderStartTs = 0;
+interface PerfMemoryLite { usedJSHeapSize?: number; totalJSHeapSize?: number; }
+function logRendererPerfTick(): void {
+  perfRenderCounter++;
+  if (perfRenderCounter < 20) return;
+  perfRenderCounter = 0;
+  if (perfRenderStartTs === 0) perfRenderStartTs = Date.now();
+  const mem = (performance as Performance & { memory?: PerfMemoryLite }).memory;
+  const heapMB = mem?.usedJSHeapSize ? (mem.usedJSHeapSize / 1024 / 1024).toFixed(1) : '?';
+  const totalMB = mem?.totalJSHeapSize ? (mem.totalJSHeapSize / 1024 / 1024).toFixed(1) : '?';
+  const elapsedS = ((Date.now() - perfRenderStartTs) / 1000).toFixed(0);
+  const dom = document.getElementsByTagName('*').length;
+  console.log(`[chessray] PERF[renderer] t=${elapsedS}s renders/tick=20 heap=${heapMB}/${totalMB}MB dom=${dom}`);
+}
+
 function processPendingResult(): void {
   rafScheduled = false;
   const result = pendingResult;
   if (!result) return;
   pendingResult = null;
   const tRender = Date.now();
+  logRendererPerfTick();
 
   // Capture is producing frames — hide the empty-state CTA. We hide on
   // *any* frame-result (board found or not) because at this point capture
