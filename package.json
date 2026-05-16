@@ -19,6 +19,7 @@
     "test:electron": "cd packages/electron && npx vitest run",
     "test:watch": "cd packages/core && npx vitest",
     "setup": "node scripts/download-vendor.js",
+    "build:webstore": "node scripts/build-webstore.mjs",
     "gen-expected": "tsx scripts/gen-expected-images.ts",
     "gen-expected-sequences": "tsx scripts/gen-expected-sequences.ts"
   },
