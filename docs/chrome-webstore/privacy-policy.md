@@ -39,6 +39,11 @@ leaves the user's machine.
 - Does **not** read DOM content, cookies, passwords, form input, browsing
   history, or any data outside the captured video stream.
 - Does **not** read or modify any other tab.
+- Does **not** run on chess.com or lichess.org. The on-page overlay is
+  excluded from those hosts at the manifest level
+  (`content_scripts.exclude_matches`) and the service worker hard-refuses
+  to start tab capture there from every invocation path — toolbar click,
+  keyboard shortcut, context menu, and side-panel CTA.
 
 ## Third-party services
 

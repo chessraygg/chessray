@@ -57,6 +57,18 @@ export default defineManifest({
   content_scripts: [
     {
       matches: ['<all_urls>'],
+      // Hard-block the overlay from injecting on chess.com / lichess.org.
+      // The service worker also refuses tabCapture starts on these hosts
+      // (see service-worker.ts isCaptureBlockedUrl) so the user can't
+      // bypass via toolbar/shortcut/context-menu either. Chessray is a
+      // streams / videos / screenshots / PDFs tool — running it on a live
+      // chess-server tab would violate those sites' anti-cheat policies.
+      exclude_matches: [
+        '*://*.chess.com/*',
+        '*://chess.com/*',
+        '*://*.lichess.org/*',
+        '*://lichess.org/*',
+      ],
       js: ['src/content/overlay.ts'],
       run_at: 'document_idle',
       all_frames: false,
