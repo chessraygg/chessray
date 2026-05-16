@@ -696,6 +696,11 @@ function initOverlay(): void {
 
   dispOverlay?.addEventListener('change', () => document.getElementById('cv-overlay-btn')?.click());
   dispEval?.addEventListener('change', () => document.getElementById('cv-eval-btn')?.click());
+  // Reflect the loaded prefs on the checkboxes themselves. The template
+  // markup hardcodes both inputs as `checked`, so without this the boxes
+  // always re-appear ticked on remount even when state was loaded as off
+  // — and the user sees a checkbox that disagrees with the actual overlay.
+  syncDisplayToggles();
 
   // ── Unified PV line cycle ──
   // In line mode, the actual board and virtual board animate in sync:
