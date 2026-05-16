@@ -80,6 +80,38 @@ async function readTabViewport(tabId: number): Promise<{ width: number; height: 
  *  Initialized from storage on SW startup so it survives SW sleeps. */
 let currentlyCapturing = false;
 
+/** Hosts where Chessray refuses to start capture. The content-script
+ *  exclude_matches in the manifest already prevents the on-page overlay
+ *  from injecting here; this is the matching SW-side guard so the
+ *  toolbar click, keyboard shortcut, context menu, and side-panel CTA
+ *  also bail. Patterns are anchored to host boundaries so plausibly-
+ *  related-but-distinct domains (chess24.com, chesscom.io, lichess.dev)
+ *  are NOT blocked — we're targeting the two sites with active games
+ *  + anti-cheat policies, not the whole chess web. */
+const BLOCKED_HOST_PATTERNS = [
+  /^(?:[^/]+\.)?chess\.com$/i,
+  /^(?:[^/]+\.)?lichess\.org$/i,
+];
+function isCaptureBlockedUrl(url: string | undefined | null): boolean {
+  if (!url) return false;
+  // chrome.tabs.* always hands back well-formed URLs (http/https/chrome:/
+  // file:/ extension:); if new URL() ever throws here it means Chrome gave
+  // us something unexpected, which is a real bug — let it propagate.
+  const host = new URL(url).hostname;
+  return BLOCKED_HOST_PATTERNS.some((re) => re.test(host));
+}
+/** Brief toolbar-badge flash so the user understands their click/shortcut
+ *  did register but was refused. Distinct from the capturing badge (red ●
+ *  on transparent) and from the idle badge (empty): solid red "OFF" pill
+ *  for 2 s, then revert to whatever state the SW thinks it's in. */
+function flashBlockedBadge(): void {
+  chrome.action.setBadgeText({ text: 'OFF' });
+  chrome.action.setBadgeTextColor?.({ color: '#ffffff' });
+  chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+  chrome.action.setTitle({ title: 'Chessray does not run on chess.com or lichess.org' });
+  setTimeout(() => setRecBadge(currentlyCapturing), 2000);
+}
+
 /** Toolbar badge: red dot while capturing, clear when idle. Lives in
  *  browser chrome (not in the captured tab pixels) so it doesn't leak
  *  into screen recordings while still being always-visible feedback. */
@@ -135,10 +167,22 @@ async function stopCapture(): Promise<void> {
 
 chrome.runtime.onMessage.addListener((msg: ExtensionMessage, sender, sendResponse) => {
   if (msg.type === 'start-capture') {
-    startCapture(msg.tabId, msg.streamId).then(
-      () => sendResponse({ ok: true }),
-      (err) => sendResponse({ ok: false, error: String(err) }),
-    );
+    // Side-panel CTA path: the panel already grabbed a streamId (in its
+    // user-gesture context) and forwarded here. Look up the tab URL and
+    // refuse if it's a blocklisted host — same posture as the toolbar
+    // click / context menu / keyboard shortcut paths.
+    chrome.tabs.get(msg.tabId).then((tab) => {
+      if (isCaptureBlockedUrl(tab.url)) {
+        note(`start-capture REFUSED — blocked host: ${tab.url}`);
+        flashBlockedBadge();
+        sendResponse({ ok: false, error: 'Chessray does not run on chess.com or lichess.org' });
+        return;
+      }
+      return startCapture(msg.tabId, msg.streamId).then(
+        () => sendResponse({ ok: true }),
+        (err) => sendResponse({ ok: false, error: String(err) }),
+      );
+    });
     return true; // async response
   }
   if (msg.type === 'stop-capture') {
@@ -310,6 +354,15 @@ chrome.action.onClicked.addListener((tab) => {
     void stopCapture();
     return;
   }
+  // Blocklist check (chess.com / lichess.org). Done synchronously before
+  // touching the user-gesture-consuming APIs so refusing here doesn't
+  // burn the activeTab grant — next click on a non-blocked tab still
+  // works. tab.url is populated because we hold host_permissions for it.
+  if (isCaptureBlockedUrl(tab.url)) {
+    note(`action.onClicked REFUSED — blocked host: ${tab.url}`);
+    flashBlockedBadge();
+    return;
+  }
   // Start path. getMediaStreamId MUST run synchronously before any
   // await — chrome.sidePanel.open consumes the user activation on some
   // Chrome versions (chromium 40916430-class). Grab the streamId
@@ -355,6 +408,11 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   note(`contextMenu.onClicked id=${info.menuItemId} tab=${tab?.id}`);
   if (info.menuItemId !== 'chessray-capture' || tab?.id == null) return;
+  if (isCaptureBlockedUrl(tab.url)) {
+    note(`contextMenu.onClicked REFUSED — blocked host: ${tab.url}`);
+    flashBlockedBadge();
+    return;
+  }
   await recordInvocation(tab.id, 'context-menu');
   try {
     await chrome.sidePanel.open({ tabId: tab.id });
@@ -388,6 +446,11 @@ chrome.commands.onCommand.addListener(async (command) => {
   }
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (!tab?.id) return;
+  if (isCaptureBlockedUrl(tab.url)) {
+    note(`commands.onCommand REFUSED — blocked host: ${tab.url}`);
+    flashBlockedBadge();
+    return;
+  }
   try {
     const streamId = await new Promise<string>((resolve, reject) => {
       chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }, (id) => {

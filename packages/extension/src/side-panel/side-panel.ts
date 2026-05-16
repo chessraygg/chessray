@@ -151,7 +151,18 @@ const bridge: ChessRayAPI = createDefaultBridge({
       if (chrome.runtime.lastError || !streamId) {
         throw new Error(`chessray: tabCapture.getMediaStreamId failed: ${chrome.runtime.lastError?.message ?? 'no stream id'}`);
       }
-      chrome.runtime.sendMessage({ type: 'start-capture', tabId, streamId } satisfies ExtensionMessage);
+      chrome.runtime.sendMessage(
+        { type: 'start-capture', tabId, streamId } satisfies ExtensionMessage,
+        (response: { ok?: boolean; error?: string } | undefined) => {
+          // SW refuses on the chess.com / lichess.org blocklist; surface that
+          // so the user understands their click did register but was bounced.
+          // alert() in a side panel renders in the panel's own window — no
+          // active-tab consumption, no flicker on the captured page.
+          if (response && response.ok === false && response.error) {
+            alert(response.error);
+          }
+        },
+      );
     });
   },
 
