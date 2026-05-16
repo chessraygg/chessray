@@ -15,7 +15,7 @@ Chessray
 
 ### Summary (≤132 chars)
 ```
-Stockfish evaluation overlay for chess streams, videos, replays and screenshots. Local-only. Excludes chess.com / lichess.org.
+Chess companion that draws and updates top moves + an eval bar on any chess video or stream as it plays. No manual scans.
 ```
 
 ### Detailed description

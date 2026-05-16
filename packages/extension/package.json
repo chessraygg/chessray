@@ -4,7 +4,7 @@
   "private": true,
   "license": "GPL-3.0-or-later",
   "author": "chessraygg",
-  "description": "Stockfish evaluation overlay for chess streams, videos, replays, and screenshots. Local-only. Excludes chess.com / lichess.org.",
+  "description": "Chess companion that draws and updates top moves + an eval bar on any chess video or stream as it plays. No manual scans.",
   "type": "module",
   "scripts": {
     "dev": "vite",
