@@ -102,31 +102,6 @@
   expected_square_colors:
     light: [218, 192, 158]
     dark: [170, 120, 93]
-- file: test-carlsen-titled2.png
-  orientation: white top
-  highlighted:
-    - g5
-    - g6
-  turn: b
-  bbox:
-    x: 47
-    'y': 115
-    width: 699
-    height: 699
-  squareSize: 88
-  expectedFen: 1K6/7k/7p/8/8/1P6/PR6/r7
-  orientation_source: pawn_move
-  expected_labels:
-    skipped: false
-    result: null
-  expected_candidates:
-    - square: g5
-      score: 305.4
-    - square: g6
-      score: 217.1
-  expected_square_colors:
-    light: [239, 208, 170]
-    dark: [180, 123, 91]
 - file: test-eric-rosen.png
   orientation: white bottom
   highlighted:
@@ -526,3 +501,57 @@
   expected_square_colors:
     light: [195, 169, 122]
     dark: [126, 93, 61]
+- file: test-csquared-sindarov.png
+  orientation: white bottom
+  highlighted:
+    - g4
+    - h5
+  turn: b
+  bbox:
+    x: 761
+    'y': 523
+    width: 535
+    height: 535
+  squareSize: 67
+  expectedFen: 8/4R1p1/1r2bpk1/4p2P/2p5/2N2P2/P3PK1P/8
+  orientation_source: piece_count
+  expected_labels:
+    skipped: false
+    result: null
+  expected_candidates:
+    - square: g4
+      score: 129.8
+    - square: h5
+      score: 122.9
+  expected_square_colors:
+    light: [221, 231, 238]
+    dark: [163, 180, 191]
+# Freestyle (chess960) castle: both highlighted squares have pieces of the
+# same color (rook + king on the back rank). The disambiguator must recognize
+# this king↔rook same-color pair as a castle move rather than rejecting it
+# for having no empty source square.
+- file: test-take-take-take-magnus-freestyle-castle.png
+  orientation: white bottom
+  highlighted:
+    - f8
+    - g8
+  turn: w
+  bbox:
+    x: 985
+    'y': 87
+    width: 931
+    height: 931
+  squareSize: 116
+  expectedFen: 4qrk1/p1Qn1pp1/1p1p1b1p/3b1N2/5PP1/1P1P3R/P7/B2B1K2
+  orientation_source: piece_count
+  expected_labels:
+    skipped: true
+    reason: piece_count
+  expected_candidates:
+    - square: f8
+      score: 248.6
+    - square: g8
+      score: 175.4
+  expected_square_colors:
+    light: [231, 215, 178]
+    dark: [173, 137, 103]

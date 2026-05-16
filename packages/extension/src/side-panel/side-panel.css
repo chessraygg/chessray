@@ -1,0 +1,80 @@
+/* Popup-specific styles. Imported AFTER mountOverlay so panel.css from
+   @chessray/overlay-ui (which sets body { background: transparent }
+   among other things) doesn't clobber what we need here. */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  /* Side panel: fills the panel viewport. No fixed width — Chrome
+     allocates ~480px by default and the user can drag-resize. */
+  width: 100%;
+  min-width: 280px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  /* panel.css sets body{overflow:hidden} — fine for the Electron
+     overlay window, fatal here. Restore vertical scrolling. */
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+/* The mounted overlay panel: in production it's a fixed-positioned
+   floating window. Inside the popup body we want it inline, full width,
+   sized to its content. */
+.panel.user-panel {
+  position: static !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* The on-screen overlay canvas (#video-overlay) belongs to the captured
+   PAGE, not the side panel. mountOverlay still injects it into the
+   document because the renderer's wiring depends on the element being
+   present, but in the side panel it's irrelevant — force-hide it. */
+canvas#video-overlay {
+  display: none !important;
+}
+
+/* The board canvas / piece grid sits inside .r2-board-block; let it
+   size to the popup width naturally. */
+.r2-board-block {
+  padding: 8px 10px 6px;
+}
+
+/* Drop the bottom-of-panel resize grips inside a popup. */
+.resize-grip {
+  display: none !important;
+}
+
+/* The Electron overlay's "minimize" button (cv-hide-btn) hides the
+   floating panel while keeping the on-screen overlay running. In the
+   extension the side panel is a Chrome-managed surface that the user
+   already closes via Chrome's own close affordance, so a separate
+   minimize button is redundant — same outcome, two places to look.
+   Hidden via display:none rather than removing from the template so
+   the Electron build keeps its window control. */
+#cv-hide-btn {
+  display: none !important;
+}
+
+/* Engine-info diagnostics row at the bottom of the panel's debug section.
+   Reference info — muted styling so it doesn't compete with primary
+   diagnostics. */
+#cv-engine-info {
+  font: 10px var(--mono);
+  color: var(--text-muted);
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+  white-space: pre-wrap;
+  opacity: 0.75;
+}

@@ -5,11 +5,10 @@
  */
 
 import type { PixelBuffer } from '@chessray/core';
-import type { PipelineResult } from '../shared/types.js';
-import { setMultiPvMax, setMultiPvRamp } from './eval-cache.js';
+import type { PipelineResult } from '@chessray/core';
+import { FrameProcessor, setMultiPvMax, type ImageDataLike } from '@chessray/runtime';
 import { getEngine, getRecognizer, getOnnxSession, getOrtModule, reinitEngine } from './engine-init.js';
-import { initAndStartCapture, stopCapture, setTargetFps } from './frame-capture.js';
-import { FrameProcessor, type ImageDataLike } from './frame-processor.js';
+import { initAndStartCapture, stopCapture, setTargetFps, type FrameMeta } from './frame-capture.js';
 import { setRecording, recordFrame, recordResultSidecar, currentFrameFilename, isRecording } from './frame-recorder.js';
 
 /// <reference path="../shared/window.d.ts" />
@@ -60,7 +59,7 @@ const processor = new FrameProcessor({
   encodePreviewUrl,
 });
 
-async function onCapturedFrame(imageData: ImageDataLike): Promise<void> {
+async function onCapturedFrame(imageData: ImageDataLike, meta: FrameMeta): Promise<void> {
   if (isRecording()) {
     pendingArtifactFilename = currentFrameFilename();
     // Fire and forget — PNG encoding should not block the processor.
@@ -68,7 +67,7 @@ async function onCapturedFrame(imageData: ImageDataLike): Promise<void> {
   } else {
     pendingArtifactFilename = null;
   }
-  await processor.processFrame(imageData);
+  await processor.processFrame(imageData, meta);
 }
 
 window.chessRay.onRecordingStateChanged((active: boolean, sessionDir: string | null) => {
@@ -87,26 +86,15 @@ window.chessRay.onStopCapture(() => {
   previewCtx = null;
 });
 
-window.chessRay.onSetMaxDepth((depth: number) => {
-  debugLog(`Max depth changed to ${depth}`);
-  processor.setMaxDepth(depth);
-});
-
 window.chessRay.onSetMultiPvMax((n: number) => {
   debugLog(`MultiPV max changed to ${n}`);
   setMultiPvMax(n);
   processor.setMultiPvMax(n);
 });
 
-window.chessRay.onSetMultiPvRamp((n: number) => {
-  debugLog(`MultiPV ramp changed to ${n} steps/line`);
-  setMultiPvRamp(n);
-  processor.setMultiPvRamp(n);
-});
-
-window.chessRay.onSetChangeDetect((enabled: boolean) => {
-  debugLog(`Change detection ${enabled ? 'enabled' : 'disabled'}`);
-  processor.setChangeDetect(enabled);
+window.chessRay.onSetManualFlip((v: boolean | null) => {
+  debugLog(`Manual orientation override: ${v === null ? 'auto' : v ? 'white top' : 'white bottom'}`);
+  processor.setManualFlip(v);
 });
 
 window.chessRay.onSetTargetFps((fps: number) => {

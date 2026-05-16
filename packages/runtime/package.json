@@ -1,0 +1,15 @@
+{
+  "name": "@chessray/runtime",
+  "version": "0.2.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chessray/core": "*",
+    "chess.js": "^1.4.0"
+  }
+}

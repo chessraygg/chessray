@@ -23,9 +23,13 @@
         played_move: null
     - file: topalov-yagiz/frame-001.png
       expected:
-        # Mid-drag: king visually moved to g1 but the last-move highlight is
-        # still c6/c2. FEN change + unchanged highlights ⇒ intermediate frame.
-        fen: 4k3/1R6/p5p1/P3pp1p/8/1N6/1Pr3PP/6K1
+        # Mid-drag: YOLO sees the king visually on g1, but FrameProcessor's
+        # intermediate-frame branch (FEN change + unchanged highlights)
+        # deliberately re-emits the *previous* committed recognition (king on
+        # f2) so the overlay's arrow-animation state isn't reset by a flicker
+        # FEN that the next frame will replace. The detection_status flag is
+        # how consumers tell that no real position change happened this tick.
+        fen: 4k3/1R6/p5p1/P3pp1p/8/1N6/1Pr2KPP/8
         highlighted: [c6, c2]
         turn: w
         flipped: false

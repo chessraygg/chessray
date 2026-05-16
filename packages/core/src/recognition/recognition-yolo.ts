@@ -17,6 +17,11 @@ const CLASS_TO_FEN: Record<number, string> = {
 export class YoloPieceRecognizer implements PieceRecognizerInterface {
   session: any = null;
   ort: any = null;
+  /** Which ORT execution provider was actually selected at load time
+   *  ('webgpu' or 'wasm'). Hosts log this so we can tell from the
+   *  side-panel trace whether GPU acceleration is engaged — the
+   *  difference is ~10-20× per inference. */
+  executionProvider: string = 'unknown';
 
   constructor(private modelUrl: string) {}
 
@@ -53,45 +58,24 @@ export class YoloPieceRecognizer implements PieceRecognizerInterface {
     }
 
     const gpu = (globalThis as any).navigator?.gpu;
+    this.executionProvider = selectedEp;
     console.log(`[YOLO] ONNX session created, EP: ${selectedEp} | navigator.gpu: ${!!gpu}`);
 
-    // Warm-up + micro-benchmark: run 3 dummy inferences per EP with a zero
-    // tensor. Kernels compile on the first call; runs 2-3 show steady-state.
-    // We benchmark WebGPU (the active session) AND a separate WASM-only
-    // session so we can tell whether ort-web is actually GPU-accelerating vs
-    // silently running ops on CPU despite the requested EP.
-    const inputSize = 640;
-    const zero = new Float32Array(1 * 3 * inputSize * inputSize);
-    const runBench = async (session: any, label: string): Promise<void> => {
-      try {
-        const tensor = new this.ort.Tensor('float32', zero, [1, 3, inputSize, inputSize]);
-        const feeds: Record<string, unknown> = { [session.inputNames[0]]: tensor };
-        const timings: number[] = [];
-        for (let i = 0; i < 3; i++) {
-          const t0 = Date.now();
-          await session.run(feeds);
-          timings.push(Date.now() - t0);
-        }
-        console.log(`[YOLO bench] ${label}: ${timings.join(', ')}ms`);
-      } catch (err) {
-        console.log(`[YOLO bench] ${label}: skipped (${err})`);
-      }
-    };
-
-    await runBench(this.session, `active[${selectedEp}]`);
-
-    // Comparison WASM-only session — same model, same input. If its times
-    // match the active session's, we know the WebGPU path isn't accelerating.
-    if (selectedEp === 'webgpu') {
-      try {
-        const wasmSession = await this.ort.InferenceSession.create(modelBuffer, {
-          executionProviders: ['wasm'],
-        });
-        await runBench(wasmSession, 'wasm[reference]');
-        wasmSession.release?.();
-      } catch (err) {
-        console.log(`[YOLO bench] WASM reference skipped: ${err}`);
-      }
+    // Single warm-up inference: kernel compilation (the only fixed cost we
+    // need to pay before the first real frame). One zero-tensor run is enough
+    // to trigger compilation; further benchmark runs and a WASM-reference
+    // session were dropped — together they added ~6 s to cold start without
+    // affecting steady-state performance.
+    try {
+      const inputSize = 640;
+      const zero = new Float32Array(1 * 3 * inputSize * inputSize);
+      const tensor = new this.ort.Tensor('float32', zero, [1, 3, inputSize, inputSize]);
+      const feeds: Record<string, unknown> = { [this.session.inputNames[0]]: tensor };
+      const t0 = Date.now();
+      await this.session.run(feeds);
+      console.log(`[YOLO warmup] ${selectedEp}: ${Date.now() - t0}ms`);
+    } catch (err) {
+      console.log(`[YOLO warmup] skipped (${err})`);
     }
   }
 
@@ -130,11 +114,22 @@ export class YoloPieceRecognizer implements PieceRecognizerInterface {
     const tInfer = Date.now() - tInferStart;
 
     // Parse YOLO output: shape [1, 17, 8400] — 17 = 4 (bbox) + 13 (class probs)
-    // Bbox coords are normalized (0-1), not pixel-based
+    // Bbox coords are normalized (0-1), not pixel-based.
+    // COPY outputData out of the tensor before disposing — on WASM
+    // tensor.data is a view into ORT-managed memory that becomes
+    // invalid after dispose(); on WebGPU it's already a CPU-side
+    // Float32Array but copying is cheap and keeps both EPs uniform.
+    // Disposing input + output tensors releases GPU buffer handles
+    // (WebGPU) / WASM-heap allocations (WASM) that otherwise
+    // accumulate per inference and ramp inference time over a session.
     const output = results[Object.keys(results)[0]];
-    const outputData = output.data as Float32Array;
     const numDetections = output.dims[2]; // 8400
     const numChannels = output.dims[1];   // 17
+    const outputData = new Float32Array(output.data as Float32Array);
+    try { (inputTensor as { dispose?: () => void }).dispose?.(); } catch { /* ignore */ }
+    for (const k of Object.keys(results)) {
+      try { (results[k] as { dispose?: () => void }).dispose?.(); } catch { /* ignore */ }
+    }
 
     const confThreshold = 0.5;
 

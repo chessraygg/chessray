@@ -6,8 +6,8 @@ import {
   computeArrows,
   squareToPixel,
   arrowGeometry,
-} from '../src/shared/arrows.js';
-import type { EvalMove } from '@chessray/core';
+  type EvalMove,
+} from '@chessray/core';
 
 describe('lossToColor', () => {
   it('returns green for 0 cp loss', () => {
@@ -34,20 +34,27 @@ describe('lossToColor', () => {
 });
 
 describe('rankToWidth', () => {
-  it('returns decreasing widths for ranks 0, 1, 2', () => {
-    expect(rankToWidth(0)).toBeGreaterThan(rankToWidth(1));
-    expect(rankToWidth(1)).toBeGreaterThan(rankToWidth(2));
+  // Uniform width by design: we don't encode engine-preference order in arrow
+  // thickness. The list of top_moves itself communicates rank; arrows are
+  // drawn at the same size regardless of rank.
+  it('returns the same width for every rank', () => {
+    expect(rankToWidth(0)).toBe(rankToWidth(1));
+    expect(rankToWidth(1)).toBe(rankToWidth(2));
+    expect(rankToWidth(5)).toBe(rankToWidth(0));
   });
 });
 
 describe('rankToOpacity', () => {
-  it('returns decreasing opacity for ranks 0, 1, 2', () => {
-    expect(rankToOpacity(0)).toBeGreaterThan(rankToOpacity(1));
-    expect(rankToOpacity(1)).toBeGreaterThan(rankToOpacity(2));
+  // Uniform opacity by design: color (loss) carries 100% of the quality signal
+  // and width carries rank — alpha is just "presence", same for every arrow.
+  it('returns the same opacity for every rank', () => {
+    expect(rankToOpacity(0)).toBe(rankToOpacity(1));
+    expect(rankToOpacity(1)).toBe(rankToOpacity(2));
+    expect(rankToOpacity(5)).toBe(rankToOpacity(0));
   });
 
-  it('returns 0.675 for best move', () => {
-    expect(rankToOpacity(0)).toBe(0.675);
+  it('returns 0.85 (uniform presence)', () => {
+    expect(rankToOpacity(0)).toBe(0.85);
   });
 });
 
@@ -69,10 +76,10 @@ describe('computeArrows', () => {
     expect(arrows[0].loss_cp).toBe(0);
   });
 
-  it('arrows have decreasing width', () => {
+  it('arrows have equal width regardless of rank', () => {
     const arrows = computeArrows(topMoves);
-    expect(arrows[0].width).toBeGreaterThan(arrows[1].width);
-    expect(arrows[1].width).toBeGreaterThan(arrows[2].width);
+    expect(arrows[0].width).toBe(arrows[1].width);
+    expect(arrows[1].width).toBe(arrows[2].width);
   });
 
   it('arrows have correct from/to squares', () => {

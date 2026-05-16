@@ -1,4 +1,5 @@
 export * from './types.js';
+export * from './vendor/resolver.js';
 export * from './fen/fen.js';
 export * from './fen/move-notation.js';
 export * from './board/board-detect.js';
@@ -13,3 +14,7 @@ export * from './pipeline/recognize-board.js';
 export * from './pipeline/pipeline.js';
 export * from './engine/stockfish.js';
 export * from './engine/stockfish-uci-parser.js';
+export * from './shared/types.js';
+export * from './shared/arrows.js';
+export * from './shared/colors.js';
+export * from './host-bridge.js';

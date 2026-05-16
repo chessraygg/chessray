@@ -1,5 +1,5 @@
 import { StockfishEngine, YoloPieceRecognizer } from '@chessray/core';
-import { EVAL_START_DEPTH, EVAL_MULTI_PV_START } from './eval-cache.js';
+import { evalStartDepth, EVAL_MULTI_PV_START } from '@chessray/runtime';
 
 let engine: StockfishEngine | null = null;
 let recognizer: YoloPieceRecognizer | null = null;
@@ -22,7 +22,7 @@ function debugLog(msg: string): void {
 export async function initEngine(): Promise<void> {
   if (!engineInitPromise) {
     engineInitPromise = (async () => {
-      engine = new StockfishEngine({ depth: EVAL_START_DEPTH, multiPV: EVAL_MULTI_PV_START });
+      engine = new StockfishEngine({ depth: evalStartDepth(), multiPV: EVAL_MULTI_PV_START });
       const sfUrl = 'chess-vendor://stockfish/stockfish-18-lite-single.js';
       await engine.init(sfUrl);
       debugLog('Stockfish 18 initialized');

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, protocol, screen, session, shell, systemPreferences } from 'electron';
+import { app, BrowserWindow, desktopCapturer, dialog, globalShortcut, ipcMain, Menu, protocol, screen, session, shell, systemPreferences } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { platform } from './platform.js';
@@ -135,7 +135,11 @@ function createOverlayWindow(): BrowserWindow {
     const display = getActiveDisplay();
     sendDisplayInfoForDisplay(display);
   };
-  win.webContents.once('did-finish-load', sendDisplayInfo);
+  // .on (not .once): location.reload() — used by Reset All Settings — fires a
+  // fresh did-finish-load and the renderer's displayInfo state is null until
+  // it receives the IPC again. Without this, the menu-bar Y offset is lost
+  // and arrows render 25px too low after a reset.
+  win.webContents.on('did-finish-load', sendDisplayInfo);
   win.on('move', sendDisplayInfo);
   win.on('resize', sendDisplayInfo);
 
@@ -236,8 +240,18 @@ async function switchDisplay(displayId: number): Promise<void> {
   const sourceId = await getScreenSourceId(displayId);
   startCapture(sourceId);
 
-  // Update dock menu to reflect new selection
+  // Update dock menu + in-panel display switcher to reflect new selection.
   buildDockMenu();
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('displays-changed');
+  }
+}
+
+/** Toggle overlay user-panel visibility (canvas overlay arrows continue regardless). */
+function togglePanel(): void {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('toggle-panel');
+  }
 }
 
 /** Build the dock menu with display list and panel reset */
@@ -251,8 +265,8 @@ function buildDockMenu(): void {
     for (const display of displays) {
       const isPrimary = display.id === screen.getPrimaryDisplay().id;
       const label = isPrimary
-        ? `Built-in Display (${display.size.width}\u00d7${display.size.height})`
-        : `Display (${display.size.width}\u00d7${display.size.height})`;
+        ? `Built-in Display \u00b7 ${display.size.width}\u00d7${display.size.height}`
+        : `External Display \u00b7 ${display.size.width}\u00d7${display.size.height}`;
       template.push({
         label,
         type: 'checkbox',
@@ -264,15 +278,36 @@ function buildDockMenu(): void {
   }
 
   template.push({
-    label: 'Reset Panel Position',
-    click: () => {
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send('reset-panel-position');
-      }
-    },
+    label: 'Toggle Control Panel',
+    accelerator: 'CommandOrControl+Shift+H',
+    click: togglePanel,
+  });
+
+  template.push({
+    label: 'Restore Default Settings\u2026',
+    click: () => confirmAndResetAllSettings(),
   });
 
   (app as any).dock?.setMenu(Menu.buildFromTemplate(template));
+}
+
+/** Show the reset-all-settings confirmation dialog and, on confirmation,
+ *  tell the overlay renderer to wipe its prefs and reload. Shared by the
+ *  dock menu and the in-panel Settings → System button. */
+async function confirmAndResetAllSettings(): Promise<void> {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const { response } = await dialog.showMessageBox(overlayWindow, {
+    type: 'warning',
+    buttons: ['Cancel', 'Reset'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Restore default settings',
+    message: 'Restore all panel settings to defaults?',
+    detail: 'Clears your saved layout, panel size/position (returns to top-right), sliders, hidden sections, and all other preferences. The display capture choice is preserved.',
+  });
+  if (response === 1) {
+    overlayWindow.webContents.send('reset-all-settings');
+  }
 }
 
 // Serve vendor files via custom protocol so renderers can load them
@@ -438,27 +473,15 @@ ipcMain.on('update-lichess', (_e, fen: string, color: string) => {
   lichessWindow.loadURL(`https://lichess.org/analysis/${fenPath}?color=${side}`);
 });
 
-ipcMain.on('set-max-depth', (_e, depth: number) => {
-  if (analysisWindow && !analysisWindow.isDestroyed()) {
-    analysisWindow.webContents.send('set-max-depth', depth);
-  }
-});
-
 ipcMain.on('set-multi-pv-max', (_e, n: number) => {
   if (analysisWindow && !analysisWindow.isDestroyed()) {
     analysisWindow.webContents.send('set-multi-pv-max', n);
   }
 });
 
-ipcMain.on('set-multi-pv-ramp', (_e, n: number) => {
+ipcMain.on('set-manual-flip', (_e, v: boolean | null) => {
   if (analysisWindow && !analysisWindow.isDestroyed()) {
-    analysisWindow.webContents.send('set-multi-pv-ramp', n);
-  }
-});
-
-ipcMain.on('set-change-detect', (_e, enabled: boolean) => {
-  if (analysisWindow && !analysisWindow.isDestroyed()) {
-    analysisWindow.webContents.send('set-change-detect', enabled);
+    analysisWindow.webContents.send('set-manual-flip', v);
   }
 });
 
@@ -512,6 +535,26 @@ ipcMain.on('save-frame-artifact', (_e, filename: string, buf: Uint8Array) => {
   }
 });
 
+// In-panel System group — same flows the dock menu offers.
+ipcMain.on('request-reset-all-settings', () => {
+  void confirmAndResetAllSettings();
+});
+
+ipcMain.handle('get-displays', () => {
+  const primaryId = screen.getPrimaryDisplay().id;
+  return screen.getAllDisplays().map(d => ({
+    id: d.id,
+    width: d.size.width,
+    height: d.size.height,
+    primary: d.id === primaryId,
+    activeId: activeDisplayId,
+  }));
+});
+
+ipcMain.on('switch-display', (_e, id: number) => {
+  void switchDisplay(id);
+});
+
 // ── App lifecycle ──
 
 // Enforce single instance — quit if another copy is already running
@@ -530,14 +573,20 @@ app.whenReady().then(() => {
   activeDisplayId = savedDisplayExists ? savedDisplayId! : screen.getPrimaryDisplay().id;
   buildDockMenu();
 
-  // Rebuild dock menu when displays change
-  screen.on('display-added', () => buildDockMenu());
+  // Rebuild dock menu + notify the overlay panel when displays change.
+  const notifyDisplaysChanged = (): void => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('displays-changed');
+    }
+  };
+  screen.on('display-added', () => { buildDockMenu(); notifyDisplaysChanged(); });
   screen.on('display-removed', () => {
     // If active display was removed, fall back to primary
     if (activeDisplayId != null && !screen.getAllDisplays().some(d => d.id === activeDisplayId)) {
       switchDisplay(screen.getPrimaryDisplay().id);
     }
     buildDockMenu();
+    notifyDisplaysChanged();
   });
 
   registerVendorProtocol();
@@ -547,6 +596,12 @@ app.whenReady().then(() => {
     // Allow all display media requests (source is selected via our picker)
     callback({});
   });
+
+  // Global hotkey to toggle the overlay user-panel without focusing the app.
+  // Same accelerator as the "Show/Hide Panel" dock menu entry.
+  if (!globalShortcut.register('CommandOrControl+Shift+H', togglePanel)) {
+    fs.appendFileSync(LOG, `[chessray] Failed to register CommandOrControl+Shift+H global shortcut\n`);
+  }
 
   const screenStatus = platform.getScreenCaptureStatus(systemPreferences);
   fs.writeFileSync(LOG, `[chessray] App ready. Screen status=${screenStatus} platform=${process.platform} (trying capture)\n`);
@@ -560,6 +615,10 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (platform.quitOnAllWindowsClosed) app.quit();
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
 
 

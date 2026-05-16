@@ -1,7 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ChessRayAPI } from '@chessray/overlay-ui';
 
 /** Typed API exposed to renderer processes via window.chessRay */
-const api = {
+const api: ChessRayAPI = {
   // Analysis renderer: receive capture commands
   onStartCapture: (cb: (sourceId: string) => void) =>
     ipcRenderer.on('start-capture', (_e, sourceId: string) => cb(sourceId)),
@@ -49,24 +50,16 @@ const api = {
     ipcRenderer.send('reopen-picker'),
 
   // Engine settings
-  setMaxDepth: (depth: number) =>
-    ipcRenderer.send('set-max-depth', depth),
-  onSetMaxDepth: (cb: (depth: number) => void) =>
-    ipcRenderer.on('set-max-depth', (_e, depth: number) => cb(depth)),
   setMultiPvMax: (n: number) =>
     ipcRenderer.send('set-multi-pv-max', n),
   onSetMultiPvMax: (cb: (n: number) => void) =>
     ipcRenderer.on('set-multi-pv-max', (_e, n: number) => cb(n)),
-  setMultiPvRamp: (n: number) =>
-    ipcRenderer.send('set-multi-pv-ramp', n),
-  onSetMultiPvRamp: (cb: (n: number) => void) =>
-    ipcRenderer.on('set-multi-pv-ramp', (_e, n: number) => cb(n)),
 
-  // Change detection
-  setChangeDetect: (enabled: boolean) =>
-    ipcRenderer.send('set-change-detect', enabled),
-  onSetChangeDetect: (cb: (enabled: boolean) => void) =>
-    ipcRenderer.on('set-change-detect', (_e, enabled: boolean) => cb(enabled)),
+  // Manual orientation override (null = auto-detect, true/false = user choice)
+  setManualFlip: (v: boolean | null) =>
+    ipcRenderer.send('set-manual-flip', v),
+  onSetManualFlip: (cb: (v: boolean | null) => void) =>
+    ipcRenderer.on('set-manual-flip', (_e, v: boolean | null) => cb(v)),
 
   // Frame rate
   setTargetFps: (fps: number) =>
@@ -74,9 +67,24 @@ const api = {
   onSetTargetFps: (cb: (fps: number) => void) =>
     ipcRenderer.on('set-target-fps', (_e, fps: number) => cb(fps)),
 
-  // Panel reset
-  onResetPanelPosition: (cb: () => void) =>
-    ipcRenderer.on('reset-panel-position', () => cb()),
+  // Panel show/hide toggle (driven by global shortcut + dock menu)
+  onTogglePanel: (cb: () => void) =>
+    ipcRenderer.on('toggle-panel', () => cb()),
+
+  // Wipe saved prefs and reload the overlay (dock-menu "Restore Default Settings")
+  onResetAllSettings: (cb: () => void) =>
+    ipcRenderer.on('reset-all-settings', () => cb()),
+
+  // Trigger the same flow the dock menu does (so the in-panel System group
+  // mirrors the dock menu without re-implementing the confirm dialog).
+  requestResetAllSettings: () =>
+    ipcRenderer.send('request-reset-all-settings'),
+  getDisplays: (): Promise<{ id: number; width: number; height: number; primary: boolean; activeId: number | null }[]> =>
+    ipcRenderer.invoke('get-displays'),
+  switchDisplay: (id: number) =>
+    ipcRenderer.send('switch-display', id),
+  onDisplaysChanged: (cb: () => void) =>
+    ipcRenderer.on('displays-changed', () => cb()),
 
   // Frame recording (test fixture capture)
   startRecording: () => ipcRenderer.send('start-recording'),
@@ -97,8 +105,20 @@ const api = {
     ipcRenderer.send('toggle-lichess', fen, color),
   updateLichess: (fen: string, color: string) =>
     ipcRenderer.send('update-lichess', fen, color),
+
+  // PV control sync — Electron's panel + on-screen overlay live in the
+  // same overlay window's DOM and share state, so no broadcast needed.
+  broadcastPvAction: () => { /* same-document host: state sync is direct */ },
+  onPvAction: () => { /* same-document host: state sync is direct */ },
+
+  // Side-panel CTA wired into the extension uses chrome.tabCapture; Electron
+  // has no source-picker bridge yet so the in-board "Start capture" button is
+  // a no-op here. Lands properly when the desktopCapture flow is plumbed.
+  requestStartCapture: () => { /* TODO: wire to source picker */ },
 };
 
 contextBridge.exposeInMainWorld('chessRay', api);
 
-export type ChessRayAPI = typeof api;
+// Re-export so existing electron-side imports keep resolving without
+// changes; the canonical definition now lives in @chessray/overlay-ui.
+export type { ChessRayAPI };

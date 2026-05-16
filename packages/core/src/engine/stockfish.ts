@@ -11,6 +11,12 @@ export interface EvalEngine {
     multiPV: number,
     signal?: AbortSignal,
   ): Promise<EvalResult | null>;
+  /** Tell the engine the next position is from a fresh game.
+   *  Sends `ucinewgame` + waits `readyok` so Stockfish flushes per-game
+   *  state (transposition entries from unrelated previous positions
+   *  that gradually pollute the hash and slow successive searches).
+   *  Optional in the interface — test stubs can omit it. */
+  newGame?(): Promise<void>;
 }
 
 export interface StockfishOptions {
@@ -214,6 +220,14 @@ export class StockfishEngine {
     signal?: AbortSignal,
   ): Promise<EvalResult | null> {
     return new Promise<EvalResult | null>((resolve) => {
+      // Keep the engine's MultiPV in sync with the caller's request. Without
+      // this, direct runDepth() callers (bypassing run()) get the defaultMultiPV
+      // set during UCI init — so ramp-up past the starting N silently returns
+      // fewer PV lines than requested.
+      if (multiPV !== this.defaultMultiPV) {
+        this.send(`setoption name MultiPV value ${multiPV}`);
+        this.defaultMultiPV = multiPV;
+      }
       const startTime = Date.now();
       // Safety timeout: 5 minutes. Normal cancellation uses AbortSignal.
       const timeout = setTimeout(() => {
@@ -282,6 +296,39 @@ export class StockfishEngine {
 
   stop(): void {
     this.send('stop');
+  }
+
+  /** UCI 'ucinewgame' + sync via 'isready'. Serialized through the
+   *  same busyPromise chain as runDepth so it can't interleave with an
+   *  in-flight search. Call between unrelated positions to keep the
+   *  transposition table from polluting successive searches over a
+   *  long live-analysis session. */
+  newGame(): Promise<void> {
+    const run = this.busyPromise.then(() => this.doNewGame());
+    this.busyPromise = run.then(() => {}, () => {});
+    return run;
+  }
+
+  private doNewGame(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (!this.worker || !this.ready) {
+        reject(new Error('Stockfish not initialized'));
+        return;
+      }
+      const timeout = setTimeout(() => {
+        this.messageHandler = null;
+        reject(new Error('newGame timed out'));
+      }, 5000);
+      this.messageHandler = (line: string) => {
+        if (line.includes('readyok')) {
+          clearTimeout(timeout);
+          this.messageHandler = null;
+          resolve();
+        }
+      };
+      this.send('ucinewgame');
+      this.send('isready');
+    });
   }
 
   destroy(): void {

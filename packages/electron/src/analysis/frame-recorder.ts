@@ -10,7 +10,7 @@
  * the processor completes, not here, because only the processor knows the result.
  */
 
-import type { ImageDataLike } from './frame-processor.js';
+import type { ImageDataLike } from '@chessray/runtime';
 
 let recording = false;
 let frameN = 0;

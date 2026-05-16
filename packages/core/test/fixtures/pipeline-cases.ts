@@ -35,8 +35,8 @@ const REQUIRED_FIELDS: Array<keyof PipelineTestCase> = [
 
 const VALID_ORIENTATIONS = ['white bottom', 'white top'];
 const VALID_TURNS = ['w', 'b', null];
-const VALID_ORIENTATION_SOURCES = ['label', 'pawn_move', 'piece_count'];
-const VALID_LABEL_REASONS = ['piece_count', 'cached'];
+const VALID_ORIENTATION_SOURCES = ['label', 'manual', 'piece_count'];
+const VALID_LABEL_REASONS = ['piece_count', 'cached', 'manual'];
 const SQUARE_RE = /^[a-h][1-8]$/;
 
 function validateCase(tc: any, index: number): PipelineTestCase {

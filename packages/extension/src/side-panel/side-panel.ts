@@ -1,0 +1,293 @@
+/**
+ * Popup: hosts the full @chessray/overlay-ui panel. Same canvas-renderer,
+ * eval bar, top-moves list, settings and diagnostics the Electron app
+ * uses. Capture start/stop is driven by the toolbar icon
+ * (chrome.action.onClicked → service-worker), not from this popup —
+ * the popup just preloads the target tab id so pref changes here can
+ * be relayed to the captured tab's content script.
+ */
+
+import { mountOverlay, createDefaultBridge, DEFAULT_PREFS, type ChessRayAPI, type DisplayInfo } from '@chessray/overlay-ui';
+import type { ExtensionMessage, ExtensionSetting } from '../shared/messages.js';
+// Popup owns its document, so it can safely load panel.css's global
+// rules. (mount-overlay.ts no longer pulls panel.css automatically —
+// that was leaking body{overflow:hidden} into every page the content
+// script ran on.)
+import '@chessray/overlay-ui/src/panel.css';
+import './side-panel.css';
+
+// ── Pre-resolve target tabId at popup load ──────────────────────────
+// Used by the localStorage→content-script pref relay below so the
+// captured tab's overlay re-renders when the user toggles things in
+// the popup. Falls back from sw-target → currentWindow → lastFocused
+// → any so the relay works even when the popup is opened in odd ways
+// (test harness paths, side-panel re-open after capture stopped).
+let cachedTabId: number | null = null;
+/** True iff cachedTabId came from the SW's lastInvokedTabId (i.e. the
+ *  user clicked the toolbar icon at least once for this tab — Chrome
+ *  granted activeTab and tabCapture.getMediaStreamId will succeed).
+ *  False when we fell back to chrome.tabs.query because the SW had no
+ *  invocation record — that path produces a tabId, but tabCapture will
+ *  reject with "Extension has not been invoked". The Start-capture
+ *  button uses this to render a clearer hint to the user. */
+let tabWasInvoked = false;
+async function preloadTabId(): Promise<void> {
+  const params = new URLSearchParams(location.search);
+  const override = params.get('tabId');
+  if (override) {
+    cachedTabId = Number(override);
+    // Treat ?tabId=N as test-harness instrumentation; assume the harness
+    // already arranged for the tab to be invokable.
+    tabWasInvoked = true;
+    syncStartCaptureLabel();
+    return;
+  }
+  try {
+    const resp = await chrome.runtime.sendMessage({ type: 'get-target-tab' } satisfies ExtensionMessage);
+    if (resp?.tabId != null) {
+      cachedTabId = resp.tabId;
+      tabWasInvoked = true;
+      syncStartCaptureLabel();
+      return;
+    }
+  } catch { /* SW unreachable; fall through */ }
+  const isContent = (t: chrome.tabs.Tab | undefined): boolean =>
+    !!t?.url && (t.url.startsWith('http://') || t.url.startsWith('https://'));
+  const queries: chrome.tabs.QueryInfo[] = [
+    { active: true, currentWindow: true },
+    { active: true, lastFocusedWindow: true },
+    { currentWindow: true },
+    {},
+  ];
+  for (const q of queries) {
+    const tabs = await chrome.tabs.query(q);
+    const t = tabs.find(isContent);
+    if (t) {
+      cachedTabId = t.id ?? null;
+      // Fell through from get-target-tab — no toolbar invocation, so
+      // tabCapture won't grant. Surface the "click the icon" hint.
+      tabWasInvoked = false;
+      syncStartCaptureLabel();
+      return;
+    }
+  }
+  cachedTabId = null;
+  tabWasInvoked = false;
+  syncStartCaptureLabel();
+}
+/** Update the in-panel Start-capture button to reflect whether the tab
+ *  has been invoked. The button is owned by mount-overlay (panel-template
+ *  emits it, mount-overlay attaches the click handler), but the label
+ *  text is host-specific — only the extension's right-click-open path
+ *  needs the "click the icon" wording — so we toggle it from here.
+ *
+ *  preloadTabId fires before mountOverlay (the latter runs synchronously
+ *  at module load; this runs after the SW response). The button is
+ *  guaranteed to exist by the time we resolve, so a single getElementById
+ *  is enough — no DOM polling needed. */
+function syncStartCaptureLabel(): void {
+  const btn = document.getElementById('cv-start-capture-btn');
+  const span = btn?.querySelector('span');
+  if (!span) return;
+  span.textContent = tabWasInvoked
+    ? 'Start capture'
+    : 'Click the Chessray icon\nin your Chrome toolbar \u2197';
+}
+void preloadTabId();
+
+// When the SW updates the invoked tab id (i.e., the user clicks the
+// toolbar icon and the side panel rehydrates onto a new tab), refresh
+// the cached tab id so subsequent pref changes go to the right tab.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'session') return;
+  if ('__chessrayInvokedTab' in changes) void preloadTabId();
+});
+
+// ── Frame-result + display-info plumbing ───────────────────────────────
+const frameResultListeners: Array<(r: unknown) => void> = [];
+const displayInfoListeners: Array<(info: DisplayInfo) => void> = [];
+const stopTrackingListeners: Array<() => void> = [];
+
+chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
+  if (msg.type === 'frame-result') {
+    for (const cb of frameResultListeners) cb(msg.result);
+  }
+  if (msg.type === 'capture-stopped') {
+    for (const cb of stopTrackingListeners) cb();
+  }
+});
+
+function applySetting(setting: ExtensionSetting): void {
+  chrome.runtime.sendMessage({ type: 'apply-setting', setting } satisfies ExtensionMessage).catch(() => {});
+}
+
+// ── Bridge ─────────────────────────────────────────────────────────────
+
+const bridge: ChessRayAPI = createDefaultBridge({
+  sendDebugLog: (msg: string) => { console.log('[chessray]', msg); },
+
+  onFrameResult: (cb) => { frameResultListeners.push(cb); },
+
+  onStopTracking: (cb) => { stopTrackingListeners.push(cb); },
+
+  /** Click handler for the in-panel "Start capture" CTA. Mirrors the
+   *  toolbar-icon path (action.onClicked in service-worker.ts:295) but
+   *  initiated from the side panel: getMediaStreamId MUST run synchronously
+   *  in the click's user-gesture context — putting an `await` before it
+   *  consumes the gesture and Chrome refuses the request, exactly the same
+   *  failure mode the toolbar-icon code documents. We then send the
+   *  resulting streamId to the SW's start-capture handler, which already
+   *  knows how to spin up the offscreen recorder and pipe frame-results
+   *  back. cachedTabId is preloaded at popup load (preloadTabId, line 26)
+   *  so it's available without an awaited query. Errors throw — the user
+   *  pressed the button and deserves a loud failure rather than a silent
+   *  no-op (matches the project's no-fallback rule). */
+  requestStartCapture: () => {
+    if (cachedTabId == null) {
+      throw new Error('chessray: requestStartCapture called before target tab id was resolved');
+    }
+    const tabId = cachedTabId;
+    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
+      if (chrome.runtime.lastError || !streamId) {
+        throw new Error(`chessray: tabCapture.getMediaStreamId failed: ${chrome.runtime.lastError?.message ?? 'no stream id'}`);
+      }
+      chrome.runtime.sendMessage({ type: 'start-capture', tabId, streamId } satisfies ExtensionMessage);
+    });
+  },
+
+  onDisplayInfo: (cb) => {
+    displayInfoListeners.push(cb);
+    cb({
+      scaleFactor: window.devicePixelRatio || 1,
+      overlayBounds: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
+      displayBounds: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
+    });
+  },
+
+  setMultiPvMax: (n) => applySetting({ key: 'multi-pv-max', value: n }),
+  setManualFlip: (v) => applySetting({ key: 'manual-flip', value: v }),
+  setTargetFps: (fps) => applySetting({ key: 'target-fps', value: fps }),
+
+  requestResetAllSettings: () => {
+    if (!confirm('Reset all panel settings to defaults?')) return;
+    // Side panel and the captured tab's content script keep separate
+    // localStorage. Just removing our own copy and reloading would leave
+    // the on-page overlay running with the previous prefs (we can't reload
+    // the user's tab). Writing DEFAULT_PREFS via setItem trips the mirror
+    // below, which relays a prefs-update to the content script —
+    // applyPrefsToHiddenPanel then re-fires every panel control on that
+    // side so the visible markers (arrow size/opacity, loss threshold,
+    // eval bar, border) snap back to defaults live.
+    try {
+      localStorage.setItem('chessray-prefs', JSON.stringify(DEFAULT_PREFS));
+    } catch { /* ignore */ }
+    location.reload();
+  },
+
+  closeApp: () => { window.close(); },
+  openExternal: (url) => { chrome.tabs.create({ url }); },
+  toggleLichess: (fen, color) => {
+    // Match the Electron path: pass the *full* FEN with spaces → underscores
+    // so Lichess parses side-to-move, castling, etc. Position-only FENs
+    // silently render the starting position.
+    const fenPath = fen.replace(/ /g, '_');
+    const side = color === 'black' ? 'black' : 'white';
+    chrome.tabs.create({ url: `https://lichess.org/analysis/${fenPath}?color=${side}` });
+  },
+
+  // PV control sync: popup ↔ content script. Each surface broadcasts its
+  // own user-initiated PV actions; the SW relays popup→content via
+  // chrome.tabs.sendMessage, content→popup auto-broadcasts via runtime.
+  broadcastPvAction: (action) => {
+    chrome.runtime.sendMessage({ type: 'pv-action', action, from: 'popup' } satisfies ExtensionMessage)
+      .catch(() => {});
+  },
+  onPvAction: (cb) => {
+    chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
+      if (msg?.type === 'pv-action' && msg.from === 'content') cb(msg.action);
+    });
+  },
+});
+
+mountOverlay(bridge, { hideWindowControls: true });
+// Ensure the Start-capture button label reflects the current tabWasInvoked
+// state. preloadTabId fires before mountOverlay; if it took the override
+// path (synchronous, no await), syncStartCaptureLabel ran before the
+// button existed and was a no-op. Calling it again after mountOverlay
+// covers that case. The async paths in preloadTabId resolve later and
+// also call syncStartCaptureLabel — by then the button exists, so they
+// update normally. This call is the one-shot belt-and-suspenders.
+syncStartCaptureLabel();
+
+// ── Engine info in Diagnostics ────────────────────────────────────────
+// Inject a small "Engine" line at the top of the diagnostics view
+// surfacing the YOLO ONNX execution provider (webgpu vs wasm) and
+// recent applyConstraints results — both come from the SW trace,
+// which is populated by debugLog() in offscreen. The trace lives in
+// the SW only; pull it on bootstrap and on a 2s interval so the side
+// panel always shows fresh values without DevTools.
+function ensureEngineInfoEl(): HTMLElement | null {
+  let el = document.getElementById('cv-engine-info') as HTMLElement | null;
+  if (el) return el;
+  const debugSection = document.getElementById('debug-section');
+  if (!debugSection) return null;
+  el = document.createElement('div');
+  el.id = 'cv-engine-info';
+  // Append at the BOTTOM of the diagnostics view — it's reference info,
+  // not the primary thing the user is looking at. Styled in side-panel.css.
+  el.textContent = 'Engine info: loading…';
+  debugSection.appendChild(el);
+  return el;
+}
+
+function renderEngineInfo(info: { yolo?: string; stream?: string; constraints?: string } | null): void {
+  const el = ensureEngineInfoEl();
+  if (!el) return;
+  if (!info) { el.textContent = 'Engine info: loading…'; return; }
+  const parts: string[] = [];
+  if (info.yolo) parts.push(info.yolo);
+  if (info.stream) parts.push(info.stream);
+  if (info.constraints) parts.push(info.constraints);
+  el.textContent = parts.length ? parts.join('\n') : 'Engine info: capture not started';
+}
+
+async function refreshEngineInfo(): Promise<void> {
+  // Direct query to offscreen. SW also receives the message but has no
+  // handler for it, so offscreen's response wins. If offscreen isn't
+  // up yet (capture never started this session), the message rejects
+  // and we surface that.
+  try {
+    const resp = await chrome.runtime.sendMessage({ type: 'get-engine-info' } satisfies ExtensionMessage);
+    renderEngineInfo(resp?.info ?? null);
+  } catch {
+    const el = ensureEngineInfoEl();
+    if (el) el.textContent = 'Engine info: offscreen not running (start capture)';
+  }
+}
+void refreshEngineInfo();
+
+// Live updates: offscreen broadcasts engine-info-update on every change.
+chrome.runtime.onMessage.addListener((msg: ExtensionMessage) => {
+  if (msg.type === 'engine-info-update') renderEngineInfo(msg.info);
+});
+
+// Belt-and-braces: also poll every 3s in case a broadcast was missed
+// (e.g. side panel opened mid-flight before the YOLO load fired).
+setInterval(refreshEngineInfo, 3000);
+
+// Relay pref changes to the captured tab's content script so the on-page
+// overlay (border/box, arrow opacity/size, eval-bar opacity, etc.) keeps
+// up with what the user just toggled in the side panel. Side panel and
+// content script each have their own localStorage; without this bridge,
+// every setting only takes effect inside the (hidden) side-panel canvas.
+const origSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = (key: string, value: string): void => {
+  origSetItem(key, value);
+  if (key !== 'chessray-prefs' || cachedTabId == null) return;
+  try {
+    const prefs = JSON.parse(value) as Record<string, unknown>;
+    void chrome.tabs.sendMessage(cachedTabId, {
+      type: 'prefs-update', prefs,
+    } satisfies ExtensionMessage).catch(() => { /* content script may be missing */ });
+  } catch { /* ignore parse errors */ }
+};

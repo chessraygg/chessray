@@ -1,0 +1,1903 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: rgba(23, 23, 23, 0.95);
+  --bg-inset: #0f0f0f;
+  --bg-hover: #1f1f1f;
+  --border: #272727;
+  --text: #e5e5e5;
+  --text-dim: #9ca3af;
+  --text-muted: #6b7280;
+  --text-faint: #4b5563;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --radius: 8px;
+  --radius-sm: 4px;
+  --panel-w: 300px;
+  --accent: #f2b6b6;
+  --accent-hover: #4ade80;
+  --danger: #f87171;
+  --danger-hover: #fca5a5;
+}
+
+body {
+  background: transparent;
+  overflow: hidden;
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--text);
+}
+
+canvas#video-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/* ── Scrollbars ──
+ * macOS Chromium follows the system "Show scroll bars" setting; with a mouse
+ * attached this defaults to "Always", which clutters the panel's section
+ * bodies. Force overlay-style: invisible at rest, faint on container hover,
+ * darker on direct hover. Using ::-webkit-scrollbar (Chromium-only is fine,
+ * Electron is Chromium). */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+*:hover > ::-webkit-scrollbar-thumb,
+:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── Panel base ── */
+
+.panel {
+  position: fixed;
+  width: var(--panel-w);
+  height: var(--panel-h, 640px);
+  background: var(--bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  pointer-events: auto;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Full-screen dim backdrop for reset highlight */
+.reset-dim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 99;
+  pointer-events: none;
+  animation: dim-fade 1.2s ease-out forwards;
+}
+
+@keyframes dim-fade {
+  0%   { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.panel.flash {
+  z-index: 100;
+  animation: panel-highlight 1.2s ease-out;
+}
+
+@keyframes panel-highlight {
+  0%   { box-shadow: 0 0 20px rgba(34, 197, 94, 0.7), 0 0 40px rgba(34, 197, 94, 0.3); border-color: var(--accent); }
+  70%  { box-shadow: 0 0 20px rgba(34, 197, 94, 0.7), 0 0 40px rgba(34, 197, 94, 0.3); border-color: var(--accent); }
+  100% { box-shadow: none; border-color: var(--border); }
+}
+
+.color-pick {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.color-pick::-webkit-color-swatch-wrapper { padding: 1px; }
+.color-pick::-webkit-color-swatch { border: none; border-radius: 2px; }
+
+.resize-grip {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  user-select: none;
+}
+
+.resize-grip.bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
+.resize-grip.bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
+.resize-grip.top-right { top: 0; right: 0; cursor: nesw-resize; }
+.resize-grip.top-left { top: 0; left: 0; cursor: nwse-resize; }
+
+.resize-grip::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  opacity: 0.5;
+}
+
+.resize-grip.bottom-right::after { bottom: 3px; right: 3px; border-bottom: 2px solid var(--text-faint); border-right: 2px solid var(--text-faint); }
+.resize-grip.bottom-left::after { bottom: 3px; left: 3px; border-bottom: 2px solid var(--text-faint); border-left: 2px solid var(--text-faint); }
+.resize-grip.top-right::after { top: 3px; right: 3px; border-top: 2px solid var(--text-faint); border-right: 2px solid var(--text-faint); }
+.resize-grip.top-left::after { top: 3px; left: 3px; border-top: 2px solid var(--text-faint); border-left: 2px solid var(--text-faint); }
+
+.panel.hidden { display: none; }
+
+.user-panel {
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+}
+
+
+/* ── Split layout ── */
+
+.split-root {
+  display: flex;
+  flex: 1;
+  min-height: 200px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.split {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.split.row { flex-direction: row; }
+.split.col { flex-direction: column; }
+
+.splitter {
+  flex: 0 0 6px;
+  background: transparent;
+  position: relative;
+  z-index: 3;
+}
+.split.row > .splitter { cursor: col-resize; }
+.split.col > .splitter { cursor: row-resize; }
+/* Expanded hit-area pseudo (overhangs ±3px beyond the visible 6px bar) */
+.splitter::before {
+  content: '';
+  position: absolute;
+  background: transparent;
+  transition: background 0.12s;
+}
+.split.row > .splitter::before { top: 0; bottom: 0; left: -3px; right: -3px; }
+.split.col > .splitter::before { left: 0; right: 0; top: -3px; bottom: -3px; }
+/* Visible gripline */
+.splitter::after {
+  content: '';
+  position: absolute;
+  background: var(--border);
+  transition: background 0.12s;
+}
+.split.row > .splitter::after { top: 25%; bottom: 25%; left: 2px; right: 2px; }
+.split.col > .splitter::after { left: 25%; right: 25%; top: 2px; bottom: 2px; }
+.splitter:hover::after,
+.splitter.dragging::after { background: var(--accent); }
+
+.leaf {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  position: relative;
+}
+.leaf.dragging { opacity: 0.4; }
+
+.leaf-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Drop zones overlay — visible only while dragging */
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.leaf.drop-active .drop-overlay { opacity: 1; pointer-events: auto; }
+
+.drop-zone {
+  border: 1px dashed transparent;
+  transition: background 0.12s, border-color 0.12s;
+}
+.drop-zone.hover {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: var(--accent);
+}
+.zone-n { grid-column: 1 / 4; grid-row: 1 / 2; }
+.zone-s { grid-column: 1 / 4; grid-row: 3 / 4; }
+.zone-w { grid-column: 1 / 2; grid-row: 2 / 3; }
+.zone-e { grid-column: 3 / 4; grid-row: 2 / 3; }
+.zone-center { grid-column: 2 / 3; grid-row: 2 / 3; }
+
+/* Drag ghost follows cursor */
+.drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  background: var(--accent);
+  color: #000;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font: 600 10px/1 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ── Panel sections ── */
+
+.section-header {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  cursor: move;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid var(--border);
+}
+.section-header::before {
+  content: '⋮⋮';
+  font-size: 10px;
+  color: var(--text-faint);
+  letter-spacing: -2px;
+}
+.section-header .title { flex: 1; }
+.section-header .hide-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+.section-header .hide-btn:hover { color: var(--text); }
+
+.section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Hidden-sections tray (re-add hidden blocks) */
+.hidden-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0 0;
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
+}
+.hidden-tray:empty { display: none; }
+.hidden-tray button {
+  padding: 2px 8px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.hidden-tray button:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── Inline debug section ── */
+
+.debug-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.debug-section.hidden { display: none; }
+
+.debug-build {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--text-faint, rgba(255, 255, 255, 0.45));
+  letter-spacing: 0.02em;
+  padding: 2px 4px;
+  align-self: flex-start;
+}
+
+.debug-history-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  background: rgba(245,158,11,0.10);
+  border: 1px solid rgba(245,158,11,0.25);
+  font: 9px/1.2 var(--mono);
+  color: var(--text-dim);
+}
+.debug-history-nav .hist-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: 9px/1 var(--mono);
+  padding: 3px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.debug-history-nav .hist-btn:hover { background: rgba(255,255,255,0.10); }
+.debug-history-nav .hist-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.debug-history-nav .hist-btn.hist-live.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0a0a0a;
+}
+.debug-history-nav .hist-idx {
+  min-width: 36px;
+  text-align: center;
+  color: #f59e0b;
+  font-weight: 600;
+}
+.debug-history-nav .hist-meta {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 8px;
+}
+.debug-history-nav .hist-clear {
+  margin-left: 4px;
+  color: var(--text-faint);
+}
+
+/* Slow-frame badge on the total bar */
+.ft-total .ft-slow-badge {
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--ft-over);
+  color: #0a0a0a;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Recognition cache pill (fresh = pipeline ran, cached = result reused) */
+.ft-total .ft-cache-badge {
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid currentColor;
+  background: transparent;
+}
+.ft-total .ft-cache-fresh  { color: var(--ft-fast); }
+.ft-total .ft-cache-cached { color: var(--text-faint); }
+
+/* Active FPS pill (set by the auto-tuner) */
+.ft-total .ft-fps-badge {
+  font-size: 9px;
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.debug-img-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  /* Cap visible area so a >100% scale doesn't blow out the panel — the image
+   * scrolls horizontally inside the wrap when it overflows. */
+  max-width: 100%;
+  overflow: auto;
+}
+
+.debug-section img {
+  width: 100%;
+  max-width: none;
+  border-radius: var(--radius-sm);
+  display: block;
+  object-fit: cover;
+}
+
+
+.ctrl-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font: 12px/1 var(--sans);
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
+}
+
+.ctrl-btn:hover { background: var(--bg-hover); color: var(--text); }
+.ctrl-btn.active { color: var(--text); }
+.ctrl-btn.close:hover { background: #c53030; color: #fff; }
+
+.ctrl-btn.chevron {
+  font-size: 10px;
+  transition: transform 0.2s ease, background 0.12s, color 0.12s;
+}
+
+.ctrl-btn.chevron.collapsed { transform: rotate(-90deg); }
+
+
+/* ── Top bar: icons + collapse/close, always visible ── */
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.top-bar .ctrl-btn { margin-left: auto; }
+.top-bar .ctrl-btn + .ctrl-btn { margin-left: 0; }
+
+
+
+.icon-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.icon-toggle svg { flex-shrink: 0; }
+
+.toggle-label { font-size: 9px; }
+
+/* ── Body ── */
+
+.panel-body {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+}
+
+.panel-body.hidden { display: none; }
+
+/* ── Toggle row ── */
+
+.toggle-row {
+  display: flex;
+  gap: 2px;
+}
+
+.toggle-row.compact { margin-top: 2px; }
+
+.toggle {
+  flex: 1;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+  font: 10px/1 var(--sans);
+  padding: 4px 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.toggle:hover { border-color: #3a3a3a; }
+.toggle.active { background: #272727; border-color: #3a3a3a; color: var(--text); }
+.toggle:disabled { opacity: 0.3; cursor: default; }
+.toggle.parent-hidden { opacity: 0.35; }
+
+.pv-depth-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 9px/1 var(--sans);
+  color: var(--text-faint);
+}
+
+.pv-depth-row > label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pv-depth-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--text-muted);
+}
+
+.pv-depth-row span {
+  min-width: 12px;
+  text-align: center;
+  font: 9px/1 var(--mono);
+  color: var(--text-faint);
+}
+
+/* ── Unified slider styling (V4: hairline + dot thumb) ──
+ * Applies to every range input inside the panel (Analysis, Settings,
+ * Debug). The bicolor track uses the runtime `--p` CSS var (0-100%) set
+ * by mount-overlay's slider-fill helper on every input event. */
+.panel input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  background: transparent;
+  margin: 0;
+  cursor: pointer;
+}
+.panel input[type="range"]::-webkit-slider-runnable-track {
+  height: 1px;
+  background: linear-gradient(to right,
+    var(--accent) 0%, var(--accent) var(--p, 50%),
+    #3a3a3a var(--p, 50%), #3a3a3a 100%);
+  border: 0;
+}
+.panel input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border: 0;
+  border-radius: 50%;
+  margin-top: -3.5px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
+  transition: box-shadow 0.15s, transform 0.12s;
+}
+.panel input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.panel input[type="range"]:focus { outline: none; }
+.panel input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+
+/* ── Board frame ── */
+
+.board-frame {
+  background: var(--bg-inset);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.board-fit {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.board-container {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  flex-shrink: 0;
+  transform: scale(var(--board-scale, 1));
+  transform-origin: center;
+}
+
+.board-container canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/* Arrow canvas accepts clicks so users can click arrows / click-to-reset
+ * during PV animation, mirroring the actual-board overlay interaction. */
+.board-container canvas#cv-arrow-canvas {
+  pointer-events: auto;
+}
+
+/* "Start capture" affordance — overlays the empty board so the user has a
+   visible call-to-action when nothing is being captured yet. Sits above
+   cv-arrow-canvas (canvas is z-auto, button is positioned absolute later
+   in source order, so it naturally stacks on top). The .board-container
+   already has position: relative so absolute positioning anchors here. */
+.board-container .board-start-btn {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(20, 20, 20, 0.55);
+  border: 1px dashed color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: 4px;
+  color: var(--text);
+  font: 600 11px/1.2 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+.board-container .board-start-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, rgba(20, 20, 20, 0.55));
+  border-style: solid;
+  border-color: var(--accent);
+}
+.board-container .board-start-btn svg {
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+/* Honor explicit '\n' in the textContent so the side-panel can render a
+   two-line instructional label when the tab hasn't been invoked yet
+   ('Click the Chessray icon\nin your Chrome toolbar ↗'). The 'Start
+   capture' single-line label has no '\n' and is unaffected. */
+.board-container .board-start-btn span {
+  white-space: pre-line;
+  text-align: center;
+  line-height: 1.3;
+}
+.board-container .board-start-btn[hidden] {
+  display: none;
+}
+
+/* Non-interactive informational overlay shown while capture is running but
+   no chessboard has been detected. Same dashed-border ghost style as the
+   start-capture button so the slot reads consistently, but no hover
+   affordance and no cursor: pointer (this is informational, not a CTA). */
+.board-container .board-status-msg {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(20, 20, 20, 0.55);
+  border: 1px dashed color-mix(in srgb, var(--text-muted) 60%, transparent);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font: 600 11px/1.2 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.board-container .board-status-msg svg {
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+.board-container .board-status-msg span {
+  text-align: center;
+}
+.board-container .board-status-msg[hidden] {
+  display: none;
+}
+
+/* ── Piece grid with SVG pieces ── */
+
+.piece-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 25px);
+  grid-template-rows: repeat(8, 25px);
+  width: 200px;
+  height: 200px;
+}
+
+.piece-grid .sq {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.piece-grid .sq svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Square background colors are set inline by renderBoardGrid using the
+ * detected real-board theme (with brightening when the grid has class
+ * "analysis"). See packages/core/src/shared/colors.ts. */
+
+/* ── Compact mode ── */
+
+.display-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 8px;
+}
+.display-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 9px/1 var(--sans);
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.display-toggle input { margin: 0; }
+.display-toggle input:checked + span { color: var(--text); }
+
+.panel.compact .top-bar { display: none; }
+.panel.compact .section-header { display: none; }
+.panel.compact .leaf { background: transparent; border: none; }
+.panel.compact .leaf-body { padding: 2px; }
+.panel.compact .splitter { display: none; }
+.panel.compact .hidden-tray { display: none; }
+.panel.compact .compact-moves { display: flex !important; }
+.panel.compact { padding: 4px; }
+/* Don't reserve 200px for an empty split-root in compact mode — that was the
+ * "blank section" above the double-click hint when all sections are hidden. */
+.panel.compact .split-root { min-height: 0; }
+.panel.compact .split-root:empty { display: none; }
+/* When no sections are visible, collapse panel to just the hint (invisible
+ * frame — user can still double-click the hint to exit compact). */
+.panel.compact:has(.split-root:empty) {
+  height: auto !important;
+  width: auto !important;
+  min-width: 0;
+  background: transparent;
+  border-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.compact-hint {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translate(-50%, 4px);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  white-space: nowrap;
+  font: 11px/1.2 var(--sans);
+  color: var(--text);
+  opacity: 0;
+  user-select: none;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.panel:hover .compact-hint { opacity: 0.75; }
+/* When the compact panel is empty (invisible frame), keep the hint visible
+ * so the user can still find and double-click to exit compact. */
+.panel.compact:has(.split-root:empty) .compact-hint { opacity: 0.75; }
+
+.compact-moves {
+  display: flex;
+  gap: 2px;
+  padding: 3px 0 0;
+  min-height: 35px;
+  flex-shrink: 0;
+}
+
+.compact-move {
+  flex: 1 1 0;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 4px 3px;
+  border-radius: 3px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.compact-move .compact-label {
+  display: block;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.compact-move .compact-loss {
+  display: block;
+  font-size: 8px;
+  line-height: 1.2;
+  opacity: 0.55;
+}
+.compact-move:hover { filter: brightness(1.2); }
+.compact-move.locked { border: 1px solid rgba(255, 255, 255, 0.3); }
+.compact-move.selected::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 15%;
+  right: 15%;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text);
+  opacity: 0.7;
+}
+
+.piece-anim {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10;
+  transition: left 0.35s ease-in-out, top 0.35s ease-in-out;
+}
+.piece-anim svg { width: 22px; height: 22px; }
+
+/* ── Board status bar ── */
+
+.board-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px;
+  background: rgba(0,0,0,0.3);
+}
+
+.turn-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.turn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.turn-dot.white { background: #f0f0f0; }
+.turn-dot.black { background: #1a1a1a; }
+
+.orientation-badge {
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 3px;
+  transition: background 0.1s, color 0.1s;
+}
+.orientation-badge:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+/* Active manual-override indicator */
+.orientation-badge.manual {
+  color: var(--accent);
+  background: var(--accent-soft, rgba(34, 197, 94, 0.15));
+}
+
+.orient-arrow {
+  display: inline-block;
+  font-size: 11px;
+}
+
+/* ── Eval bar ── */
+
+.eval-bar {
+  height: 14px;
+  background: #272727;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.eval-bar-fill {
+  height: 100%;
+  background: #d4d4d4;
+  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease;
+  min-width: 2px;
+}
+.eval-bar { transition: background 0.2s ease; }
+
+.eval-bar-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 10px/1 var(--mono);
+  color: #888;
+  mix-blend-mode: difference;
+}
+
+.eval-bar-depth {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  font: 8px/1 var(--mono);
+  color: #888;
+  mix-blend-mode: difference;
+}
+
+/* ── Best moves ── */
+
+.best-moves { font: 10px/1.4 var(--mono); }
+
+.best-moves .move-line {
+  padding: 3px 6px;
+  border-radius: 3px;
+  margin-bottom: 1px;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.best-moves .move-line { cursor: pointer; }
+.best-moves .move-line:hover { filter: brightness(1.3); }
+.best-moves .move-line.selected { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); background-blend-mode: lighten; }
+.move-score { font-weight: 600; margin-right: 2px; }
+
+
+.fen {
+  flex: 1;
+  padding: 3px 6px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-sm);
+  word-break: break-all;
+  font: 9px/1.4 var(--mono);
+  color: var(--text-muted);
+}
+.lichess-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lichess-sync-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 10px/1 var(--sans);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.lichess-sync-label input { margin: 0; }
+
+.debug-orient {
+  font: 9px/1.2 var(--sans);
+  color: var(--text-faint);
+}
+
+.meta {
+  font: 9px/1.3 var(--mono);
+  color: var(--text-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0;
+}
+.meta:empty { display: none; }
+.meta .ft-fallback { color: var(--text-faint); }
+
+/* ── Frame timing breakdown ──
+   Color levels (shared by total bar, stacked segments, per-row bars and ms text):
+     fast  <25ms  (<100ms total)  — green
+     ok    <75ms  (<250ms total)  — cyan
+     mid   <200ms (<400ms total)  — yellow
+     slow  <400ms (<500ms total)  — orange
+     over  ≥400ms (≥500ms total)  — red
+*/
+.meta {
+  --ft-fast: #22c55e;
+  --ft-ok:   #38bdf8;
+  --ft-mid:  #eab308;
+  --ft-slow: #f59e0b;
+  --ft-over: #ef4444;
+}
+.ft-stack .ft-fast,    .ft-rowbar-fill.ft-fast { background: var(--ft-fast); }
+.ft-stack .ft-ok,      .ft-rowbar-fill.ft-ok   { background: var(--ft-ok);   }
+.ft-stack .ft-mid,     .ft-rowbar-fill.ft-mid  { background: var(--ft-mid);  }
+.ft-stack .ft-slow,    .ft-rowbar-fill.ft-slow { background: var(--ft-slow); }
+.ft-stack .ft-over,    .ft-rowbar-fill.ft-over { background: var(--ft-over); }
+
+.ft-total {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.03);
+  border-left: 3px solid;
+  color: var(--text);
+}
+.ft-total.ft-fast { border-left-color: var(--ft-fast); background: rgba(34,197,94,0.10); }
+.ft-total.ft-ok   { border-left-color: var(--ft-ok);   background: rgba(56,189,248,0.10); }
+.ft-total.ft-mid  { border-left-color: var(--ft-mid);  background: rgba(234,179,8,0.10); }
+.ft-total.ft-slow { border-left-color: var(--ft-slow); background: rgba(245,158,11,0.12); }
+.ft-total.ft-over { border-left-color: var(--ft-over); background: rgba(239,68,68,0.14); }
+.ft-total-label {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 8px;
+  color: var(--text-faint);
+}
+.ft-total-ms {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 11px;
+}
+.ft-total .ft-meta {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 9px;
+}
+.ft-total .ft-eval { color: var(--accent); }
+
+.ft-stack {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.04);
+}
+.ft-stack .ft-seg {
+  height: 100%;
+  border-right: 1px solid rgba(0,0,0,0.35);
+}
+.ft-stack .ft-seg:last-child { border-right: none; }
+
+.ft-rows {
+  display: grid;
+  grid-template-columns: 78px 1fr 38px;
+  column-gap: 6px;
+  row-gap: 2px;
+  align-items: center;
+}
+.ft-rows .ft-row {
+  display: contents;
+}
+.ft-rows .ft-label {
+  color: var(--text-dim);
+  font-size: 9px;
+}
+.ft-row-dim .ft-label,
+.ft-row-dim .ft-ms { color: var(--text-faint); }
+.ft-rowbar {
+  position: relative;
+  height: 4px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.ft-rowbar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+}
+.ft-ms {
+  font-size: 9px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ft-ms.ft-ms-fast { color: var(--ft-fast); }
+.ft-ms.ft-ms-ok   { color: var(--ft-ok);   }
+.ft-ms.ft-ms-mid  { color: var(--ft-mid);  }
+.ft-ms.ft-ms-slow { color: var(--ft-slow); }
+.ft-ms.ft-ms-over { color: var(--ft-over); }
+.detection-status {
+  font: 9px/1.3 var(--mono);
+  color: #f59e0b;
+  padding: 2px 0;
+}
+
+/* ── Highlight detection debug ── */
+
+.highlight-debug {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font: 9px/1.35 var(--mono);
+  color: var(--text-dim);
+  padding: 2px 0;
+}
+.highlight-debug:empty { display: none; }
+
+.highlight-debug .hl-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.highlight-debug .hl-k {
+  color: var(--text-faint);
+  text-transform: uppercase;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  min-width: 78px;
+}
+.highlight-debug .hl-dim { color: var(--text-faint); }
+
+.highlight-debug .sw {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid rgba(255,255,255,0.15);
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
+.highlight-debug .hl-cand {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 4px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 3px;
+  color: var(--text);
+}
+.highlight-debug .hl-score { color: var(--text-dim); font-size: 8px; }
+.highlight-debug .hl-glyph { color: var(--accent); font-weight: 600; }
+
+.highlight-debug .hl-pairs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 78px;
+}
+.highlight-debug .hl-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 6px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 3px;
+  border-left: 2px solid transparent;
+}
+.highlight-debug .hl-pair.winner {
+  border-left-color: var(--accent);
+  background: rgba(34,197,94,0.08);
+  color: var(--text);
+}
+.highlight-debug .hl-pair-move { color: var(--text); font-weight: 600; }
+.highlight-debug .hl-pair-piece { color: var(--accent); }
+.highlight-debug .hl-pair-score { color: var(--text-dim); font-size: 8px; }
+.highlight-debug .hl-pair-pass {
+  color: var(--text-faint);
+  font-size: 8px;
+  background: rgba(255,255,255,0.05);
+  padding: 0 3px;
+  border-radius: 2px;
+}
+.highlight-debug .hl-natural { color: #22c55e; font-size: 8px; }
+.highlight-debug .hl-anno { color: #f59e0b; font-size: 8px; }
+.highlight-debug .hl-rejected { color: var(--text-faint); font-size: 8px; }
+
+.highlight-debug .hl-winner {
+  color: var(--text);
+  padding-top: 2px;
+  border-top: 1px dashed var(--border);
+}
+
+.highlight-debug .hl-flags { display: flex; gap: 4px; }
+.highlight-debug .hl-flag {
+  font-size: 8px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.highlight-debug .hl-flag.warn { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.highlight-debug .hl-flag.err { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+/* ── Zoom controls ── */
+
+
+/* ── Custom tooltips (native title doesn't work in transparent Electron windows) ──
+ * A single shared tooltip element lives at document.body level (injected by
+ * JS) so it escapes every ancestor overflow-clipping. `::after` pseudo-els
+ * don't work here because several panel ancestors use overflow:hidden/auto
+ * for scrolling, which would crop the tooltip. */
+
+.cv-tooltip {
+  position: fixed;
+  background: rgba(0,0,0,0.92);
+  color: #e5e5e5;
+  font: 10px/1.35 var(--sans);
+  padding: 5px 8px;
+  border-radius: 4px;
+  white-space: normal;
+  max-width: 240px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 10000;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  left: 0;
+  top: 0;
+}
+.cv-tooltip.visible { opacity: 1; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   v2 — actual-board-driven panel
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Panel rewrites a few base rules so the new layout has no chrome padding. */
+.user-panel {
+  padding: 0;
+  width: var(--panel-w);
+  min-width: 260px;
+  height: var(--panel-h, 540px);
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* In-moves board block: virtual board + eval bar above the move list */
+.r2-board-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+/* Board + eval bar both fill the panel content width. The ResizeObserver
+   in mount-overlay.ts reads .board-fit's contentRect and rewrites
+   --board-scale so the fixed-200px .board-container scales to fit; the
+   eval bar uses aspect-ratio for a Lichess-style 30:1 sliver that grows
+   in both axes with the panel. Matches across Electron + extension —
+   side-panel.css used to override this for the extension only because
+   panel.css previously pinned the board to 168×168 for the Electron
+   floating panel; the panel-width-driven layout works in both hosts now. */
+.r2-board-block .board-fit {
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.r2-board-block .eval-bar {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 30 / 1;
+}
+
+/* Header */
+.r2-head {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 4px 0 8px;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.22);
+  flex-shrink: 0;
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+}
+/* Single-row variant: tabs share the row with status dot, diag icon, and
+   window controls. Inner .r2-tabs lays out side-by-side with the buttons. */
+.r2-head-merged {
+  height: 32px;
+  padding: 0 4px 0 8px;
+  gap: 6px;
+}
+.r2-head-merged .r2-tabs {
+  height: 100%;
+  padding: 0;
+  gap: 0;
+  border-bottom: 0;
+  background: transparent;
+}
+.r2-head-merged .r2-tab {
+  align-self: stretch;
+  padding: 0 10px;
+}
+.r2-head-merged .r2-tab.active {
+  border-bottom-width: 2px;
+}
+/* Analysis-view inline controls (Top lines + Loss cap). Sits between the
+   status bar and the moves list as a compact two-row slider grid. */
+.r2-controls {
+  display: grid;
+  grid-template-columns: auto 1fr 36px;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 4px;
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.015);
+  font-size: 11px;
+}
+.r2-controls label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: help;
+}
+.r2-controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.r2-controls > span {
+  font: 10px var(--mono);
+  color: var(--text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* The header turn-dot reuses the global .turn-dot class because debug-panel.ts
+   rewrites className to "turn-dot white|black" each frame; selector targets
+   the dot only when it lives inside the header. */
+.r2-head .turn-dot {
+  width: 7px; height: 7px;
+  border: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+.r2-head .turn-dot.white { background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); }
+.r2-head .turn-dot.black { background: #1a1a1a; box-shadow: 0 0 0 1px #555; }
+.r2-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 10px var(--mono);
+  color: var(--text-faint);
+  margin-left: 4px;
+  letter-spacing: 0.04em;
+}
+.r2-meta-depth { color: var(--text-dim); }
+.r2-meta-depth:empty::before { content: "—"; color: var(--text-faint); }
+.r2-meta-lines,
+.r2-meta-fps { color: var(--text-faint); }
+.r2-meta-lines:empty,
+.r2-meta-fps:empty { display: none; }
+/* Middle-dot separators between non-empty header readouts. */
+.r2-meta > span + span:not(:empty)::before {
+  content: "·";
+  color: var(--text-faint);
+  margin: 0 6px 0 0;
+  opacity: 0.6;
+}
+.r2-meta > .r2-meta-orient::before { content: none; }
+.r2-meta-orient {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px; height: 16px;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: 10px;
+  transition: color 0.12s, background 0.12s;
+}
+.r2-meta-orient:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+.r2-meta-orient.manual { color: var(--accent); background: rgba(34, 197, 94, 0.15); }
+.r2-spacer { flex: 1; }
+.r2-btn {
+  width: 24px; height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  font-size: 12px;
+  line-height: 1;
+  font-family: var(--sans);
+}
+.r2-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+.r2-btn.active { color: var(--accent); background: rgba(34, 197, 94, 0.15); }
+.r2-btn.danger:hover { background: rgba(239, 68, 68, 0.18); color: #ef4444; }
+.r2-btn svg { width: 13px; height: 13px; }
+
+/* Panel body / view switching */
+.panel-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.panel-body.hidden { display: none; }
+.r2-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.r2-view[hidden] { display: none; }
+
+/* Move list (the hero view) */
+.r2-view-moves {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* Status bar: H2-style merged strip between the board and the moves list.
+   Three segments (turn, orientation, depth) share one rounded shell with
+   hairline dividers. Orientation segment is clickable and toggles a
+   .manual class when the user has overridden auto-detection. */
+.r2-status-bar {
+  display: flex;
+  align-items: stretch;
+  margin: 6px 8px 4px;
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  border-radius: var(--radius-sm, 6px);
+  background: rgba(255,255,255,0.02);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+  overflow: hidden;
+  user-select: none;
+}
+.r2-status-cell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 4px 6px;
+  text-align: center;
+  border-left: 1px solid var(--border, rgba(255,255,255,0.08));
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.r2-status-cell .r2-status-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.r2-status-cell:first-child { border-left: 0; }
+.r2-status-orient {
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.r2-status-orient:hover {
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+}
+.r2-status-orient.manual { color: var(--accent); }
+.r2-status-dot {
+  flex: 0 0 auto;
+}
+
+.r2-moves {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Sticky action bar under the moves list. Holds the Open in Lichess CTA so
+   it stays reachable in one click without scrolling the moves out. */
+.r2-bottom-bar {
+  display: flex;
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
+}
+.r2-bottom-bar .r2-lichess-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.r2-bottom-bar .r2-lichess-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.r2-bottom-bar .r2-lichess-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+/* Re-style the existing .move-line markup emitted by debug-panel.renderBestMoves
+   so the rest of the codebase doesn't need to change. */
+.r2-moves .move-line {
+  display: grid;
+  /* rank | san | score | loss — loss column reserved on every row
+     (even when empty) so rows align: without a fixed loss column,
+     the top line (no loss) had its score at a different x-position
+     than the rest. */
+  grid-template-columns: 18px 1fr auto 50px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background 0.1s, border-color 0.1s;
+  background: transparent !important;   /* override inline accent tint */
+  font-family: var(--sans);
+  font-size: 11px;
+}
+.r2-moves .move-line:hover { background: rgba(255, 255, 255, 0.04) !important; }
+.r2-moves .move-line.selected {
+  background: rgba(34, 197, 94, 0.10) !important;
+  border-left-color: var(--accent);
+}
+.r2-moves .move-line .r2-rank {
+  font: 10px var(--mono);
+  color: var(--text-faint);
+  text-align: center;
+}
+.r2-moves .move-line.selected .r2-rank { color: var(--accent); }
+.r2-moves .move-line .r2-san {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  font-family: 'Charter', 'Georgia', serif;
+}
+.r2-moves .move-line .r2-san em {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: 400;
+  margin-left: 8px;
+  letter-spacing: 0;
+}
+/* Inline SVG figurine pieces emitted by sanToUnicode (debug-panel.ts). The
+   SVGs have a fixed 45×45 viewBox with the piece body roughly filling
+   y=6..39 (≈73% of viewBox height), so on-screen height is deterministic
+   and we can target cap-height alignment without per-OS guesswork. */
+.r2-moves .move-line .r2-san svg.r2-piece {
+  width: 1.3em;
+  height: 1.3em;
+  vertical-align: -0.35em;
+}
+.r2-moves .move-line .r2-san em svg.r2-piece {
+  width: 1.4em;
+  height: 1.4em;
+  vertical-align: -0.4em;
+}
+.r2-moves .move-line .r2-score {
+  font: 12px var(--mono);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.r2-moves .move-line.r2-pos .r2-score { color: #86efac; }
+.r2-moves .move-line.r2-neg .r2-score { color: #fca5a5; }
+.r2-moves .move-line.selected .r2-score { color: var(--accent); font-weight: 600; }
+.r2-moves .move-line .r2-loss {
+  font: 9px var(--mono);
+  color: var(--text-faint);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Empty / waiting state for the move list */
+.r2-moves:empty::before {
+  content: "Waiting for board...";
+  display: block;
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+/* Surface (settings + debug) */
+.r2-tabs {
+  display: flex;
+  align-items: stretch;
+  height: 28px;
+  padding: 0 4px;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+.r2-tabs-spacer { flex: 1; }
+.r2-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.r2-tab:hover { color: var(--text-dim); }
+.r2-tab:focus { outline: none; }
+.r2-tab:focus-visible { outline: none; }
+.r2-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.r2-tab-diag {
+  padding: 0 8px;
+}
+.r2-tab-diag svg { width: 13px; height: 13px; }
+.r2-tab-diag.active { background: rgba(34, 197, 94, 0.1); }
+.r2-surface-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+/* Settings groups */
+.r2-group {
+  padding: 8px 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.r2-group:last-child { border-bottom: 0; }
+.r2-group-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+.r2-group .pv-depth-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+.r2-group .pv-depth-row > label { flex: 0 0 auto; }
+.r2-group .pv-depth-row input[type="range"] { flex: 1 1 auto; min-width: 60px; }
+.r2-group .pv-depth-row > span { flex: 0 0 auto; margin-left: auto; }
+.r2-group .pv-depth-row > span + .pv-unit { margin-left: 1px; }
+.r2-group .pv-depth-row label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.r2-group .pv-depth-row input[type=range] { width: 100%; accent-color: var(--accent); }
+.r2-group .pv-depth-row input[type=checkbox] { accent-color: var(--accent); justify-self: start; margin: 0; }
+.r2-group .pv-depth-row > span { font: 10.5px var(--mono); color: var(--text); text-align: right; }
+.r2-group .pv-depth-row .pv-unit { color: var(--text-faint); margin-left: 1px; }
+
+/* "Show on screen" switches (mirror checkboxes, drive hidden icon-toggles) */
+.r2-group .display-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.r2-group .display-toggle input { accent-color: var(--accent); margin: 0; }
+.r2-group .display-toggle span { flex: 1; }
+
+/* Tools group */
+.r2-group .lichess-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.r2-group .toggle-btn {
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s, color 0.12s;
+}
+.r2-group .toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+.r2-group .toggle-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(34,197,94,0.10); }
+.r2-group .lichess-sync-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.r2-group .lichess-sync-label input { accent-color: var(--accent); margin: 0; }
+
+/* Debug surface — restyle the existing classes to fit the new layout */
+.r2-view #debug-section {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* System group: reset actions + (multi-monitor) display switcher */
+.r2-system-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.r2-display-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.r2-display-switcher .toggle-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+/* Hidden legacy host (kept so JS handlers don't trip over null queries) */
+.r2-legacy-hidden { display: none !important; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   PV animation playback controls (YouTube-style bottom bar)
+   ───────────────────────────────────────────────────────────────────────── */
+
+.pv-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+  background: linear-gradient(to top,
+    rgba(0, 0, 0, 0.78) 0%,
+    rgba(0, 0, 0, 0.55) 70%,
+    rgba(0, 0, 0, 0) 100%);
+  padding: 14px 4px 4px;
+  opacity: 0;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+  z-index: 20;
+}
+.pv-controls.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pv-controls__progress {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 32px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.pv-controls__progress::before {
+  content: "";
+  display: block;
+  height: 100%;
+  width: var(--pv-progress, 0%);
+  background: rgba(255, 255, 255, 0.78);
+  border-radius: 2px;
+  transition: width 180ms ease;
+}
+
+.pv-controls__btn {
+  flex: 1;
+  height: 24px;
+  border-radius: 4px;
+  margin: 0 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s, background 0.15s, transform 0.1s;
+}
+.pv-controls__btn:hover { background: rgba(255, 255, 255, 0.10); color: #fff; }
+.pv-controls__btn:active { transform: scale(0.92); }
+.pv-controls__btn.is-hidden { visibility: hidden; pointer-events: none; }
+.pv-controls__btn svg { display: block; }
+
+/* Variant: anchored to the live video-overlay board bbox via CSS vars
+ * set by canvas-renderer each frame the PV animation is active. */
+.pv-controls--video {
+  position: fixed;
+  left: var(--pv-vboard-x, 0px);
+  top: calc(var(--pv-vboard-y, 0px) + var(--pv-vboard-h, 0px) - 32px);
+  width: var(--pv-vboard-w, 0px);
+  height: 32px;
+  right: auto;
+  bottom: auto;
+  display: none; /* hidden until pvBoardState is set */
+}
+.pv-controls--video.is-active { display: flex; }
