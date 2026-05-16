@@ -5,20 +5,27 @@
  *   node scripts/build-webstore.mjs
  *
  * Steps:
- *   1. Run `vite build` in packages/extension (production mode — CRXJS
+ *   1. Resolve the version from the latest `v*` git tag (release CI tags
+ *      every merge to main but does NOT commit a package.json bump back —
+ *      so packages/extension/package.json on main stays at 0.2.0 forever
+ *      and any local build would inherit that stale version). Temporarily
+ *      rewrite version in root + packages/* package.json so vite's bundle
+ *      and manifest.ts both pick up the tag-derived version. Restored in
+ *      a finally block so the working tree is left clean.
+ *   2. Run `vite build` in packages/extension (production mode — CRXJS
  *      emits a clean MV3 bundle without HMR/localhost shims).
- *   2. Validate dist/manifest.json: no localhost references, no wildcard
+ *   3. Validate dist/manifest.json: no localhost references, no wildcard
  *      web_accessible_resources, expected permissions, no 'unsafe-eval'.
- *   3. Scan every file under dist/ for accidental localhost / 127.0.0.1
+ *   4. Scan every file under dist/ for accidental localhost / 127.0.0.1
  *      references (would be a dev-build artifact).
- *   4. Zip dist/ contents into releases/chessray-v<version>.zip.
+ *   5. Zip dist/ contents into releases/chessray-v<version>.zip.
  *
  * Fails loudly on any validation failure — the goal is to make it
  * impossible to upload a dev build to the store by accident.
  */
 
 import { execSync } from 'node:child_process';
-import { readFileSync, mkdirSync, statSync, readdirSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, statSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -51,18 +58,70 @@ function* walk(dir) {
   }
 }
 
-const pkg = JSON.parse(readFileSync(join(extDir, 'package.json'), 'utf8'));
-const version = pkg.version;
-info(`extension version: ${version}`);
+// Resolve version from the latest v* git tag (mirrors what release.yml does
+// for Electron artifacts). Falls back to package.json only if no tag exists
+// in the working repo — that's the cold-start case where the release CI
+// hasn't tagged anything yet; warn loudly so the user knows.
+const latestTag = execSync(
+  'git tag -l "v*" --sort=-v:refname | head -n1',
+  { cwd: repoRoot, encoding: 'utf8' },
+).trim();
+const stalePkg = JSON.parse(readFileSync(join(extDir, 'package.json'), 'utf8'));
+let version;
+if (latestTag) {
+  version = latestTag.replace(/^v/, '');
+  info(`version: ${version} (from latest git tag ${latestTag})`);
+  if (version !== stalePkg.version) {
+    info(`  packages/extension/package.json shows ${stalePkg.version} on disk — ` +
+         `will be temporarily overwritten for the build, then restored.`);
+  }
+} else {
+  version = stalePkg.version;
+  info(`version: ${version} (from packages/extension/package.json — no v* git tag found; ` +
+       `run "git fetch --tags" if you expect one)`);
+}
 
-info('running production build');
-run('npm run build', extDir);
+// Snapshot every package.json that has a version field, rewrite to the
+// tag-derived version, then restore in a finally block. Matches the pattern
+// release.yml uses but doesn't commit the change back.
+const pkgPaths = [
+  join(repoRoot, 'package.json'),
+  ...readdirSync(join(repoRoot, 'packages'))
+    .map((name) => join(repoRoot, 'packages', name, 'package.json'))
+    .filter((p) => existsSync(p)),
+];
+const originalContents = new Map();
+for (const p of pkgPaths) {
+  const content = readFileSync(p, 'utf8');
+  originalContents.set(p, content);
+  const parsed = JSON.parse(content);
+  if (parsed.version === version) continue;
+  parsed.version = version;
+  writeFileSync(p, JSON.stringify(parsed, null, 2) + '\n');
+}
 
-info('validating dist/manifest.json');
-const manifest = JSON.parse(readFileSync(join(distDir, 'manifest.json'), 'utf8'));
+let manifest;
+try {
+  info('running production build');
+  run('npm run build', extDir);
+
+  info('validating dist/manifest.json');
+  manifest = JSON.parse(readFileSync(join(distDir, 'manifest.json'), 'utf8'));
+} finally {
+  // Always restore originals so the working tree is left exactly as found,
+  // even if the build / validation throws. Without this, a failed build would
+  // leave the user with a dirty diff to clean up by hand. Restoration must
+  // happen BEFORE any fail() call below — fail() calls process.exit(1) which
+  // bypasses pending finally blocks in Node, so version-check / structural
+  // validation fail()s have to live OUTSIDE this try.
+  for (const [p, content] of originalContents) {
+    writeFileSync(p, content);
+  }
+  info('restored original package.json files');
+}
 
 if (manifest.version !== version) {
-  fail(`manifest version (${manifest.version}) != package.json version (${version})`);
+  fail(`manifest version (${manifest.version}) != resolved version (${version})`);
 }
 
 const swPath = manifest?.background?.service_worker;
