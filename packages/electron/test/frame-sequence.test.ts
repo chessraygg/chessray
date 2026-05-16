@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { PNG } from 'pngjs';
 import { YoloPieceRecognizer, indexToSquare, type PipelineResult } from '@chessray/core';
-import { FrameProcessor, type ImageDataLike } from '../src/analysis/frame-processor.js';
+import { FrameProcessor, type ImageDataLike } from '@chessray/runtime';
 import { StubEngine } from './helpers/stub-engine.js';
 import { FRAME_SEQUENCE_CASES } from './fixtures/frame-sequences.js';
 
