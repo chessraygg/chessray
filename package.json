@@ -14,7 +14,9 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm test --workspaces --if-present",
+    "pretypecheck": "node scripts/ensure-build-info.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "pretest": "node scripts/ensure-build-info.mjs",
     "test:core": "cd packages/core && npx vitest run",
     "test:electron": "cd packages/electron && npx vitest run",
     "test:watch": "cd packages/core && npx vitest",
