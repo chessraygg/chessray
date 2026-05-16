@@ -4,7 +4,7 @@
   "private": true,
   "license": "GPL-3.0-or-later",
   "author": "chessraygg",
-  "description": "Chrome extension (MV3) for real-time chess position recognition and evaluation in-browser",
+  "description": "Stockfish evaluation overlay for chess streams, videos, replays, and screenshots. Local-only. Excludes chess.com / lichess.org.",
   "type": "module",
   "scripts": {
     "dev": "vite",
