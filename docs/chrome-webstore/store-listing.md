@@ -103,11 +103,6 @@ The Chessray analysis UI (board view, eval, move list, settings) lives in Chrome
 Provides a right-click "Chessray: Capture this tab" entry. Some Chrome versions suppress the toolbar action click when a side panel is configured; the context menu is a reliable fallback for invoking capture with a user gesture.
 ```
 
-**`activeTab`**
-```
-Grants per-invocation access to the tab the user activates Chessray on (toolbar click, context menu, keyboard shortcut). Used together with tabCapture.getMediaStreamId, which requires an active-tab grant or matching host permission.
-```
-
 **Host permission: `<all_urls>`**
 ```
 The on-page overlay is a content script that draws arrows, an eval bar, and a PV preview board on top of the captured board. The user may invoke Chessray on any site that happens to show a chess board (Twitch / YouTube streams, image viewers, PDF readers, screenshots, replay / study pages, archived games), so the script's match pattern cannot be narrowed to a fixed allowlist without breaking the long tail of sites where the feature is useful. No site is read or modified — the overlay is drawn into a top-level container; no page DOM is queried. chess.com and lichess.org are excluded explicitly: content_scripts.exclude_matches in the manifest prevents the overlay from ever injecting on those hosts, and a service-worker guard refuses to start tabCapture on those hosts from every invocation path (toolbar click, keyboard shortcut, context menu, side-panel CTA). The extension cannot be used to assist live games on either platform.

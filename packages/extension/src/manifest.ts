@@ -36,13 +36,16 @@ export default defineManifest({
     type: 'module',
   },
   permissions: [
-    'offscreen',
-    'scripting',
-    'storage',
-    'tabCapture',
-    'activeTab',
-    'sidePanel',
-    'contextMenus',
+    'offscreen',     // Stockfish WASM + ONNX inference (off the SW thread)
+    'scripting',     // executeScript reads tab viewport for overlay alignment
+    'storage',       // capture state + user prefs (chrome.storage.session/local)
+    'tabCapture',    // getMediaStreamId — core feature
+    'sidePanel',     // setPanelBehavior + open the analysis UI
+    'contextMenus',  // right-click "Capture this tab" fallback entry point
+    // activeTab intentionally NOT requested — it's redundant when
+    // host_permissions includes <all_urls>; tabCapture/scripting/tabs.*
+    // all work via the host permission, and the install prompt is already
+    // driven by <all_urls> so removing activeTab doesn't worsen UX.
   ],
   commands: {
     'toggle-capture': {
