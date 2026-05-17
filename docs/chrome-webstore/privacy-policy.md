@@ -71,7 +71,7 @@ extension bundle (`chrome.runtime.getURL`) — none are downloaded at runtime:
 | `offscreen`       | Run the Stockfish WASM engine and ONNX inference off the service-worker thread. |
 | `scripting`       | Inject the on-page overlay and read viewport size for accurate overlay placement. |
 | `storage`         | Persist user preferences (overlay opacity, panel layout) across browser restarts. |
-| `sidePanel`       | Open the Chessray side panel where the analysis UI lives. |
+| `sidePanel`       | Declare the Chessray side-panel surface so Chrome exposes "Open side panel" on the right-click menu of the toolbar icon. The panel hosts the analysis UI. |
 | `contextMenus`    | Provide a right-click "Capture this tab" entry as a fallback to the toolbar button. |
 | `activeTab`       | Grant per-invocation access when the user clicks the toolbar button or uses the keyboard shortcut. |
 | `<all_urls>`      | Allow the on-page overlay to draw on top of any site that contains a chess board (chess.com, lichess.org, YouTube, Twitch, image/PDF viewers, etc.). |

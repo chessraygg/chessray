@@ -48,7 +48,7 @@ It's built for content you watch, not games you play:
 • Chess books open as PDFs in the browser
 • Screenshots and image viewers
 
-How it's different from scan-on-demand extensions: no Scan button, no popup window, no jumping to an external analysis page. The overlay paints in place on the captured tab and updates continuously as moves happen. One click on the toolbar (or the keyboard shortcut) starts it; another click stops it. The side panel shows the full analysis — evaluation, principal variation, settings — while the on-page overlay keeps your eyes on the board.
+How it's different from scan-on-demand extensions: no Scan button, no popup window, no jumping to an external analysis page. The overlay paints in place on the captured tab and updates continuously as moves happen. One click on the toolbar (or the keyboard shortcut) starts it; another click stops it. For the detailed analysis view — evaluation, principal variation, settings — open Chrome's side panel by right-clicking the toolbar icon and choosing "Open side panel."
 
 Everything runs locally on your computer. No account, no sign-up, no data leaves your device. The Stockfish 18 Lite engine, the YOLOv11 board-recognition model, and the PaddleOCR orientation model are all bundled with the extension and load from the local extension bundle. No network calls during analysis.
 
@@ -58,7 +58,7 @@ Features:
 • Live board recognition from screen pixels — works on any site, no DOM scraping, no per-site integration
 • Stockfish 18 Lite (WASM) with iterative deepening and multi-PV
 • On-page overlay: best-move arrows, evaluation bar, and a small "PV board" preview
-• Side panel with full analysis and a one-click "Open in Lichess Analysis" button
+• Side panel with full analysis and a one-click "Open in Lichess Analysis" button (reachable via right-click on the toolbar icon → Open side panel)
 • Keyboard shortcut (configurable at chrome://extensions/shortcuts) to start/stop capture without touching the toolbar
 • Right-click "Capture this tab" context-menu fallback
 • Customizable: overlay size, opacity, what to show, panel layout
@@ -99,7 +99,7 @@ Skip for v1. Add later if a 30–60 s demo video is recorded showing capture on 
 
 ### Screenshots — 1280×800 or 640×400, JPEG/PNG no alpha, max 5, ≥1 required
 Suggested set (capture Chrome window at exactly 1280×800):
-1. **Hero shot** — on-page overlay (arrows + eval bar + PV board) **and** the side panel open together, on a lichess study or a YouTube chess video. This is the one that converts.
+1. **Hero shot** — on-page overlay (arrows + eval bar + PV board) and the side panel (manually opened via right-click toolbar → Open side panel) shown together, on a lichess study or a YouTube chess video. This is the one that converts.
 2. **Close-up overlay** — zoomed-in view of arrows + eval bar painted on a board mid-game.
 3. **Side panel detail** — full analysis view (eval, PV, settings).
 4. **Twitch chess stream** — Hikaru / chessbrah / BotezLive with Chessray's overlay live. Demonstrates the "live streams" use case.
@@ -182,7 +182,7 @@ Persists user preferences (overlay opacity, side-panel layout, last-known captur
 
 **`sidePanel`**
 ```
-The Chessray analysis UI (board view, eval, PV, settings) lives in Chrome's side panel. The sidePanel permission is required to open it programmatically when the user clicks the toolbar button or uses the keyboard shortcut.
+The Chessray analysis UI (board view, eval, PV, settings) lives in Chrome's side panel. The sidePanel permission is required to declare the side-panel surface in manifest.json so Chrome exposes the "Open side panel" entry on the right-click menu of the extension's toolbar icon. The panel is opened by the user from that menu.
 ```
 
 **`contextMenus`**
@@ -272,10 +272,10 @@ skimmed; this fits in the reviewer's eyeline at full zoom.
 
 ```
 1. Open any chess YouTube video (e.g. agadmator).
-2. Click the toolbar icon (or Alt+Shift+C, rebindable at chrome://extensions/shortcuts). Red ● badge appears; side panel opens.
-3. In ~1s: arrows + eval bar painted on the board, PV preview in corner. Overlay updates as the video plays — no manual scan.
-4. Click again to stop.
-5. Blocklist: chess.com / lichess.org refuse to start; toolbar flashes a red OFF badge for 2s.
+2. Click the toolbar icon (or Alt+Shift+C). Red ● badge appears.
+3. Within ~1s: arrows + eval bar painted on the board, PV preview in corner. Overlay updates as the video plays — no manual scan.
+4. Click toolbar icon to stop. Blocklist: chess.com / lichess refuse capture; red OFF badge flashes 2s.
+5. Open side panel manually: right-click toolbar icon → Open side panel.
 
 All analysis runs on-device. No network requests during capture.
 ```

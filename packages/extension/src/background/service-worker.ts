@@ -262,14 +262,25 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, sender, sendRespons
   return false;
 });
 
-// Toolbar click → open the side panel via an explicit chrome.action
-// .onClicked handler. We deliberately DON'T use
+// Toolbar click → start capture and ATTEMPT to open the side panel via
+// chrome.sidePanel.open. We deliberately DON'T use
 // sidePanel.setPanelBehavior({openPanelOnActionClick: true}) because
 // that flag suppresses the onClicked event, and we want onClicked to
 // fire — that's the canonical "user invoked the extension on this tab"
 // signal Chrome uses to grant activeTab. Without that grant, the side
 // panel's Start button hits "Extension has not been invoked" when it
 // tries chrome.tabCapture.getMediaStreamId.
+//
+// NOTE: in practice chrome.sidePanel.open() from inside the
+// getMediaStreamId callback often does NOT actually surface the panel —
+// the user-gesture token attached to the original click is consumed by
+// getMediaStreamId, and Chrome rejects sidePanel.open() without a fresh
+// gesture. The call still succeeds API-wise (no error thrown) but no
+// panel appears. Users open the side panel manually via right-click on
+// the toolbar icon → "Open side panel". The on-page overlay (eval bar,
+// arrows, PV board) is the primary surface and works regardless. The
+// sidePanel.open() call below is left as a best-effort attempt for the
+// Chrome versions where the gesture chain does work.
 /** The tab activeTab was last granted on. Side-panel UI queries this so
  *  Start always targets the tab the user invoked the extension on, even
  *  if they've since switched tabs in the same window. */
@@ -366,7 +377,10 @@ chrome.action.onClicked.addListener((tab) => {
   // Start path. getMediaStreamId MUST run synchronously before any
   // await — chrome.sidePanel.open consumes the user activation on some
   // Chrome versions (chromium 40916430-class). Grab the streamId
-  // first, then do housekeeping in the callback.
+  // first, then do housekeeping in the callback. Note that the
+  // sidePanel.open() in the callback is best-effort (see big comment
+  // above the listener) — users manually open the side panel via
+  // right-click toolbar → "Open side panel" when needed.
   chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, async (streamId) => {
     if (chrome.runtime.lastError || !streamId) {
       note(`getMediaStreamId FAILED: ${chrome.runtime.lastError?.message ?? 'no id'}`);
@@ -414,6 +428,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
   await recordInvocation(tab.id, 'context-menu');
+  // Best-effort sidePanel.open — same caveat as the action.onClicked
+  // path above: the gesture chain through the context-menu often isn't
+  // honored by Chrome for sidePanel.open(). The "Open side panel" entry
+  // in the right-click toolbar menu remains the reliable path for users
+  // who want the panel UI.
   try {
     await chrome.sidePanel.open({ tabId: tab.id });
     note(`sidePanel.open ok (from context menu)`);
