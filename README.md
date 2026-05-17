@@ -23,8 +23,10 @@ The published Chrome Web Store listing is the easiest path (link will be added o
 ### macOS desktop app
 
 ```bash
-brew install chessray
+brew install --cask chessraygg/tap/chessray
 ```
+
+Auto-taps [chessraygg/homebrew-tap](https://github.com/chessraygg/homebrew-tap) on first run, then installs the signed Chessray.app into `/Applications`.
 
 For other platforms (and to build the desktop app from source), see [Building for release → Electron distributable](#electron-distributable).
 
