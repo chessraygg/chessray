@@ -42,6 +42,12 @@ To run from source while waiting for the store listing, see [Development](#devel
 - [Git LFS](https://git-lfs.github.com/) (for the YOLO model weights)
 - npm 10+
 
+### macOS one-liner
+
+```bash
+brew install node git-lfs && git lfs install
+```
+
 ## Setup
 
 ```bash
