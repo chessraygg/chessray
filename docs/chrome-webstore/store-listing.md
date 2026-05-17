@@ -39,7 +39,7 @@ Chess companion that draws and updates top moves + an eval bar on any chess vide
 
 ### Description (0/16,000 chars — manually entered)
 ```
-Chessray is a chess companion for streams, videos, replays, screenshots, and PDFs. It watches the chess board in your tab and draws Stockfish's best moves directly on top of it — arrows on the source/destination squares, an evaluation bar down one side, and a small preview board for the engine's planned line.
+Chessray is a chess companion for streams, videos, replays, screenshots, and PDFs. It watches the chess board in your tab and draws Stockfish's best moves directly on top of it — arrows on the source/destination squares and an evaluation bar down one side.
 
 It's built for content you watch, not games you play:
 • YouTube chess channels — agadmator, GothamChess, Hanging Pawns, Eric Rosen
@@ -49,13 +49,16 @@ It's built for content you watch, not games you play:
 • Screenshots and image viewers
 
 Features:
-• Live board recognition from screen pixels — works on any site, no DOM scraping, no per-site integration
-• Stockfish 18 Lite (WASM) with iterative deepening and multi-PV
-• On-page overlay: best-move arrows, evaluation bar, and a small "PV board" preview
-• Side panel with full analysis (reachable via right-click on the toolbar icon → Open side panel)
-• Keyboard shortcut (configurable at chrome://extensions/shortcuts) to start/stop capture without touching the toolbar
-• Right-click "Capture this tab" context-menu fallback
-• Customizable: overlay size, opacity, what to show, panel layout
+• Live tracking — as the chess board on screen changes (next move in the video, scrubbing back, a new puzzle), Chessray re-analyzes within ~1 second.
+• Color-coded top-move arrows — the engine's best moves drawn directly on the source/destination squares, color-coded so you can tell the first choice from second / third options at a glance.
+• Live evaluation bar — numeric eval painted alongside the board, updated continuously as moves happen.
+• Auto last-move + turn detection — Chessray finds the highlighted squares the chess UI draws after each move and uses them to infer both the last move played AND whose turn it is. No manual board flip, no manual turn toggle.
+• Variation preview — click any best-move arrow and the on-page board is replaced with a virtual board that plays through the engine's principal variation move-by-move. One click returns to the live board.
+• Adjustable overlay — change arrow size, change overlay opacity, or hide move hints entirely.
+• Works on any site — pure pixel-based recognition (YOLOv11), no DOM scraping, no site-specific integration. Streams, replays, PDFs, screenshots all work the same way.
+• Stockfish 18 Lite (WASM) — iterative deepening + multi-PV, all bundled and running on-device. No network calls.
+• Side panel with detailed analysis (reachable via right-click on the toolbar icon → Open side panel).
+• Keyboard shortcut to start/stop capture (rebindable at chrome://extensions/shortcuts).
 
 How it's different from scan-on-demand extensions: no Scan button, no popup window, no jumping to an external analysis page. The overlay paints in place on the captured tab and updates continuously as moves happen. One click on the toolbar (or the keyboard shortcut) starts it; another click stops it. For the detailed analysis view — evaluation, principal variation, settings — open Chrome's side panel by right-clicking the toolbar icon and choosing "Open side panel."
 
@@ -99,7 +102,7 @@ Skip for v1. Add later if a 30–60 s demo video is recorded showing capture on 
 
 ### Screenshots — 1280×800 or 640×400, JPEG/PNG no alpha, max 5, ≥1 required
 Suggested set (capture Chrome window at exactly 1280×800):
-1. **Hero shot** — on-page overlay (arrows + eval bar + PV board) and the side panel (manually opened via right-click toolbar → Open side panel) shown together, on a YouTube chess video or a Twitch chess stream. This is the one that converts. (Don't use a lichess.org screenshot — it contradicts the blocklist.)
+1. **Hero shot** — on-page overlay (best-move arrows + eval bar) drawn on a board, ideally with the side panel (manually opened via right-click toolbar → Open side panel) also visible, on a YouTube chess video or a Twitch chess stream. This is the one that converts. (Don't use a lichess.org screenshot — it contradicts the blocklist.)
 2. **Close-up overlay** — zoomed-in view of arrows + eval bar painted on a board mid-game.
 3. **Side panel detail** — full analysis view (eval, PV, settings).
 4. **Twitch chess stream** — Hikaru / chessbrah / BotezLive with Chessray's overlay live. Demonstrates the "live streams" use case.
@@ -273,7 +276,7 @@ skimmed; this fits in the reviewer's eyeline at full zoom.
 ```
 1. Open any chess YouTube video (e.g. agadmator).
 2. Click the toolbar icon (or Alt+Shift+C). Red ● badge appears.
-3. Within ~1s: arrows + eval bar painted on the board, PV preview in corner. Overlay updates as the video plays — no manual scan.
+3. Within ~1s: arrows + eval bar painted on the board. Overlay updates as the video plays — no manual scan.
 4. Click toolbar icon to stop. Blocklist: chess.com / lichess refuse capture; red OFF badge flashes 2s.
 5. Open side panel manually: right-click toolbar icon → Open side panel.
 
