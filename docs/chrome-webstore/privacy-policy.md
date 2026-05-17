@@ -88,5 +88,8 @@ listing. The "Last updated" date above is authoritative.
 
 ## Contact
 
-Source code, issue tracker, and contact:
-<https://github.com/chessraygg/chessray>
+Bugs, privacy questions, feature requests, or anything else — reach out:
+
+- Email: **chessraygg@gmail.com**
+- Issue tracker: <https://github.com/chessraygg/chessray/issues>
+- Source code: <https://github.com/chessraygg/chessray>

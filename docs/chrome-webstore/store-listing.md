@@ -65,6 +65,8 @@ Features:
 
 Privacy: Chessray does not transmit pixels, recognized positions, evaluations, or any other data off your device. Full privacy policy: https://github.com/chessraygg/chessray/blob/main/docs/chrome-webstore/privacy-policy.md
 
+Bugs, feature requests, or anything else — reach out at chessraygg@gmail.com or open an issue at https://github.com/chessraygg/chessray/issues.
+
 Open source under GPL-3.0: https://github.com/chessraygg/chessray
 ```
 
@@ -131,6 +133,12 @@ https://github.com/chessraygg/chessray
 https://github.com/chessraygg/chessray/issues
 ```
 GitHub Issues is where users should report bugs. Reviewers occasionally check that this URL works.
+
+### Contact email (publisher-level — Account → Account info, NOT per-item)
+```
+chessraygg@gmail.com
+```
+Set this in **Account → Account info → Email address** at the publisher level. The Web Store doesn't have a per-item contact-email field — the publisher email is what reviewers and users see for support communication. Also pasted into the detailed Description above so it's discoverable from the public store listing without leaving the page.
 
 ### Mature content
 ```
@@ -286,7 +294,7 @@ Notes:
   side-panel CTA).
 - All analysis is on-device. No telemetry, no analytics, no third-party
   SDKs. Open source under GPL-3.0 at https://github.com/chessraygg/chessray.
-- A pre-recorded demo video can be provided on request — email cagdasozek@gmail.com.
+- A pre-recorded demo video can be provided on request — email chessraygg@gmail.com (or open an issue at https://github.com/chessraygg/chessray/issues).
 ```
 
 ---
@@ -301,6 +309,7 @@ Before clicking **Submit for review**:
 - [ ] **Store listing → Product details:** Description pasted, Category set, Language set
 - [ ] **Store listing → Graphic assets:** Store icon auto-detected (128×128); ≥1 screenshot at 1280×800; 440×280 promo tile uploaded
 - [ ] **Store listing → Additional fields:** Homepage URL, Support URL set; Mature content = No
+- [ ] **Account → Account info → Email address** set to `chessraygg@gmail.com` (publisher-level; what users and reviewers see for support)
 - [ ] **Privacy → Single purpose:** description pasted
 - [ ] **Privacy → Permission justifications:** all 7 blocks pasted (tabCapture, offscreen, scripting, storage, sidePanel, contextMenus, host_permissions)
 - [ ] **Privacy → Data usage:** only "Website content" checked + 3 certifications ticked
