@@ -436,34 +436,46 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 // click), so we get activeTab → tabCapture access from inside the SW
 // without bouncing through the popup. Also makes the extension usable
 // without ever opening the popup, which is friendlier for power users.
-let captureRunning = false;
 chrome.commands.onCommand.addListener(async (command) => {
+  note(`commands.onCommand command=${command} (capturing=${currentlyCapturing})`);
   if (command !== 'toggle-capture') return;
-  if (captureRunning) {
-    captureRunning = false;
+  // Use the SAME state flag as chrome.action.onClicked / setRecBadge /
+  // startCapture / stopCapture. The previous implementation kept a
+  // separate `captureRunning` boolean that was only mutated inside this
+  // handler — fine within a single SW lifetime, broken across MV3 service-
+  // worker sleeps: `currentlyCapturing` is hydrated from
+  // chrome.storage.session on SW startup (see line ~305), but a separate
+  // local flag would reset to false after every sleep, and the next
+  // shortcut press would re-START an already-running capture instead of
+  // toggling it off.
+  if (currentlyCapturing) {
     await stopCapture();
     return;
   }
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  if (!tab?.id) return;
+  if (!tab?.id) {
+    note(`commands.onCommand: no active tab in lastFocusedWindow`);
+    return;
+  }
   if (isCaptureBlockedUrl(tab.url)) {
     note(`commands.onCommand REFUSED — blocked host: ${tab.url}`);
     flashBlockedBadge();
     return;
   }
-  try {
-    const streamId = await new Promise<string>((resolve, reject) => {
-      chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }, (id) => {
-        if (chrome.runtime.lastError || !id) {
-          reject(new Error(chrome.runtime.lastError?.message ?? 'no stream id'));
-          return;
-        }
-        resolve(id);
-      });
-    });
-    captureRunning = true;
-    await startCapture(tab.id, streamId);
-  } catch (err) {
-    console.error('[chessray] toggle-capture failed:', err);
-  }
+  await recordInvocation(tab.id, 'command');
+  chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }, async (streamId) => {
+    if (chrome.runtime.lastError || !streamId) {
+      // note() instead of console.error so the failure surfaces in the
+      // in-extension trace ring the side panel reads — console output is
+      // invisible in production without DevTools open on the SW.
+      note(`commands.onCommand getMediaStreamId FAILED: ${chrome.runtime.lastError?.message ?? 'no id'}`);
+      return;
+    }
+    try {
+      await startCapture(tab.id!, streamId);
+      note(`commands.onCommand startCapture ok tab=${tab.id}`);
+    } catch (err) {
+      note(`commands.onCommand startCapture FAILED: ${String(err)}`);
+    }
+  });
 });

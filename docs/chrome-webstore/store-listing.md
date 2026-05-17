@@ -42,13 +42,13 @@ Chess companion that draws and updates top moves + an eval bar on any chess vide
 Chessray is a chess companion for streams, videos, replays, screenshots, and PDFs. It watches the chess board in your tab and draws Stockfish's best moves directly on top of it — arrows on the source/destination squares, an evaluation bar down one side, and a small preview board for the engine's planned line.
 
 It's built for content you watch, not games you play:
-• YouTube chess channels — agadmator, GothamChess, Hanging Pawns, Daniel Naroditsky
+• YouTube chess channels — agadmator, GothamChess, Hanging Pawns, Eric Rosen
 • Twitch chess streams — Hikaru, BotezLive, chessbrah
 • Replays and study pages on chess platforms
 • Chess books open as PDFs in the browser
 • Screenshots and image viewers
 
-How it's different from scan-on-demand extensions: no Scan button, no popup window, no jumping to an external analysis page. The overlay paints in place on the captured tab and updates continuously as moves happen. One click on the toolbar (or Ctrl/Cmd+Shift+M) starts it; another click stops it. The side panel shows the full analysis — move list, evaluation, principal variation, settings — while the on-page overlay keeps your eyes on the board.
+How it's different from scan-on-demand extensions: no Scan button, no popup window, no jumping to an external analysis page. The overlay paints in place on the captured tab and updates continuously as moves happen. One click on the toolbar (or the keyboard shortcut) starts it; another click stops it. The side panel shows the full analysis — evaluation, principal variation, settings — while the on-page overlay keeps your eyes on the board.
 
 Everything runs locally on your computer. No account, no sign-up, no data leaves your device. The Stockfish 18 Lite engine, the YOLOv11 board-recognition model, and the PaddleOCR orientation model are all bundled with the extension and load from the local extension bundle. No network calls during analysis.
 
@@ -58,8 +58,8 @@ Features:
 • Live board recognition from screen pixels — works on any site, no DOM scraping, no per-site integration
 • Stockfish 18 Lite (WASM) with iterative deepening and multi-PV
 • On-page overlay: best-move arrows, evaluation bar, and a small "PV board" preview
-• Side panel with full analysis, move history, and a one-click "Open in Lichess Analysis" button
-• Keyboard shortcut (Cmd/Ctrl+Shift+M) to start/stop capture without touching the toolbar
+• Side panel with full analysis and a one-click "Open in Lichess Analysis" button
+• Keyboard shortcut (configurable at chrome://extensions/shortcuts) to start/stop capture without touching the toolbar
 • Right-click "Capture this tab" context-menu fallback
 • Customizable: overlay size, opacity, what to show, panel layout
 
@@ -99,7 +99,7 @@ Skip for v1. Add later if a 30–60 s demo video is recorded showing capture on 
 Suggested set (capture Chrome window at exactly 1280×800):
 1. **Hero shot** — on-page overlay (arrows + eval bar + PV board) **and** the side panel open together, on a lichess study or a YouTube chess video. This is the one that converts.
 2. **Close-up overlay** — zoomed-in view of arrows + eval bar painted on a board mid-game.
-3. **Side panel detail** — full analysis view (eval, move list, PV, settings).
+3. **Side panel detail** — full analysis view (eval, PV, settings).
 4. **Twitch chess stream** — Hikaru / chessbrah / BotezLive with Chessray's overlay live. Demonstrates the "live streams" use case.
 5. **PDF or screenshot** — Chessray analyzing a chess book opened in Chrome's PDF viewer, or a screenshot of a chess position. Demonstrates the "anything on screen" use case.
 
@@ -174,7 +174,7 @@ Persists user preferences (overlay opacity, side-panel layout, last-known captur
 
 **`sidePanel`**
 ```
-The Chessray analysis UI (board view, eval, move list, settings) lives in Chrome's side panel. The sidePanel permission is required to open it programmatically when the user clicks the toolbar button or uses the keyboard shortcut.
+The Chessray analysis UI (board view, eval, PV, settings) lives in Chrome's side panel. The sidePanel permission is required to open it programmatically when the user clicks the toolbar button or uses the keyboard shortcut.
 ```
 
 **`contextMenus`**
@@ -249,14 +249,14 @@ Quick test (≤2 min):
 2. Open a chess YouTube video in a tab — for example:
    https://www.youtube.com/results?search_query=agadmator+chess
    (pick any video with a clear chess board on screen)
-3. Click the Chessray toolbar icon (or press Ctrl/Cmd+Shift+M).
+3. Click the Chessray toolbar icon (or press Alt+Shift+C — the default keyboard shortcut, rebindable at chrome://extensions/shortcuts).
    - A red "●" badge appears on the toolbar = capture is live.
    - The side panel opens with the analysis UI.
 4. Wait ~1 second for board recognition. You should see:
    - An evaluation bar drawn along one edge of the board.
    - One or more arrows showing Stockfish's suggested move.
    - A small "PV board" in the corner previewing the planned line.
-   - The side panel showing the same data: eval, move list, principal variation.
+   - The side panel showing the same data: eval, principal variation, settings.
 5. As the video plays and the on-screen board changes, the overlay updates
    continuously — no manual scan, no extra click required.
 6. Click the toolbar icon again to stop. The overlay clears, the badge clears.
@@ -268,7 +268,7 @@ Blocklist verification (≤1 min):
    - Expected: a red "OFF" badge appears for 2 seconds with the title
      "Chessray does not run on chess.com or lichess.org". No capture starts,
      no overlay injects, no side panel opens.
-9. Repeat with Ctrl/Cmd+Shift+M — same refusal behavior.
+9. Repeat with the Alt+Shift+C keyboard shortcut — same refusal behavior.
 
 Network test:
 
