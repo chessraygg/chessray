@@ -48,12 +48,6 @@ It's built for content you watch, not games you play:
 • Chess books open as PDFs in the browser
 • Screenshots and image viewers
 
-How it's different from scan-on-demand extensions: no Scan button, no popup window, no jumping to an external analysis page. The overlay paints in place on the captured tab and updates continuously as moves happen. One click on the toolbar (or the keyboard shortcut) starts it; another click stops it. For the detailed analysis view — evaluation, principal variation, settings — open Chrome's side panel by right-clicking the toolbar icon and choosing "Open side panel."
-
-Everything runs locally on your computer. No account, no sign-up, no data leaves your device. The Stockfish 18 Lite engine, the YOLOv11 board-recognition model, and the PaddleOCR orientation model are all bundled with the extension and load from the local extension bundle. No network calls during analysis.
-
-Chessray does not run on chess.com or lichess.org. Both sites have active anti-cheat policies against engine-assisted play; the on-page overlay is excluded from those hosts at the manifest level and the service worker hard-refuses to start tab capture there from every entry point (toolbar, keyboard shortcut, context menu, side-panel CTA). Chessray is built for streams, videos, and study material, not live play on those platforms.
-
 Features:
 • Live board recognition from screen pixels — works on any site, no DOM scraping, no per-site integration
 • Stockfish 18 Lite (WASM) with iterative deepening and multi-PV
@@ -62,6 +56,12 @@ Features:
 • Keyboard shortcut (configurable at chrome://extensions/shortcuts) to start/stop capture without touching the toolbar
 • Right-click "Capture this tab" context-menu fallback
 • Customizable: overlay size, opacity, what to show, panel layout
+
+How it's different from scan-on-demand extensions: no Scan button, no popup window, no jumping to an external analysis page. The overlay paints in place on the captured tab and updates continuously as moves happen. One click on the toolbar (or the keyboard shortcut) starts it; another click stops it. For the detailed analysis view — evaluation, principal variation, settings — open Chrome's side panel by right-clicking the toolbar icon and choosing "Open side panel."
+
+Everything runs locally on your computer. No account, no sign-up, no data leaves your device. The Stockfish 18 Lite engine, the YOLOv11 board-recognition model, and the PaddleOCR orientation model are all bundled with the extension and load from the local extension bundle. No network calls during analysis.
+
+Chessray does not run on chess.com or lichess.org. Both sites have active anti-cheat policies against engine-assisted play; the on-page overlay is excluded from those hosts at the manifest level and the service worker hard-refuses to start tab capture there from every entry point (toolbar, keyboard shortcut, context menu, side-panel CTA). Chessray is built for streams, videos, and study material, not live play on those platforms.
 
 Privacy: Chessray does not transmit pixels, recognized positions, evaluations, or any other data off your device. Full privacy policy: https://github.com/chessraygg/chessray/blob/main/docs/chrome-webstore/privacy-policy.md
 
