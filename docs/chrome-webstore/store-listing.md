@@ -266,54 +266,21 @@ Already publishing under the existing `digest.tube` publisher account (reuse for
 ## Test instructions (visible only to the reviewer)
 
 Paste this into the **Test instructions** tab. Reviewers reject extensions
-with `tabCapture` + `<all_urls>` without clear repro steps.
+with `tabCapture` + `<all_urls>` without clear repro steps. The block below
+is kept under 500 chars on purpose — long test-instructions copy gets
+skimmed; this fits in the reviewer's eyeline at full zoom.
 
 ```
-Quick test (≤2 min):
+1. Open any chess YouTube video (e.g. agadmator).
+2. Click the toolbar icon (or Alt+Shift+C, rebindable at chrome://extensions/shortcuts). Red ● badge appears; side panel opens.
+3. In ~1s: arrows + eval bar painted on the board, PV preview in corner. Overlay updates as the video plays — no manual scan.
+4. Click again to stop.
+5. Blocklist: chess.com / lichess.org refuse to start; toolbar flashes a red OFF badge for 2s.
 
-1. Install the extension. Pin the toolbar icon.
-2. Open a chess YouTube video in a tab — for example:
-   https://www.youtube.com/results?search_query=agadmator+chess
-   (pick any video with a clear chess board on screen)
-3. Click the Chessray toolbar icon (or press Alt+Shift+C — the default keyboard shortcut, rebindable at chrome://extensions/shortcuts).
-   - A red "●" badge appears on the toolbar = capture is live.
-   - The side panel opens with the analysis UI.
-4. Wait ~1 second for board recognition. You should see:
-   - An evaluation bar drawn along one edge of the board.
-   - One or more arrows showing Stockfish's suggested move.
-   - A small "PV board" in the corner previewing the planned line.
-   - The side panel showing the same data: eval, principal variation, settings.
-5. As the video plays and the on-screen board changes, the overlay updates
-   continuously — no manual scan, no extra click required.
-6. Click the toolbar icon again to stop. The overlay clears, the badge clears.
-
-Blocklist verification (≤1 min):
-
-7. Open chess.com or lichess.org in a tab.
-8. Click the Chessray toolbar icon.
-   - Expected: a red "OFF" badge appears for 2 seconds with the title
-     "Chessray does not run on chess.com or lichess.org". No capture starts,
-     no overlay injects, no side panel opens.
-9. Repeat with the Alt+Shift+C keyboard shortcut — same refusal behavior.
-
-Network test:
-
-10. Open Chrome DevTools → Network tab → reload, then run capture for 30 s
-    on a chess video. No network requests are made by Chessray; Stockfish,
-    YOLO, and OCR models are loaded from the local extension bundle via
-    chrome.runtime.getURL.
-
-Notes:
-- The extension hard-refuses to run on chess.com / lichess.org because
-  those platforms have active anti-cheat policies against engine-assisted
-  play. The blocklist is enforced in four layers — manifest
-  content_scripts.exclude_matches plus a service-worker guard on all four
-  capture entry points (toolbar, keyboard shortcut, context menu,
-  side-panel CTA).
-- All analysis is on-device. No telemetry, no analytics, no third-party
-  SDKs. Open source under GPL-3.0 at https://github.com/chessraygg/chessray.
-- A pre-recorded demo video can be provided on request — email chessraygg@gmail.com (or open an issue at https://github.com/chessraygg/chessray/issues).
+All analysis runs on-device. No network requests during capture.
 ```
+
+Demo video on request — email chessraygg@gmail.com.
 
 ---
 
