@@ -1,67 +1,146 @@
-# Chrome Web Store — Listing Copy & Permission Justifications
+# Chrome Web Store — Dashboard Field Reference
 
-Copy/paste-ready text for the Web Store developer console
-(`https://chrome.google.com/webstore/devconsole`). Fields are grouped
-by the dashboard section they belong to.
+Copy/paste-ready text for every field in the developer console
+(<https://chrome.google.com/webstore/devconsole>). Sections below mirror
+the dashboard sidebar tabs in the order they appear, and the field order
+within each tab matches the live form. Field names are quoted exactly as
+the dashboard labels them.
+
+---
+
+## Package (auto-uploaded from zip — read-only in dashboard)
+
+These come from `manifest.json` (built by `npm run build:webstore`) and
+cannot be edited in the dashboard. Listed so the "from package" labels on
+the Store listing tab make sense.
+
+| Dashboard label | Source |
+| --- | --- |
+| Title (from package) | manifest `name` → `"Chessray"` |
+| Summary (from package) | manifest `description` → the 122-char tagline |
+| Version | manifest `version` → latest `v*` git tag (e.g., `0.2.87`) |
+
+To regenerate the zip with the latest tag: `npm run build:webstore`. The
+upload artifact is `releases/chessray-v<version>.zip`.
 
 ---
 
 ## Store listing → Product details
 
-### Name
+### Title (from package, read-only)
 ```
 Chessray
 ```
 
-### Summary (≤132 chars)
+### Summary (from package, read-only)
 ```
 Chess companion that draws and updates top moves + an eval bar on any chess video or stream as it plays. No manual scans.
 ```
 
-### Detailed description
+### Description (0/16,000 chars — manually entered)
 ```
-Chessray turns any chess board on your screen into a live analysis board.
+Chessray is a chess companion for streams, videos, replays, screenshots, and PDFs. It watches the chess board in your tab and draws Stockfish's best moves directly on top of it — arrows on the source/destination squares, an evaluation bar down one side, and a small preview board for the engine's planned line.
 
-It captures the current tab, finds the chess board using on-device computer vision (YOLOv11), recognizes every piece, figures out which side is to move, and runs Stockfish 18 right inside the browser. The best moves, evaluation, and principal variation appear in a side panel and as an overlay drawn on top of the board itself — arrows, eval bar, and a small preview board for the engine's planned line.
+It's built for content you watch, not games you play:
+• YouTube chess channels — agadmator, GothamChess, Hanging Pawns, Daniel Naroditsky
+• Twitch chess streams — Hikaru, BotezLive, chessbrah
+• Replays and study pages on chess platforms
+• Chess books open as PDFs in the browser
+• Screenshots and image viewers
 
-Works with anything visible:
-• Twitch and YouTube chess streams
-• video files and PDF viewers in the browser
-• screenshots and images
-• replays, studies, and analysis pages on other chess platforms
+How it's different from scan-on-demand extensions: no Scan button, no popup window, no jumping to an external analysis page. The overlay paints in place on the captured tab and updates continuously as moves happen. One click on the toolbar (or Ctrl/Cmd+Shift+M) starts it; another click stops it. The side panel shows the full analysis — move list, evaluation, principal variation, settings — while the on-page overlay keeps your eyes on the board.
 
-Chessray does NOT run on chess.com or lichess.org. The extension hard-refuses to start capture on those hosts and the on-page overlay never injects there — running engine analysis on a live game on either site would violate their anti-cheat policies, and Chessray is built for streams, videos, and study material, not live play.
+Everything runs locally on your computer. No account, no sign-up, no data leaves your device. The Stockfish 18 Lite engine, the YOLOv11 board-recognition model, and the PaddleOCR orientation model are all bundled with the extension and load from the local extension bundle. No network calls during analysis.
 
-Everything runs locally. No account, no sign-up, no data leaves your computer. The Stockfish engine and all recognition models are bundled with the extension — no network calls during analysis.
+Chessray does not run on chess.com or lichess.org. Both sites have active anti-cheat policies against engine-assisted play; the on-page overlay is excluded from those hosts at the manifest level and the service worker hard-refuses to start tab capture there from every entry point (toolbar, keyboard shortcut, context menu, side-panel CTA). Chessray is built for streams, videos, and study material, not live play on those platforms.
 
 Features:
-• Live board recognition from screen pixels (no DOM scraping, no site integrations)
+• Live board recognition from screen pixels — works on any site, no DOM scraping, no per-site integration
 • Stockfish 18 Lite (WASM) with iterative deepening and multi-PV
-• On-page overlay with arrows, eval bar, and a PV preview board
-• Side panel with full analysis, move list, and a one-click "Open in Lichess Analysis" button
+• On-page overlay: best-move arrows, evaluation bar, and a small "PV board" preview
+• Side panel with full analysis, move history, and a one-click "Open in Lichess Analysis" button
 • Keyboard shortcut (Cmd/Ctrl+Shift+M) to start/stop capture without touching the toolbar
+• Right-click "Capture this tab" context-menu fallback
 • Customizable: overlay size, opacity, what to show, panel layout
 
-Privacy: Chessray does not transmit pixels, recognized positions, evaluations, or any other data off your device. See the privacy policy for full details.
+Privacy: Chessray does not transmit pixels, recognized positions, evaluations, or any other data off your device. Full privacy policy: https://github.com/chessraygg/chessray/blob/main/docs/chrome-webstore/privacy-policy.md
 
-Open source under GPL-3.0:
-https://github.com/chessraygg/chessray
+Open source under GPL-3.0: https://github.com/chessraygg/chessray
 ```
+
+Dashboard hint: _"Focus on explaining what the item does and why users
+should install it"_ — the lede covers what, the "How it's different"
+paragraph covers why, and the chess.com/lichess paragraph short-circuits
+the most likely reviewer objection.
 
 ### Category
 ```
-Productivity
+Tools
 ```
-(Secondary suggestion: "Fun" if Productivity is rejected.)
+Closest match in the dashboard's category list. Alternative: `Productivity`
+(less specific but higher discovery on the Web Store homepage).
 
 ### Language
 ```
-English
+English (United States)
 ```
 
 ---
 
-## Privacy practices
+## Store listing → Graphic assets
+
+### Store icon — 128×128 px, PNG, no alpha — required
+✓ already in repo: `packages/extension/src/icons/icon-128.png` (auto-included in the zip; the dashboard reads it from there).
+
+### Global promo video — YouTube URL — optional
+Skip for v1. Add later if a 30–60 s demo video is recorded showing capture on a Twitch chess stream.
+
+### Screenshots — 1280×800 or 640×400, JPEG/PNG no alpha, max 5, ≥1 required
+Suggested set (capture Chrome window at exactly 1280×800):
+1. **Hero shot** — on-page overlay (arrows + eval bar + PV board) **and** the side panel open together, on a lichess study or a YouTube chess video. This is the one that converts.
+2. **Close-up overlay** — zoomed-in view of arrows + eval bar painted on a board mid-game.
+3. **Side panel detail** — full analysis view (eval, move list, PV, settings).
+4. **Twitch chess stream** — Hikaru / chessbrah / BotezLive with Chessray's overlay live. Demonstrates the "live streams" use case.
+5. **PDF or screenshot** — Chessray analyzing a chess book opened in Chrome's PDF viewer, or a screenshot of a chess position. Demonstrates the "anything on screen" use case.
+
+**Do NOT screenshot chess.com or a live lichess.org game** — Chessray is hard-blocked on those hosts and the contradiction will trip the reviewer.
+
+### Small promo tile — 440×280 — required
+Used in search results and category pages. Should include: the Chessray name, a short tagline ("live chess engine overlay"), and a recognizable visual (a chess board with an arrow drawn on it).
+
+### Marquee promo tile — 1400×560 — optional
+Required only for "Featured" eligibility. Skip for v1.
+
+---
+
+## Store listing → Additional fields
+
+### Official URL — verified site only — optional
+```
+None
+```
+Leave unset. Chessray does not have an associated verified site in Google Search Console. (If a `chessray.com` is set up later, register it as the owner in Search Console and select it here.)
+
+### Homepage URL — 0/2,048 chars
+```
+https://github.com/chessraygg/chessray
+```
+
+### Support URL — 0/2,048 chars
+```
+https://github.com/chessraygg/chessray/issues
+```
+GitHub Issues is where users should report bugs. Reviewers occasionally check that this URL works.
+
+### Mature content
+```
+No
+```
+No sexual content, no strong language, no violence, no alcohol/tobacco/drugs.
+
+---
+
+## Privacy
 
 ### Single-purpose description
 ```
@@ -121,39 +200,112 @@ Tick the three certification checkboxes at the bottom:
 - I do not use or transfer user data to determine creditworthiness or for lending purposes
 
 ### Privacy policy URL
-
 ```
 https://github.com/chessraygg/chessray/blob/main/docs/chrome-webstore/privacy-policy.md
 ```
 
-(Or wherever the privacy policy ends up hosted — must be a publicly reachable URL.)
+---
+
+## Distribution
+
+### Visibility
+```
+Public
+```
+Anyone can find and install from the Web Store.
+
+### Regions
+```
+All regions
+```
+No geo-restriction; the analysis runs locally regardless of locale.
+
+### Pricing
+```
+Free
+```
 
 ---
 
-## Visual assets to prepare
+## Access
 
-These are NOT in the repo and must be produced before submission.
+### Trusted testers
+N/A — Public visibility. Skip the trusted testers email list.
 
-| Asset | Size | Required? | Notes |
-| ----- | ---- | --------- | ----- |
-| Extension icon | 128×128 px | ✓ already in repo | `packages/extension/src/icons/icon-128.png` |
-| Screenshots | 1280×800 or 640×400 px | ✓ at least 1, up to 5 | Show Chessray analyzing a real board on a supported surface (Twitch chess stream, YouTube replay, lichess study page, agadmator video, PDF, screenshot). DO NOT use chess.com or a live lichess.org game — those hosts are blocklisted and reviewers will catch a screenshot that contradicts the blocklist claim. At least one screenshot should show the side panel + overlay together. |
-| Small promo tile | 440×280 px | ✓ required | Used in search results and category pages. |
-| Marquee promo tile | 1400×560 px | optional | Required if you want featuring eligibility. |
+### Group publisher
+Already publishing under the existing `digest.tube` publisher account (reuse for shared support email, payment profile, and reviewer trust signals).
 
-Tip: take screenshots at exactly 1280×800 by setting the Chrome window to
-that size; reviewers reject scaled / stretched captures.
+---
+
+## Test instructions (visible only to the reviewer)
+
+Paste this into the **Test instructions** tab. Reviewers reject extensions
+with `tabCapture` + `<all_urls>` without clear repro steps.
+
+```
+Quick test (≤2 min):
+
+1. Install the extension. Pin the toolbar icon.
+2. Open a chess YouTube video in a tab — for example:
+   https://www.youtube.com/results?search_query=agadmator+chess
+   (pick any video with a clear chess board on screen)
+3. Click the Chessray toolbar icon (or press Ctrl/Cmd+Shift+M).
+   - A red "●" badge appears on the toolbar = capture is live.
+   - The side panel opens with the analysis UI.
+4. Wait ~1 second for board recognition. You should see:
+   - An evaluation bar drawn along one edge of the board.
+   - One or more arrows showing Stockfish's suggested move.
+   - A small "PV board" in the corner previewing the planned line.
+   - The side panel showing the same data: eval, move list, principal variation.
+5. As the video plays and the on-screen board changes, the overlay updates
+   continuously — no manual scan, no extra click required.
+6. Click the toolbar icon again to stop. The overlay clears, the badge clears.
+
+Blocklist verification (≤1 min):
+
+7. Open chess.com or lichess.org in a tab.
+8. Click the Chessray toolbar icon.
+   - Expected: a red "OFF" badge appears for 2 seconds with the title
+     "Chessray does not run on chess.com or lichess.org". No capture starts,
+     no overlay injects, no side panel opens.
+9. Repeat with Ctrl/Cmd+Shift+M — same refusal behavior.
+
+Network test:
+
+10. Open Chrome DevTools → Network tab → reload, then run capture for 30 s
+    on a chess video. No network requests are made by Chessray; Stockfish,
+    YOLO, and OCR models are loaded from the local extension bundle via
+    chrome.runtime.getURL.
+
+Notes:
+- The extension hard-refuses to run on chess.com / lichess.org because
+  those platforms have active anti-cheat policies against engine-assisted
+  play. The blocklist is enforced in four layers — manifest
+  content_scripts.exclude_matches plus a service-worker guard on all four
+  capture entry points (toolbar, keyboard shortcut, context menu,
+  side-panel CTA).
+- All analysis is on-device. No telemetry, no analytics, no third-party
+  SDKs. Open source under GPL-3.0 at https://github.com/chessraygg/chessray.
+- A pre-recorded demo video can be provided on request — email cagdasozek@gmail.com.
+```
 
 ---
 
 ## Submission checklist
 
-- [ ] Production zip built via `npm run build:webstore -w packages/extension`
-- [ ] Privacy policy URL is publicly reachable (200 OK, not behind login)
-- [ ] All permission justifications pasted from this file
-- [ ] Single-purpose description set
-- [ ] Data usage disclosure complete + certified
-- [ ] At least 1 screenshot at 1280×800
-- [ ] Small promo tile 440×280 uploaded
-- [ ] `manifest.json` in zip has no `localhost` references and no wildcard `web_accessible_resources`
-- [ ] Version number in `packages/extension/package.json` bumped if this is not the first submission
+Before clicking **Submit for review**:
+
+- [ ] Production zip built via `npm run build:webstore` from latest `main`
+- [ ] Zip uploaded to the Package tab and parsed without errors
+- [ ] Manifest version in zip is monotonically greater than any previously uploaded version
+- [ ] **Store listing → Product details:** Description pasted, Category set, Language set
+- [ ] **Store listing → Graphic assets:** Store icon auto-detected (128×128); ≥1 screenshot at 1280×800; 440×280 promo tile uploaded
+- [ ] **Store listing → Additional fields:** Homepage URL, Support URL set; Mature content = No
+- [ ] **Privacy → Single purpose:** description pasted
+- [ ] **Privacy → Permission justifications:** all 7 blocks pasted (tabCapture, offscreen, scripting, storage, sidePanel, contextMenus, host_permissions)
+- [ ] **Privacy → Data usage:** only "Website content" checked + 3 certifications ticked
+- [ ] **Privacy → Privacy policy URL:** pasted and returns 200 in an incognito tab
+- [ ] **Distribution:** Public, All regions, Free
+- [ ] **Access:** Trusted testers list left empty
+- [ ] **Test instructions:** pasted (reviewers reject without it for tabCapture + `<all_urls>` items)
+- [ ] `manifest.json` in zip has no `localhost` references and no wildcard `web_accessible_resources` (auto-checked by `build:webstore`)
