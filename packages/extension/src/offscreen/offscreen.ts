@@ -367,9 +367,20 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
         if (c.width !== after.width || c.height !== after.height) {
           c.width = after.width;
           c.height = after.height;
-          processor.resetCaches();
         }
       }
+      // ALWAYS reset bbox cache on viewport-resized, not just when the
+      // canvas dimensions changed. YouTube theater-mode / fullscreen-
+      // toggle / other in-page layout shifts move the chess board's
+      // pixel position on the captured frame WITHOUT changing the frame
+      // dimensions — the FrameProcessor's sampleFrameOutsideBbox
+      // fingerprint can decide "nothing changed" because the surrounding
+      // YouTube chrome is similar enough, and keep the stale bbox. After
+      // that, recognition runs against the wrong region and the overlay
+      // freezes on the pre-toggle paint. Resetting caches here guarantees
+      // the next frame re-detects the board from scratch regardless of
+      // whether dimensions changed.
+      processor.resetCaches();
       sendResponse({ ok: true });
     }).catch((err) => {
       debugLog(`applyConstraints FAILED: ${String(err)}`);
