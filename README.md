@@ -16,9 +16,17 @@ A standalone Electron desktop app shares the same recognition + evaluation core 
 
 ## Install
 
-The published Chrome Web Store listing is the easiest path (link will be added once review completes).
+### Chrome extension
 
-To run from source while waiting for the store listing, see [Development](#development) below for loading the unpacked extension.
+The published Chrome Web Store listing is the easiest path (link will be added once review completes). To run from source while waiting for the store listing, see [Development](#development) below for loading the unpacked extension.
+
+### macOS desktop app
+
+```bash
+brew install chessray
+```
+
+For other platforms (and to build the desktop app from source), see [Building for release → Electron distributable](#electron-distributable).
 
 ## How it works
 
@@ -41,12 +49,6 @@ To run from source while waiting for the store listing, see [Development](#devel
 - [Node.js](https://nodejs.org/) 22+
 - [Git LFS](https://git-lfs.github.com/) (for the YOLO model weights)
 - npm 10+
-
-### macOS one-liner
-
-```bash
-brew install node git-lfs && git lfs install
-```
 
 ## Setup
 
