@@ -243,17 +243,31 @@ function measurePhysicalViewport(): { w: number; h: number } {
   const cssH = window.innerHeight || document.documentElement?.clientHeight || 0;
   return { w: Math.round(cssW * dpr), h: Math.round(cssH * dpr) };
 }
-const reportViewportSize = (cause: string): void => {
+/** When set, the next reportViewportSize will send even if dimensions are
+ *  unchanged. Use for layout shifts that keep innerWidth/innerHeight constant
+ *  (YouTube theater mode, fullscreen toggle, in-page video resize) — the
+ *  offscreen handler always resets the FrameProcessor's bbox cache on
+ *  viewport-resized, so a "no-dimension-change" send still forces fresh
+ *  board detection. Without this, theater-mode toggle leaves the pipeline
+ *  stuck on the pre-toggle bbox and arrows never re-render. */
+let forceNextReport = false;
+const reportViewportSize = (cause: string, force = false): void => {
+  if (force) forceNextReport = true;
   if (viewportReportTimer) clearTimeout(viewportReportTimer);
-  // 500ms debounce — long enough for Chrome's side-panel slide-in (~200ms
-  // animation) plus the page's reflow + scrollbar settle to complete.
-  // Shorter values caused us to recapture mid-animation and pin to a
-  // viewport size that didn't match the post-settle page.
+  // 100ms debounce — target end-to-end latency from layout-change to
+  // overlay-update under 200ms (debounce + applyConstraints + first
+  // post-resize frame). The previous 500ms was tuned for Chrome's side-
+  // panel slide-in animation but caused YouTube theater-mode / fullscreen
+  // toggles to feel sluggish. The 1.2s verify pass below still corrects
+  // any mid-animation pin so the snappier first report is safe.
   viewportReportTimer = window.setTimeout(() => {
     viewportReportTimer = 0;
     const { w, h } = measurePhysicalViewport();
-    if (w === lastReportedViewport.w && h === lastReportedViewport.h) return;
-    console.log(`[chessray content] viewport changed (${cause}): ${lastReportedViewport.w}x${lastReportedViewport.h} → ${w}x${h}`);
+    const sameDims = w === lastReportedViewport.w && h === lastReportedViewport.h;
+    const wasForced = forceNextReport;
+    forceNextReport = false;
+    if (sameDims && !wasForced) return;
+    console.log(`[chessray content] viewport ${sameDims ? 'layout' : 'changed'} (${cause}${wasForced ? ',forced' : ''}): ${lastReportedViewport.w}x${lastReportedViewport.h} → ${w}x${h}`);
     lastReportedViewport = { w, h };
     chrome.runtime.sendMessage({ type: 'viewport-resized', viewport: { width: w, height: h } })
       .catch((err) => console.warn('[chessray content] viewport-resized send failed', err));
@@ -271,15 +285,49 @@ const reportViewportSize = (cause: string): void => {
       chrome.runtime.sendMessage({ type: 'viewport-resized', viewport: { width: settled.w, height: settled.h } })
         .catch((err) => console.warn('[chessray content] viewport-resized verify send failed', err));
     }, 1200);
-  }, 500);
+  }, 100);
 };
 window.addEventListener('resize', () => reportViewportSize('window-resize'));
 window.visualViewport?.addEventListener('resize', () => reportViewportSize('vvport-resize'));
-try {
-  new ResizeObserver(() => reportViewportSize('ro')).observe(document.documentElement);
-} catch (err) {
-  console.warn('[chessray content] ResizeObserver init failed', err);
-}
+// Fullscreen toggle (native fullscreen API). innerWidth/innerHeight DO
+// usually change here, but observers can lag a frame behind the
+// fullscreenchange event — listening directly fires immediately.
+document.addEventListener('fullscreenchange', () => reportViewportSize('fullscreen', true));
+// Older WebKit-prefixed event for compatibility with some browser builds.
+document.addEventListener('webkitfullscreenchange', () => reportViewportSize('webkit-fullscreen', true));
+// documentElement: catches whole-page reflows (side-panel slide-in,
+// window resize, scrollbar appear/disappear).
+new ResizeObserver(() => reportViewportSize('ro-de')).observe(document.documentElement);
+// body: catches some layout shifts that documentElement misses (rare
+// but cheap to observe).
+new ResizeObserver(() => reportViewportSize('ro-body')).observe(document.body);
+// YouTube's theater mode toggle changes body classes (e.g.,
+// "ytd-watch-flexy[theater]") without changing documentElement or window
+// dimensions, so ResizeObserver and resize event don't fire. MutationObserver
+// on body's class/style/data-* attributes catches the toggle within
+// microseconds; combined with the 100ms debounce, total latency to
+// overlay-update is well under 200ms. `force: true` so the report fires
+// even though innerWidth/innerHeight didn't change — the offscreen
+// handler will reset the FrameProcessor's bbox cache and the next frame
+// re-detects the board at its new pixel position.
+new MutationObserver(() => reportViewportSize('body-attr', true))
+  .observe(document.body, { attributes: true, attributeFilter: ['class', 'style', 'data-theater', 'data-fullscreen'] });
+// Safety-net poll: every 200ms, check innerWidth/innerHeight and body's
+// scroll dimensions. If anything shifted that the observers missed, fire
+// a forced report. Cheap (~3 number reads per poll), keeps worst-case
+// detection latency at ~200ms even when every observer misses.
+let lastPolledLayout = { w: 0, h: 0, bsw: 0, bsh: 0 };
+setInterval(() => {
+  const w = window.innerWidth || 0;
+  const h = window.innerHeight || 0;
+  const bsw = document.body?.scrollWidth || 0;
+  const bsh = document.body?.scrollHeight || 0;
+  if (w !== lastPolledLayout.w || h !== lastPolledLayout.h ||
+      bsw !== lastPolledLayout.bsw || bsh !== lastPolledLayout.bsh) {
+    lastPolledLayout = { w, h, bsw, bsh };
+    reportViewportSize('layout-poll', true);
+  }
+}, 200);
 
 // ── DPR change detection (Chrome moved to a screen with different
 // scale factor) ──
