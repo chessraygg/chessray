@@ -16,9 +16,19 @@ A standalone Electron desktop app shares the same recognition + evaluation core 
 
 ## Install
 
-The published Chrome Web Store listing is the easiest path (link will be added once review completes).
+### Chrome extension
 
-To run from source while waiting for the store listing, see [Development](#development) below for loading the unpacked extension.
+The published Chrome Web Store listing is the easiest path (link will be added once review completes). To run from source while waiting for the store listing, see [Development](#development) below for loading the unpacked extension.
+
+### macOS desktop app
+
+```bash
+brew install --cask chessraygg/tap/chessray
+```
+
+Auto-taps [chessraygg/homebrew-tap](https://github.com/chessraygg/homebrew-tap) on first run, then installs the signed Chessray.app into `/Applications`.
+
+For other platforms (and to build the desktop app from source), see [Building for release → Electron distributable](#electron-distributable).
 
 ## How it works
 
