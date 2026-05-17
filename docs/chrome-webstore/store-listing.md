@@ -195,17 +195,35 @@ Provides a right-click "Chessray: Capture this tab" entry. Some Chrome versions 
 The on-page overlay is a content script that draws arrows, an eval bar, and a PV preview board on top of the captured board. The user may invoke Chessray on any site that happens to show a chess board (Twitch / YouTube streams, image viewers, PDF readers, screenshots, replay / study pages, archived games), so the script's match pattern cannot be narrowed to a fixed allowlist without breaking the long tail of sites where the feature is useful. No site is read or modified — the overlay is drawn into a top-level container; no page DOM is queried. chess.com and lichess.org are excluded explicitly: content_scripts.exclude_matches in the manifest prevents the overlay from ever injecting on those hosts, and a service-worker guard refuses to start tabCapture on those hosts from every invocation path (toolbar click, keyboard shortcut, context menu, side-panel CTA). The extension cannot be used to assist live games on either platform.
 ```
 
-### Data usage disclosure (checkbox guidance)
+### Remote code
+```
+No, I am not using Remote code
+```
+All executable code ships inside the extension bundle. Stockfish (WASM), ONNX-runtime (WASM + JS), the YOLO model (.onnx), and PaddleOCR (model + JS) are loaded from `chrome.runtime.getURL('vendor/…')`. No `fetch` of remote JS/WASM/HTML at runtime, no `eval`, no `new Function`. The CSP allows only `'wasm-unsafe-eval'` (required for WASM instantiation), not `'unsafe-eval'`. `scripts/build-webstore.mjs` validates this on every build: any `localhost`, `127.0.0.1`, `@vite/env`, or `@crx/client` reference in the dist fails the build.
 
-In the **"What user data will your extension collect or use?"** section,
-mark **all checkboxes as "No"** EXCEPT:
+### Data usage — "What user data do you plan to collect from users now or in the future?"
 
-- **Website content** — _check_ → "This extension reads website content via tab capture (pixels only) for local analysis. Data is not transmitted off the device."
+Tick exactly one box (the last one). Per-row answers, in the order the dashboard lists them:
 
-Tick the three certification checkboxes at the bottom:
-- I do not sell or transfer user data to third parties …
-- I do not use or transfer user data for purposes unrelated to the item's single purpose
-- I do not use or transfer user data to determine creditworthiness or for lending purposes
+| Checkbox | Tick? | Rationale (paste in the "Why?" box if dashboard prompts) |
+| --- | --- | --- |
+| Personally identifiable information | **No** | No name, email, address, age, or ID collected. No sign-up, no account. |
+| Health information | **No** | None. |
+| Financial and payment information | **No** | Extension is free, no payment flow, no credit/financial data touched. |
+| Authentication information | **No** | No passwords, credentials, security questions, or PINs read or stored. |
+| Personal communications | **No** | No email, text, or chat content read. |
+| Location | **No** | No geolocation API used. No IP address recorded or transmitted. |
+| Web history | **No** | Does not read browsing history. Reads only the active tab's URL once per invocation to apply the chess.com / lichess.org blocklist — URL is not logged, stored, or transmitted. |
+| User activity | **No** | No keystroke logging, no mouse-position tracking, no click monitoring, no scroll telemetry. |
+| Website content | **Yes** | Tab pixels (via `chrome.tabCapture`) are read frame-by-frame to find a chess board, recognize pieces, and discard the frame in memory. Pixels never leave the device. The "Website content" example in the dashboard explicitly lists "images" — captured frames are images, so the honest answer is Yes. |
+
+### Three certification disclosures (all required)
+Tick all three:
+- [x] I do not sell or transfer user data to third parties, outside of the approved use cases
+- [x] I do not use or transfer user data for purposes that are unrelated to my item's single purpose
+- [x] I do not use or transfer user data to determine creditworthiness or for lending purposes
+
+All three are true for Chessray: no third parties, single purpose is engine-overlay analysis of the captured board, no financial use.
 
 ### Privacy policy URL
 ```
@@ -312,7 +330,8 @@ Before clicking **Submit for review**:
 - [ ] **Account → Account info → Email address** set to `chessraygg@gmail.com` (publisher-level; what users and reviewers see for support)
 - [ ] **Privacy → Single purpose:** description pasted
 - [ ] **Privacy → Permission justifications:** all 7 blocks pasted (tabCapture, offscreen, scripting, storage, sidePanel, contextMenus, host_permissions)
-- [ ] **Privacy → Data usage:** only "Website content" checked + 3 certifications ticked
+- [ ] **Privacy → Remote code:** "No, I am not using Remote code"
+- [ ] **Privacy → Data usage:** only "Website content" checked (other 8 left unchecked) + 3 certifications ticked
 - [ ] **Privacy → Privacy policy URL:** pasted and returns 200 in an incognito tab
 - [ ] **Distribution:** Public, All regions, Free
 - [ ] **Access:** Trusted testers list left empty
