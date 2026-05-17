@@ -58,9 +58,9 @@ Features:
 • Works on any site — pure pixel-based recognition (YOLOv11), no DOM scraping, no site-specific integration. Streams, replays, PDFs, screenshots all work the same way.
 • Stockfish 18 Lite (WASM) — iterative deepening + multi-PV, all bundled and running on-device. No network calls.
 • Side panel with detailed analysis (reachable via right-click on the toolbar icon → Open side panel).
-• Keyboard shortcut to start/stop capture (rebindable at chrome://extensions/shortcuts).
+• Keyboard shortcut to start/stop capture — default Alt+Shift+C (rebindable at chrome://extensions/shortcuts).
 
-How it's different from scan-on-demand extensions: no Scan button, no popup window, no jumping to an external analysis page. The overlay paints in place on the captured tab and updates continuously as moves happen. One click on the toolbar (or the keyboard shortcut) starts it; another click stops it. For the detailed analysis view — evaluation, principal variation, settings — open Chrome's side panel by right-clicking the toolbar icon and choosing "Open side panel."
+How it's different from scan-on-demand extensions: no Scan button, no popup window, no jumping to an external analysis page. The overlay paints in place on the captured tab and updates continuously as moves happen. One click on the toolbar (or Alt+Shift+C — the default shortcut, rebindable at chrome://extensions/shortcuts) starts it; another click stops it. For the detailed analysis view — evaluation, principal variation, settings — open Chrome's side panel by right-clicking the toolbar icon and choosing "Open side panel."
 
 Everything runs locally on your computer. No account, no sign-up, no data leaves your device. The Stockfish 18 Lite engine, the YOLOv11 board-recognition model, and the PaddleOCR orientation model are all bundled with the extension and load from the local extension bundle. No network calls during analysis.
 
