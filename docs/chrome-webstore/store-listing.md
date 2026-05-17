@@ -52,7 +52,7 @@ Features:
 • Live tracking — as the chess board on screen changes (next move in the video, scrubbing back, a new puzzle), Chessray re-analyzes within ~1 second.
 • Color-coded top-move arrows — the engine's best moves drawn directly on the source/destination squares, color-coded so you can tell the first choice from second / third options at a glance.
 • Live evaluation bar — numeric eval painted alongside the board, updated continuously as moves happen.
-• Auto last-move + turn detection — Chessray finds the highlighted squares the chess UI draws after each move and uses them to infer both the last move played AND whose turn it is. No manual board flip, no manual turn toggle.
+• Auto last-move + turn detection — Chessray finds the highlighted squares the chess UI draws after each move and uses them to infer both the last move played AND whose turn it is. A manual board-flip toggle in the side panel is there as a fallback when auto-orientation gets it wrong.
 • Variation preview — click any best-move arrow and the on-page board is replaced with a virtual board that plays through the engine's principal variation move-by-move. One click returns to the live board.
 • Adjustable overlay — change arrow size, change overlay opacity, or hide move hints entirely.
 • Works on any site — pure pixel-based recognition (YOLOv11), no DOM scraping, no site-specific integration. Streams, replays, PDFs, screenshots all work the same way.
