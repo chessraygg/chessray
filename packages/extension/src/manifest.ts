@@ -50,8 +50,14 @@ export default defineManifest({
   commands: {
     'toggle-capture': {
       suggested_key: {
-        default: 'Ctrl+Shift+M',
-        mac: 'Command+Shift+M',
+        // Alt+Shift+C avoids the macOS Chrome reservation of Cmd+Shift+M
+        // ("Switch Person" menu) — that earlier default never actually
+        // bound on Mac because Chrome refuses to register an extension
+        // shortcut over a built-in browser shortcut. Alt/Option+Shift+C is
+        // free on Mac and Windows/Linux. Users can override at
+        // chrome://extensions/shortcuts.
+        default: 'Alt+Shift+C',
+        mac: 'Alt+Shift+C',
       },
       description: 'Start/stop Chessray capture on the current tab',
     },

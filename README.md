@@ -6,13 +6,12 @@ A standalone Electron desktop app shares the same recognition + evaluation core 
 
 ## Features
 
-- **One-click capture in any tab** — toolbar button or `Ctrl/Cmd+Shift+M` starts capturing the active tab; analysis appears in Chrome's side panel and as an on-page overlay on the board itself.
+- **One-click capture in any tab** — toolbar button or `Alt+Shift+C` (rebindable at `chrome://extensions/shortcuts`) starts capturing the active tab. Analysis paints as an on-page overlay on the board; the detailed side-panel view is reachable via right-click on the toolbar icon → **Open side panel**.
 - **Vision-based** — captures pixels and runs YOLOv11n to detect the board and recognize every piece. No DOM scraping, no site integrations, no chess-site allowlist.
 - **Highlight + last-move detection** — finds the highlighted squares so it knows whose turn it is and what was just played, then renders the move as an arrow.
 - **Orientation auto-detection** — figures out which side is at the bottom from piece positions, falling back to PaddleOCR on the coordinate labels.
 - **Stockfish 18 Lite (WASM)** in an offscreen document — iterative deepening, configurable multi-PV, LRU eval cache.
-- **On-page overlay** — best-move arrows, eval bar, scores, principal variation, and an inline PV board preview drawn directly on the captured board.
-- **Optional Lichess sync** — one click opens the current position in Lichess Analysis.
+- **On-page overlay** — top-move arrows and an eval bar drawn directly on the captured board.
 - **Fully local** — no network calls during analysis; all models are bundled.
 
 ## Install
@@ -30,7 +29,7 @@ To run from source while waiting for the store listing, see [Development](#devel
 5. **Orientation** — Piece positions first; PaddleOCR fallback on the coordinate labels.
 6. **FEN generation** — Detected pieces → Forsyth-Edwards Notation string.
 7. **Evaluation** — Stockfish 18 Lite (WASM, Web Worker in the offscreen doc) with iterative deepening, multi-PV, and an LRU cache.
-8. **Overlay** — Arrows, eval bar, scores, PV line, and PV preview board paint directly on top of the captured tab; the side panel mirrors the same data with full move history.
+8. **Overlay** — Top-move arrows and an eval bar paint directly on top of the captured board; the side panel (opened manually via right-click on the toolbar icon → Open side panel) shows the same data plus full PV / settings / variation playback.
 
 ## Supported environments
 

@@ -262,14 +262,25 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, sender, sendRespons
   return false;
 });
 
-// Toolbar click → open the side panel via an explicit chrome.action
-// .onClicked handler. We deliberately DON'T use
+// Toolbar click → start capture and ATTEMPT to open the side panel via
+// chrome.sidePanel.open. We deliberately DON'T use
 // sidePanel.setPanelBehavior({openPanelOnActionClick: true}) because
 // that flag suppresses the onClicked event, and we want onClicked to
 // fire — that's the canonical "user invoked the extension on this tab"
 // signal Chrome uses to grant activeTab. Without that grant, the side
 // panel's Start button hits "Extension has not been invoked" when it
 // tries chrome.tabCapture.getMediaStreamId.
+//
+// NOTE: in practice chrome.sidePanel.open() from inside the
+// getMediaStreamId callback often does NOT actually surface the panel —
+// the user-gesture token attached to the original click is consumed by
+// getMediaStreamId, and Chrome rejects sidePanel.open() without a fresh
+// gesture. The call still succeeds API-wise (no error thrown) but no
+// panel appears. Users open the side panel manually via right-click on
+// the toolbar icon → "Open side panel". The on-page overlay (eval bar,
+// arrows, PV board) is the primary surface and works regardless. The
+// sidePanel.open() call below is left as a best-effort attempt for the
+// Chrome versions where the gesture chain does work.
 /** The tab activeTab was last granted on. Side-panel UI queries this so
  *  Start always targets the tab the user invoked the extension on, even
  *  if they've since switched tabs in the same window. */
@@ -366,7 +377,10 @@ chrome.action.onClicked.addListener((tab) => {
   // Start path. getMediaStreamId MUST run synchronously before any
   // await — chrome.sidePanel.open consumes the user activation on some
   // Chrome versions (chromium 40916430-class). Grab the streamId
-  // first, then do housekeeping in the callback.
+  // first, then do housekeeping in the callback. Note that the
+  // sidePanel.open() in the callback is best-effort (see big comment
+  // above the listener) — users manually open the side panel via
+  // right-click toolbar → "Open side panel" when needed.
   chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, async (streamId) => {
     if (chrome.runtime.lastError || !streamId) {
       note(`getMediaStreamId FAILED: ${chrome.runtime.lastError?.message ?? 'no id'}`);
@@ -414,6 +428,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
   await recordInvocation(tab.id, 'context-menu');
+  // Best-effort sidePanel.open — same caveat as the action.onClicked
+  // path above: the gesture chain through the context-menu often isn't
+  // honored by Chrome for sidePanel.open(). The "Open side panel" entry
+  // in the right-click toolbar menu remains the reliable path for users
+  // who want the panel UI.
   try {
     await chrome.sidePanel.open({ tabId: tab.id });
     note(`sidePanel.open ok (from context menu)`);
@@ -436,34 +455,46 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 // click), so we get activeTab → tabCapture access from inside the SW
 // without bouncing through the popup. Also makes the extension usable
 // without ever opening the popup, which is friendlier for power users.
-let captureRunning = false;
 chrome.commands.onCommand.addListener(async (command) => {
+  note(`commands.onCommand command=${command} (capturing=${currentlyCapturing})`);
   if (command !== 'toggle-capture') return;
-  if (captureRunning) {
-    captureRunning = false;
+  // Use the SAME state flag as chrome.action.onClicked / setRecBadge /
+  // startCapture / stopCapture. The previous implementation kept a
+  // separate `captureRunning` boolean that was only mutated inside this
+  // handler — fine within a single SW lifetime, broken across MV3 service-
+  // worker sleeps: `currentlyCapturing` is hydrated from
+  // chrome.storage.session on SW startup (see line ~305), but a separate
+  // local flag would reset to false after every sleep, and the next
+  // shortcut press would re-START an already-running capture instead of
+  // toggling it off.
+  if (currentlyCapturing) {
     await stopCapture();
     return;
   }
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  if (!tab?.id) return;
+  if (!tab?.id) {
+    note(`commands.onCommand: no active tab in lastFocusedWindow`);
+    return;
+  }
   if (isCaptureBlockedUrl(tab.url)) {
     note(`commands.onCommand REFUSED — blocked host: ${tab.url}`);
     flashBlockedBadge();
     return;
   }
-  try {
-    const streamId = await new Promise<string>((resolve, reject) => {
-      chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }, (id) => {
-        if (chrome.runtime.lastError || !id) {
-          reject(new Error(chrome.runtime.lastError?.message ?? 'no stream id'));
-          return;
-        }
-        resolve(id);
-      });
-    });
-    captureRunning = true;
-    await startCapture(tab.id, streamId);
-  } catch (err) {
-    console.error('[chessray] toggle-capture failed:', err);
-  }
+  await recordInvocation(tab.id, 'command');
+  chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }, async (streamId) => {
+    if (chrome.runtime.lastError || !streamId) {
+      // note() instead of console.error so the failure surfaces in the
+      // in-extension trace ring the side panel reads — console output is
+      // invisible in production without DevTools open on the SW.
+      note(`commands.onCommand getMediaStreamId FAILED: ${chrome.runtime.lastError?.message ?? 'no id'}`);
+      return;
+    }
+    try {
+      await startCapture(tab.id!, streamId);
+      note(`commands.onCommand startCapture ok tab=${tab.id}`);
+    } catch (err) {
+      note(`commands.onCommand startCapture FAILED: ${String(err)}`);
+    }
+  });
 });
