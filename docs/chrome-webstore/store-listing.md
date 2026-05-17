@@ -52,7 +52,7 @@ Features:
 • Live board recognition from screen pixels — works on any site, no DOM scraping, no per-site integration
 • Stockfish 18 Lite (WASM) with iterative deepening and multi-PV
 • On-page overlay: best-move arrows, evaluation bar, and a small "PV board" preview
-• Side panel with full analysis and a one-click "Open in Lichess Analysis" button (reachable via right-click on the toolbar icon → Open side panel)
+• Side panel with full analysis (reachable via right-click on the toolbar icon → Open side panel)
 • Keyboard shortcut (configurable at chrome://extensions/shortcuts) to start/stop capture without touching the toolbar
 • Right-click "Capture this tab" context-menu fallback
 • Customizable: overlay size, opacity, what to show, panel layout
@@ -99,7 +99,7 @@ Skip for v1. Add later if a 30–60 s demo video is recorded showing capture on 
 
 ### Screenshots — 1280×800 or 640×400, JPEG/PNG no alpha, max 5, ≥1 required
 Suggested set (capture Chrome window at exactly 1280×800):
-1. **Hero shot** — on-page overlay (arrows + eval bar + PV board) and the side panel (manually opened via right-click toolbar → Open side panel) shown together, on a lichess study or a YouTube chess video. This is the one that converts.
+1. **Hero shot** — on-page overlay (arrows + eval bar + PV board) and the side panel (manually opened via right-click toolbar → Open side panel) shown together, on a YouTube chess video or a Twitch chess stream. This is the one that converts. (Don't use a lichess.org screenshot — it contradicts the blocklist.)
 2. **Close-up overlay** — zoomed-in view of arrows + eval bar painted on a board mid-game.
 3. **Side panel detail** — full analysis view (eval, PV, settings).
 4. **Twitch chess stream** — Hikaru / chessbrah / BotezLive with Chessray's overlay live. Demonstrates the "live streams" use case.

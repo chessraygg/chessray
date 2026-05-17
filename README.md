@@ -12,7 +12,6 @@ A standalone Electron desktop app shares the same recognition + evaluation core 
 - **Orientation auto-detection** — figures out which side is at the bottom from piece positions, falling back to PaddleOCR on the coordinate labels.
 - **Stockfish 18 Lite (WASM)** in an offscreen document — iterative deepening, configurable multi-PV, LRU eval cache.
 - **On-page overlay** — best-move arrows, eval bar, scores, principal variation, and an inline PV board preview drawn directly on the captured board.
-- **Optional Lichess sync** — one click opens the current position in Lichess Analysis.
 - **Fully local** — no network calls during analysis; all models are bundled.
 
 ## Install
