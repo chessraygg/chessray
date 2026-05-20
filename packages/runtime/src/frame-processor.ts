@@ -226,7 +226,7 @@ export class FrameProcessor {
           detectSkipped = true;
         } else {
           const t0 = Date.now();
-          const detection = await detectBoard(onnxSession, ortModule, pixels.data, pixels.width, pixels.height);
+          const detection = await detectBoard(onnxSession, ortModule, pixels.data, pixels.width, pixels.height, this.cachedBbox);
           activeBbox = detection.bbox;
           detectionConf = detection.confidence;
           if (detection.bbox) this.cachedBbox = detection.bbox;

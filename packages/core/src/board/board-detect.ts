@@ -23,6 +23,9 @@ interface RawDetection {
  * @param data RGBA pixel data
  * @param width image width
  * @param height image height
+ * @param previousBbox Last accepted bbox (pixel coords). When supplied, hysteresis
+ *   prefers a candidate matching it whenever competing candidates are similar in
+ *   area and confidence — prevents flicker between two same-size boards on screen.
  */
 export async function detectBoard(
   session: any,
@@ -30,6 +33,7 @@ export async function detectBoard(
   data: Uint8ClampedArray,
   width: number,
   height: number,
+  previousBbox?: BoardBBox | null,
 ): Promise<BoardDetectionResult> {
   const t0 = Date.now();
   if (!session) throw new Error('ONNX session not loaded');
@@ -102,7 +106,37 @@ export async function detectBoard(
     if (Math.abs(areaA - areaB) > 0.01) return areaB - areaA;
     return b.confidence - a.confidence;
   });
-  const best = boardDetections[0];
+  let best = boardDetections[0];
+
+  // Hysteresis: when two boards of similar size compete (e.g., a YouTube video
+  // showing a board next to a real board of matching dimensions), per-frame
+  // YOLO confidence jitter flips the winner frame to frame. If the caller
+  // supplied the previously accepted bbox, find the candidate that overlaps it
+  // (high IoU) and stick with it unless another candidate beats it by a clear
+  // confidence margin or has a clearly larger area.
+  if (previousBbox && boardDetections.length > 1) {
+    const prevCxN = (previousBbox.x + previousBbox.width / 2) / width;
+    const prevCyN = (previousBbox.y + previousBbox.height / 2) / height;
+    const prevWN = previousBbox.width / width;
+    const prevHN = previousBbox.height / height;
+
+    let sticky: RawDetection | null = null;
+    let stickyIou = 0;
+    for (const c of boardDetections) {
+      const iou = boxIou(c.cx, c.cy, c.w, c.h, prevCxN, prevCyN, prevWN, prevHN);
+      if (iou > stickyIou) { stickyIou = iou; sticky = c; }
+    }
+
+    if (sticky && sticky !== best && stickyIou > 0.5) {
+      const bestArea = best.w * best.h;
+      const stickyArea = sticky.w * sticky.h;
+      const areaSimilar = Math.abs(bestArea - stickyArea) <= 0.01;
+      const confDelta = best.confidence - sticky.confidence;
+      if (areaSimilar && confDelta < 0.10) {
+        best = sticky;
+      }
+    }
+  }
 
   // Convert normalized coords to pixel coords (rough bbox)
   const bx = Math.round((best.cx - best.w / 2) * width);
@@ -122,4 +156,17 @@ export async function detectBoard(
     confidence: best.confidence,
     elapsed_ms: Date.now() - t0,
   };
+}
+
+function boxIou(
+  ax: number, ay: number, aw: number, ah: number,
+  bx: number, by: number, bw: number, bh: number,
+): number {
+  const ax1 = ax - aw / 2, ay1 = ay - ah / 2, ax2 = ax + aw / 2, ay2 = ay + ah / 2;
+  const bx1 = bx - bw / 2, by1 = by - bh / 2, bx2 = bx + bw / 2, by2 = by + bh / 2;
+  const iw = Math.max(0, Math.min(ax2, bx2) - Math.max(ax1, bx1));
+  const ih = Math.max(0, Math.min(ay2, by2) - Math.max(ay1, by1));
+  const inter = iw * ih;
+  const union = aw * ah + bw * bh - inter;
+  return union > 0 ? inter / union : 0;
 }
