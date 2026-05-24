@@ -41,6 +41,15 @@ Chess companion that draws and updates top moves + an eval bar on any chess vide
 ```
 chessray is a chess companion for streams, videos, replays, screenshots, and PDFs. It watches the chess board in your tab and draws Stockfish's best moves directly on top of it — arrows on the source/destination squares and an evaluation bar down one side.
 
+How to use it (step by step):
+1. Open a tab that shows a chess board — a chess YouTube video (e.g. agadmator, GothamChess), a Twitch chess stream, a replay/study page, a chess PDF, or a screenshot.
+2. Click the chessray toolbar icon (or press Alt+Shift+C). A red ● badge appears on the icon to show capture is running.
+3. Within about a second, top-move arrows and an evaluation bar paint directly on the board. The overlay keeps updating on its own as the position changes — there is no Scan button and no manual step.
+4. Click the toolbar icon again (or press Alt+Shift+C) to stop. The badge clears and the overlay disappears.
+5. For the detailed analysis view (evaluation, principal variation, settings), open the side panel: right-click the chessray toolbar icon and choose "Open side panel".
+
+Note: capture is intentionally refused on chess.com and lichess.org (anti-cheat compliance). On those hosts the toolbar icon flashes a red "OFF" badge for about 2 seconds and nothing is captured. On a page with no visible chess board, capture still starts (red ● badge) but there is nothing for the overlay to draw on.
+
 It's built for content you watch, not games you play:
 • YouTube chess channels — agadmator, GothamChess, Hanging Pawns, Eric Rosen
 • Twitch chess streams — Hikaru, BotezLive, chessbrah
@@ -77,6 +86,14 @@ Dashboard hint: _"Focus on explaining what the item does and why users
 should install it"_ — the lede covers what, the "How it's different"
 paragraph covers why, and the chess.com/lichess paragraph short-circuits
 the most likely reviewer objection.
+
+The "How to use it (step by step)" block is kept in the public description
+at Chrome Web Store Developer Support's explicit request after the
+2026-05-23 appeal (Routing ID FZSL, "Red Potassium" non-functional
+rejection) was approved and the item reinstated: they asked that these
+functional steps be mentioned in the item description going forward on
+every submission. Keep it in the description — do not move it to the
+reviewer-only Test instructions tab.
 
 ### Category
 ```
