@@ -108,7 +108,7 @@ function flashBlockedBadge(): void {
   chrome.action.setBadgeText({ text: 'OFF' });
   chrome.action.setBadgeTextColor?.({ color: '#ffffff' });
   chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
-  chrome.action.setTitle({ title: 'Chessray does not run on chess.com or lichess.org' });
+  chrome.action.setTitle({ title: 'chessray does not run on chess.com or lichess.org' });
   setTimeout(() => setRecBadge(currentlyCapturing), 2000);
 }
 
@@ -127,10 +127,10 @@ function setRecBadge(on: boolean): void {
     chrome.action.setBadgeText({ text: '\u25CF' }); // ●
     chrome.action.setBadgeTextColor?.({ color: '#ef4444' });
     chrome.action.setBadgeBackgroundColor({ color: [0, 0, 0, 0] });
-    chrome.action.setTitle({ title: 'Chessray — capturing (click to stop)' });
+    chrome.action.setTitle({ title: 'chessray — capturing (click to stop)' });
   } else {
     chrome.action.setBadgeText({ text: '' });
-    chrome.action.setTitle({ title: 'Chessray' });
+    chrome.action.setTitle({ title: 'chessray' });
   }
 }
 
@@ -175,7 +175,7 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, sender, sendRespons
       if (isCaptureBlockedUrl(tab.url)) {
         note(`start-capture REFUSED — blocked host: ${tab.url}`);
         flashBlockedBadge();
-        sendResponse({ ok: false, error: 'Chessray does not run on chess.com or lichess.org' });
+        sendResponse({ ok: false, error: 'chessray does not run on chess.com or lichess.org' });
         return;
       }
       return startCapture(msg.tabId, msg.streamId).then(
@@ -410,7 +410,7 @@ chrome.runtime.onInstalled.addListener(() => {
   try {
     chrome.contextMenus.create({
       id: 'chessray-capture',
-      title: 'Chessray: Capture this tab',
+      title: 'chessray: Capture this tab',
       contexts: ['page', 'frame', 'video', 'image'],
     });
     note('contextMenus.create ok');
