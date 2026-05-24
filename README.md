@@ -1,4 +1,4 @@
-# Chessray
+# chessray
 
 Real-time chess position recognition and evaluation, delivered as a Chrome extension that overlays Stockfish analysis on top of any chess board visible in your browser tab — chess sites, streams, videos, screenshots, PDFs. Everything runs locally; no pixels leave your machine.
 

@@ -9,7 +9,7 @@ import pkg from '../package.json' with { type: 'json' };
 
 export default defineManifest({
   manifest_version: 3,
-  name: 'Chessray',
+  name: 'chessray',
   version: pkg.version,
   description: pkg.description,
   minimum_chrome_version: '116',
@@ -20,7 +20,7 @@ export default defineManifest({
     128: 'src/icons/icon-128.png',
   },
   action: {
-    default_title: 'Chessray',
+    default_title: 'chessray',
     default_icon: {
       16: 'src/icons/icon-16.png',
       32: 'src/icons/icon-32.png',
@@ -59,7 +59,7 @@ export default defineManifest({
         default: 'Alt+Shift+C',
         mac: 'Alt+Shift+C',
       },
-      description: 'Start/stop Chessray capture on the current tab',
+      description: 'Start/stop chessray capture on the current tab',
     },
   },
   host_permissions: ['<all_urls>'],

@@ -91,7 +91,7 @@ function syncStartCaptureLabel(): void {
   if (!span) return;
   span.textContent = tabWasInvoked
     ? 'Start capture'
-    : 'Click the Chessray icon\nin your Chrome toolbar \u2197';
+    : 'Click the chessray icon\nin your Chrome toolbar \u2197';
 }
 void preloadTabId();
 

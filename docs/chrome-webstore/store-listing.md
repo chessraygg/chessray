@@ -16,7 +16,7 @@ the Store listing tab make sense.
 
 | Dashboard label | Source |
 | --- | --- |
-| Title (from package) | manifest `name` → `"Chessray"` |
+| Title (from package) | manifest `name` → `"chessray"` |
 | Summary (from package) | manifest `description` → the 122-char tagline |
 | Version | manifest `version` → latest `v*` git tag (e.g., `0.2.87`) |
 
@@ -29,7 +29,7 @@ upload artifact is `releases/chessray-v<version>.zip`.
 
 ### Title (from package, read-only)
 ```
-Chessray
+chessray
 ```
 
 ### Summary (from package, read-only)
@@ -39,7 +39,16 @@ Chess companion that draws and updates top moves + an eval bar on any chess vide
 
 ### Description (0/16,000 chars — manually entered)
 ```
-Chessray is a chess companion for streams, videos, replays, screenshots, and PDFs. It watches the chess board in your tab and draws Stockfish's best moves directly on top of it — arrows on the source/destination squares and an evaluation bar down one side.
+chessray is a chess companion for streams, videos, replays, screenshots, and PDFs. It watches the chess board in your tab and draws Stockfish's best moves directly on top of it — arrows on the source/destination squares and an evaluation bar down one side.
+
+How to use it (step by step):
+1. Open a tab that shows a chess board — a chess YouTube video (e.g. agadmator, GothamChess), a Twitch chess stream, a replay/study page, a chess PDF, or a screenshot.
+2. Click the chessray toolbar icon (or press Alt+Shift+C). A red ● badge appears on the icon to show capture is running.
+3. Within about a second, top-move arrows and an evaluation bar paint directly on the board. The overlay keeps updating on its own as the position changes — there is no Scan button and no manual step.
+4. Click the toolbar icon again (or press Alt+Shift+C) to stop. The badge clears and the overlay disappears.
+5. For the detailed analysis view (evaluation, principal variation, settings), open the side panel: right-click the chessray toolbar icon and choose "Open side panel".
+
+Note: capture is intentionally refused on chess.com and lichess.org (anti-cheat compliance). On those hosts the toolbar icon flashes a red "OFF" badge for about 2 seconds and nothing is captured. On a page with no visible chess board, capture still starts (red ● badge) but there is nothing for the overlay to draw on.
 
 It's built for content you watch, not games you play:
 • YouTube chess channels — agadmator, GothamChess, Hanging Pawns, Eric Rosen
@@ -49,10 +58,10 @@ It's built for content you watch, not games you play:
 • Screenshots and image viewers
 
 Features:
-• Live tracking — as the chess board on screen changes (next move in the video, scrubbing back, a new puzzle), Chessray re-analyzes within ~1 second.
+• Live tracking — as the chess board on screen changes (next move in the video, scrubbing back, a new puzzle), chessray re-analyzes within ~1 second.
 • Color-coded top-move arrows — the engine's best moves drawn directly on the source/destination squares, color-coded so you can tell the first choice from second / third options at a glance.
 • Live evaluation bar — numeric eval painted alongside the board, updated continuously as moves happen.
-• Auto last-move + turn detection — Chessray finds the highlighted squares the chess UI draws after each move and uses them to infer both the last move played AND whose turn it is. A manual board-flip toggle in the side panel is there as a fallback when auto-orientation gets it wrong.
+• Auto last-move + turn detection — chessray finds the highlighted squares the chess UI draws after each move and uses them to infer both the last move played AND whose turn it is. A manual board-flip toggle in the side panel is there as a fallback when auto-orientation gets it wrong.
 • Variation preview — click any top-move arrow and the on-page board is replaced with a virtual board that plays through the engine's principal variation move-by-move. One click returns to the live board.
 • Adjustable overlay — change arrow size, change overlay opacity, or hide move hints entirely.
 • Works on any site — pure pixel-based recognition (YOLOv11), no DOM scraping, no site-specific integration. Streams, replays, PDFs, screenshots all work the same way.
@@ -64,9 +73,9 @@ How it's different from scan-on-demand extensions: no Scan button, no popup wind
 
 Everything runs locally on your computer. No account, no sign-up, no data leaves your device. The Stockfish 18 Lite engine, the YOLOv11 board-recognition model, and the PaddleOCR orientation model are all bundled with the extension and load from the local extension bundle. No network calls during analysis.
 
-Chessray does not run on chess.com or lichess.org. Both sites have active anti-cheat policies against engine-assisted play; the on-page overlay is excluded from those hosts at the manifest level and the service worker hard-refuses to start tab capture there from every entry point (toolbar, keyboard shortcut, context menu, side-panel CTA). Chessray is built for streams, videos, and study material, not live play on those platforms.
+chessray does not run on chess.com or lichess.org. Both sites have active anti-cheat policies against engine-assisted play; the on-page overlay is excluded from those hosts at the manifest level and the service worker hard-refuses to start tab capture there from every entry point (toolbar, keyboard shortcut, context menu, side-panel CTA). chessray is built for streams, videos, and study material, not live play on those platforms.
 
-Privacy: Chessray does not transmit pixels, recognized positions, evaluations, or any other data off your device. Full privacy policy: https://github.com/chessraygg/chessray/blob/main/docs/chrome-webstore/privacy-policy.md
+Privacy: chessray does not transmit pixels, recognized positions, evaluations, or any other data off your device. Full privacy policy: https://github.com/chessraygg/chessray/blob/main/docs/chrome-webstore/privacy-policy.md
 
 Bugs, feature requests, or anything else — reach out at chessraygg@gmail.com or open an issue at https://github.com/chessraygg/chessray/issues.
 
@@ -77,6 +86,14 @@ Dashboard hint: _"Focus on explaining what the item does and why users
 should install it"_ — the lede covers what, the "How it's different"
 paragraph covers why, and the chess.com/lichess paragraph short-circuits
 the most likely reviewer objection.
+
+The "How to use it (step by step)" block is kept in the public description
+at Chrome Web Store Developer Support's explicit request after the
+2026-05-23 appeal (Routing ID FZSL, "Red Potassium" non-functional
+rejection) was approved and the item reinstated: they asked that these
+functional steps be mentioned in the item description going forward on
+every submission. Keep it in the description — do not move it to the
+reviewer-only Test instructions tab.
 
 ### Category
 ```
@@ -105,13 +122,13 @@ Suggested set (capture Chrome window at exactly 1280×800):
 1. **Hero shot** — on-page overlay (top-move arrows + eval bar) drawn on a board, ideally with the side panel (manually opened via right-click toolbar → Open side panel) also visible, on a YouTube chess video or a Twitch chess stream. This is the one that converts. (Don't use a lichess.org screenshot — it contradicts the blocklist.)
 2. **Close-up overlay** — zoomed-in view of arrows + eval bar painted on a board mid-game.
 3. **Side panel detail** — full analysis view (eval, PV, settings).
-4. **Twitch chess stream** — Hikaru / chessbrah / BotezLive with Chessray's overlay live. Demonstrates the "live streams" use case.
-5. **PDF or screenshot** — Chessray analyzing a chess book opened in Chrome's PDF viewer, or a screenshot of a chess position. Demonstrates the "anything on screen" use case.
+4. **Twitch chess stream** — Hikaru / chessbrah / BotezLive with chessray's overlay live. Demonstrates the "live streams" use case.
+5. **PDF or screenshot** — chessray analyzing a chess book opened in Chrome's PDF viewer, or a screenshot of a chess position. Demonstrates the "anything on screen" use case.
 
-**Do NOT screenshot chess.com or a live lichess.org game** — Chessray is hard-blocked on those hosts and the contradiction will trip the reviewer.
+**Do NOT screenshot chess.com or a live lichess.org game** — chessray is hard-blocked on those hosts and the contradiction will trip the reviewer.
 
 ### Small promo tile — 440×280 — required
-Used in search results and category pages. Should include: the Chessray name, a short tagline ("live chess engine overlay"), and a recognizable visual (a chess board with an arrow drawn on it).
+Used in search results and category pages. Should include: the chessray name, a short tagline ("live chess engine overlay"), and a recognizable visual (a chess board with an arrow drawn on it).
 
 ### Marquee promo tile — 1400×560 — optional
 Required only for "Featured" eligibility. Skip for v1.
@@ -124,7 +141,7 @@ Required only for "Featured" eligibility. Skip for v1.
 ```
 None
 ```
-Leave unset. Chessray does not have an associated verified site in Google Search Console. (If a `chessray.com` is set up later, register it as the owner in Search Console and select it here.)
+Leave unset. chessray does not have an associated verified site in Google Search Console. (If a `chessray.com` is set up later, register it as the owner in Search Console and select it here.)
 
 ### Homepage URL — 0/2,048 chars
 ```
@@ -155,7 +172,7 @@ No sexual content, no strong language, no violence, no alcohol/tobacco/drugs.
 
 ### Single-purpose description
 ```
-Chessray recognizes chess positions visible in the current browser tab using on-device computer vision and overlays the engine analysis on top of the board.
+chessray recognizes chess positions visible in the current browser tab using on-device computer vision and overlays the engine analysis on top of the board.
 ```
 
 ### Permission justifications
@@ -185,17 +202,17 @@ Persists user preferences (overlay opacity, side-panel layout, last-known captur
 
 **`sidePanel`**
 ```
-The Chessray analysis UI (board view, eval, PV, settings) lives in Chrome's side panel. The sidePanel permission is required to declare the side-panel surface in manifest.json so Chrome exposes the "Open side panel" entry on the right-click menu of the extension's toolbar icon. The panel is opened by the user from that menu.
+The chessray analysis UI (board view, eval, PV, settings) lives in Chrome's side panel. The sidePanel permission is required to declare the side-panel surface in manifest.json so Chrome exposes the "Open side panel" entry on the right-click menu of the extension's toolbar icon. The panel is opened by the user from that menu.
 ```
 
 **`contextMenus`**
 ```
-Provides a right-click "Chessray: Capture this tab" entry. Some Chrome versions suppress the toolbar action click when a side panel is configured; the context menu is a reliable fallback for invoking capture with a user gesture.
+Provides a right-click "chessray: Capture this tab" entry. Some Chrome versions suppress the toolbar action click when a side panel is configured; the context menu is a reliable fallback for invoking capture with a user gesture.
 ```
 
 **Host permission: `<all_urls>`**
 ```
-The on-page overlay is a content script that draws arrows, an eval bar, and a PV preview board on top of the captured board. The user may invoke Chessray on any site that happens to show a chess board (Twitch / YouTube streams, image viewers, PDF readers, screenshots, replay / study pages, archived games), so the script's match pattern cannot be narrowed to a fixed allowlist without breaking the long tail of sites where the feature is useful. No site is read or modified — the overlay is drawn into a top-level container; no page DOM is queried. chess.com and lichess.org are excluded explicitly: content_scripts.exclude_matches in the manifest prevents the overlay from ever injecting on those hosts, and a service-worker guard refuses to start tabCapture on those hosts from every invocation path (toolbar click, keyboard shortcut, context menu, side-panel CTA). The extension cannot be used to assist live games on either platform.
+The on-page overlay is a content script that draws arrows, an eval bar, and a PV preview board on top of the captured board. The user may invoke chessray on any site that happens to show a chess board (Twitch / YouTube streams, image viewers, PDF readers, screenshots, replay / study pages, archived games), so the script's match pattern cannot be narrowed to a fixed allowlist without breaking the long tail of sites where the feature is useful. No site is read or modified — the overlay is drawn into a top-level container; no page DOM is queried. chess.com and lichess.org are excluded explicitly: content_scripts.exclude_matches in the manifest prevents the overlay from ever injecting on those hosts, and a service-worker guard refuses to start tabCapture on those hosts from every invocation path (toolbar click, keyboard shortcut, context menu, side-panel CTA). The extension cannot be used to assist live games on either platform.
 ```
 
 ### Remote code
@@ -226,7 +243,7 @@ Tick all three:
 - [x] I do not use or transfer user data for purposes that are unrelated to my item's single purpose
 - [x] I do not use or transfer user data to determine creditworthiness or for lending purposes
 
-All three are true for Chessray: no third parties, single purpose is engine-overlay analysis of the captured board, no financial use.
+All three are true for chessray: no third parties, single purpose is engine-overlay analysis of the captured board, no financial use.
 
 ### Privacy policy URL
 ```
