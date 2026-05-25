@@ -46,6 +46,15 @@ For other platforms (and to build the desktop app from source), see [Building fo
 - **Chrome extension** (primary): Chrome 116+ on macOS / Windows / Linux. Works on any site — chess sites (chess.com, lichess), video streams (Twitch, YouTube), image / PDF viewers, screenshots.
 - **Electron desktop app** (secondary): macOS (ARM64, x64), Windows (x64), Linux (x64). Useful when the board is outside the browser (a native window, a non-Chrome screencast).
 
+## Known limitations
+
+Recognition is purely vision-based, so it infers game state from a single frame. A few situations are inherently ambiguous from pixels alone:
+
+- **Positions with no highlighted last move can't be recognized.** Detection relies on two highlighted squares (the last move's origin and destination) to determine whose turn it is and what was just played. A board with no move highlight — e.g. the starting position, or a site that doesn't highlight moves — has no last-move signal to read.
+- **Pre-moves are not handled.** Detection assumes the board shows the current position. A piece that has been pre-moved (queued for the opponent's turn) is read as if it were already played.
+- **Orientation guessing is unreliable in races.** When the board has no `a–h` / `1–8` coordinate labels, orientation falls back to a piece-position heuristic that assumes each side has more material on its own half. This misfires in king-and-pawn endgames where pawns have advanced deep into enemy territory racing to promote.
+- **A dragged-and-held piece can be misread.** If a piece is picked up and held over a square without completing the move, that frame can look like the piece has already been placed there, producing a wrong position.
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 22+
@@ -106,7 +115,7 @@ npm run build:webstore
 
 Runs a production Vite build, validates the manifest for store compliance (no localhost / HMR artifacts, no wildcard `web_accessible_resources`, CSP without `unsafe-eval`, all required permissions + vendor assets present), and produces `releases/chessray-v<version>.zip` ready to upload at <https://chrome.google.com/webstore/devconsole>.
 
-Listing copy, single-purpose statement, and per-permission justifications live in [`docs/chrome-webstore/store-listing.md`](docs/chrome-webstore/store-listing.md). Privacy policy: [`docs/chrome-webstore/privacy-policy.md`](docs/chrome-webstore/privacy-policy.md).
+Privacy policy: [`docs/chrome-webstore/privacy-policy.md`](docs/chrome-webstore/privacy-policy.md) (kept here because the Web Store submission links it at a public URL). Listing copy, single-purpose statement, and per-permission justifications live in the private marketing repo.
 
 ### Electron distributable
 
@@ -126,7 +135,7 @@ chessray/
     extension/    Chrome MV3 extension (service worker, content script, side panel, offscreen doc)
     electron/     Electron desktop app (main + transparent overlay + hidden analysis window)
   vendor/         Pre-built engines & ML models (downloaded via npm run setup)
-  docs/           Store-listing & privacy-policy docs
+  docs/           Privacy-policy doc (public URL for the Web Store submission)
   test/           Board detection tests & fixtures
   scripts/        Build & utility scripts
 ```
